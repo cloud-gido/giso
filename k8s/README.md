@@ -34,7 +34,7 @@ bash scripts/build-images.sh
 | 飞书告警 | `ghcr.io/<owner>/<repo>/giso-lark-webhook` |
 | 资讯 Demo | `ghcr.io/<owner>/<repo>/giso-news-demo` |
 
-CI 在 push 到 `main`/`dev` 时自动构建推送，见 `.github/workflows/docker-publish.yml`。
+CI 在 push 到 `main` 时自动构建推送，见 `.github/workflows/docker-publish.yml`。
 
 ## 生产清单
 

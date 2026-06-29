@@ -12,8 +12,8 @@
 ### 1. GitHub：推送源码，产出镜像
 
 ```bash
-git push origin dev
-# Actions → ghcr.io/cloud-gido/giso/giso-gateway:dev
+git push origin main
+# Actions → ghcr.io/cloud-gido/giso/giso-gateway:latest
 ```
 
 在 GitHub Packages 将 `giso-gateway` 设为 **public**（或与集群配置 pull secret）。
@@ -55,17 +55,17 @@ mysql -h <doris-fe> -P9030 -uroot < server/doris/02_routine_load.sql
 ## 日常发布（改代码后）
 
 ```bash
-# 1. giso 仓库：push 触发 CI
-git push origin dev
+# 1. giso 仓库：push main 触发 CI
+git push origin main
 
-# 2. 查看 GHCR 新 tag，例如 dev-f3a2b1c
+# 2. 查看 GHCR 新 tag，例如 main-f3a2b1c（或直接用 latest）
 
-# 3. deployment 仓库：改 tag
+# 3. deployment 仓库：改 tag（需要固定版本时）
 # apps/bigdata/giso/kustomization.yaml
-#   images.newTag: dev-f3a2b1c
+#   images.newTag: main-f3a2b1c
 
 git add apps/bigdata/giso/kustomization.yaml
-git commit -m "chore(giso): bump gateway to dev-f3a2b1c"
+git commit -m "chore(giso): bump gateway to main-f3a2b1c"
 git push origin main
 ```
 

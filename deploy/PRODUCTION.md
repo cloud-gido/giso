@@ -44,7 +44,7 @@ bash scripts/build-images.sh
 
 ### GitHub Actions（推荐）
 
-推送到 `main` / `dev` 后，`.github/workflows/docker-publish.yml` 自动构建并推送：
+推送到 `main` 后，`.github/workflows/docker-publish.yml` 自动构建并推送：
 
 | 镜像 | 用途 |
 |---|---|
@@ -52,10 +52,9 @@ bash scripts/build-images.sh
 | `giso-lark-webhook` | Alertmanager → 飞书 |
 | `giso-news-demo` | 资讯联调 Demo（可选） |
 
-标签策略（与 gido 一致）：
+标签策略：
 
-- `main` → `latest` + `<branch>-<sha>`
-- `dev` → `dev` + `dev-<sha>`
+- `main` → `latest` + `main-<sha>`
 
 首次 push 后，在 GitHub Packages 将镜像设为 **public**（开源分发）。
 
@@ -179,7 +178,7 @@ K8s 可部署 CronJob 定期执行对账脚本。
 | deployment 路径 | `apps/bigdata/giso/` |
 | ArgoCD | `wave-4-giso` |
 | 域名 | `gamelinelab-giso.envir.dev` |
-| 镜像 | `ghcr.io/cloud-gido/giso/giso-gateway:dev` |
+| 镜像 | `ghcr.io/cloud-gido/giso/giso-gateway:latest` |
 
 ---
 

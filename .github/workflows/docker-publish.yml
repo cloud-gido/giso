@@ -5,7 +5,7 @@ name: docker-publish
 
 on:
   push:
-    branches: [main, master, dev]
+    branches: [main, master]
   workflow_dispatch:
 
 concurrency:
@@ -64,8 +64,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
-            type=sha,prefix=${{ github.ref_name }}-
+            type=sha,prefix=main-
 
       - name: Build and push giso-gateway
         uses: docker/build-push-action@v5
@@ -87,8 +86,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository }}/giso-lark-webhook
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
-            type=sha,prefix=${{ github.ref_name }}-
+            type=sha,prefix=main-
 
       - name: Build and push giso-lark-webhook
         uses: docker/build-push-action@v5
@@ -106,8 +104,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository }}/giso-news-demo
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
-            type=sha,prefix=${{ github.ref_name }}-
+            type=sha,prefix=main-
 
       - name: Build and push giso-news-demo
         uses: docker/build-push-action@v5
@@ -121,14 +118,12 @@ jobs:
 
       - name: Verify gateway image health endpoint
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway:${{ github.ref_name }}-${{ github.sha }}"
-          docker pull "$IMAGE" || docker pull "${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway:dev" || \
-            docker pull "${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway:latest"
-          IMG="$(docker images --format '{{.Repository}}:{{.Tag}}' | grep giso-gateway | head -1)"
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway:latest"
+          docker pull "$IMAGE"
           cid=$(docker run -d -p 18123:8123 \
             -v "$PWD/schema:/app/schema:ro" \
             -v "$PWD/deploy/config/gateway-docker.yaml:/app/config/gateway.yaml:ro" \
-            "$IMG")
+            "$IMAGE")
           trap 'docker rm -f "$cid"' EXIT
           for i in $(seq 1 30); do
             curl -sf http://127.0.0.1:18123/health && exit 0

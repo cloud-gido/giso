@@ -44,7 +44,7 @@ cd deploy && docker compose up -d --build
 # 本地构建
 bash scripts/build-images.sh
 
-# 推送到 GHCR（push main/dev 后 CI 也会自动构建）
+# 推送到 GHCR（push main 后 CI 自动构建）
 export GISO_IMAGE_REGISTRY=ghcr.io/<your-org>/<repo>
 export GISO_IMAGE_TAG=1.0.0
 export GISO_PUSH=1
