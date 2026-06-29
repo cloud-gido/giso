@@ -36,11 +36,12 @@ class RateLimiterTest {
 
     @Test
     void refillOverTime() throws InterruptedException {
-        RateLimiter rl = new RateLimiter(1000, 2);
+        // rps=1：连续调用间不会微秒级回填，避免 CI 上 flaky
+        RateLimiter rl = new RateLimiter(1, 2);
         assertTrue(rl.allow("1.1.1.1"));
         assertTrue(rl.allow("1.1.1.1"));
         assertFalse(rl.allow("1.1.1.1"));
-        Thread.sleep(50); // 1000 rps × 50ms ≈ 50 个令牌（封顶 burst=2）
-        assertTrue(rl.allow("1.1.1.1"), "等待后令牌应回填");
+        Thread.sleep(1100);
+        assertTrue(rl.allow("1.1.1.1"), "等待 1s 后应回填至少 1 个令牌");
     }
 }
