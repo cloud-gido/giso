@@ -10,6 +10,8 @@ public final class Params {
     public static final String KW = "kw";
     /** 页签名 */
     public static final String TAB_NAME = "tab_name";
+    /** 上报环境 */
+    public static final String ENV = "env";
     /** 推荐请求追踪ID */
     public static final String REC_TRACE_ID = "rec_trace_id";
     /** 货币 */

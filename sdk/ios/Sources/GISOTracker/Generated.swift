@@ -93,6 +93,8 @@ public enum Params {
     public static let kw = "kw"
     /// 页签名
     public static let tabName = "tab_name"
+    /// 上报环境
+    public static let env = "env"
     /// 推荐请求追踪ID
     public static let recTraceId = "rec_trace_id"
     /// 货币

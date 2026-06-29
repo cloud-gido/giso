@@ -93,6 +93,8 @@ export const Params = {
   KW: 'kw',
   /** 页签名 */
   TAB_NAME: 'tab_name',
+  /** 上报环境 */
+  ENV: 'env',
   /** 推荐请求追踪ID */
   REC_TRACE_ID: 'rec_trace_id',
   /** 货币 */
