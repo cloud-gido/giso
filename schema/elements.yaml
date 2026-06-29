@@ -1,0 +1,122 @@
+# 元素池：所有可曝光/可点击元素登记表
+# 元素是全局的，不绑定页面；params 为必携参数，自动继承给 children
+version: "1.0"
+elements:
+  # ── 全局 ──
+  - eid: banner
+    desc: 运营banner位
+    domain: common
+    params: [pos]
+    owner: client-team
+  - eid: search_box
+    desc: 搜索框
+    domain: common
+    params: []
+    owner: client-team
+  - eid: bottom_tab
+    desc: 底部导航页签
+    domain: common
+    params: [tab_name]
+    owner: client-team
+  - eid: login_btn
+    desc: 登录按钮
+    domain: common
+    params: []
+    owner: client-team
+  - eid: deposit_btn
+    desc: 充值按钮
+    domain: common
+    params: []
+    owner: client-team
+  - eid: share_btn
+    desc: 分享按钮（继承所在模块参数）
+    domain: common
+    params: []
+    owner: client-team
+
+  # ── 长视频 ──
+  - eid: video_card
+    desc: 视频卡片（封面+标题+CP信息）
+    domain: video
+    params: [vid, pos, rec_trace_id]
+    children: [play_btn, like_btn, cp_avatar, share_btn]
+    owner: client-team
+  - eid: play_btn
+    desc: 播放按钮
+    domain: video
+    params: []
+    owner: client-team
+  - eid: like_btn
+    desc: 点赞按钮
+    domain: video
+    params: []
+    owner: client-team
+  - eid: cp_avatar
+    desc: CP头像
+    domain: video
+    params: [cp_id]
+    owner: client-team
+  - eid: episode_item
+    desc: 选集项
+    domain: video
+    params: [ep_num, vid]
+    owner: client-team
+  - eid: fullscreen_btn
+    desc: 全屏按钮
+    domain: video
+    params: []
+    owner: client-team
+
+  # ── 体育博彩 ──
+  - eid: match_card
+    desc: 赛事卡片（队伍+比分+主要盘口）
+    domain: bet
+    params: [match_id, sport_id, pos, is_live]
+    children: [odds_btn]
+    owner: client-team
+  - eid: odds_btn
+    desc: 赔率按钮（点击即加入注单）
+    domain: bet
+    params: [market_type, selection_id, odds]
+    owner: client-team
+  - eid: bet_confirm_btn
+    desc: 确认投注按钮
+    domain: bet
+    params: [bet_type, stake_amt, currency]
+    owner: client-team
+  - eid: sport_tab
+    desc: 运动项目页签
+    domain: bet
+    params: [sport_id]
+    owner: client-team
+
+  # ── 预测市场 ──
+  - eid: market_card
+    desc: 预测市场卡片（题目+当前概率）
+    domain: pm
+    params: [pm_market_id, pm_category, pos]
+    children: [outcome_btn]
+    owner: client-team
+  - eid: outcome_btn
+    desc: 结果选项按钮（YES/NO/多结果）
+    domain: pm
+    params: [outcome_id, price]
+    owner: client-team
+  - eid: order_confirm_btn
+    desc: 下单确认按钮
+    domain: pm
+    params: [order_side, price, shares]
+    owner: client-team
+
+  # ── 资讯 ──
+  - eid: article_card
+    desc: 资讯卡片
+    domain: news
+    params: [aid, news_cat, pos, rec_trace_id]
+    children: [share_btn]
+    owner: client-team
+  - eid: related_article
+    desc: 相关推荐文章项
+    domain: news
+    params: [aid, pos]
+    owner: client-team

@@ -1,0 +1,123 @@
+# 页面池：所有页面登记表
+# elements: 页面结构体——声明本页允许出现的元素（含继承链叶子）。
+#           声明后网关强校验「元素出现在未绑定页面」记 error；不声明则不校验（迁移期兼容）。
+# screenshot: 可选，页面截图 URL（管理台预览，不参与上报校验）
+# desc: 页面说明（用途、入口、关键交互）
+version: "1.0"
+pages:
+  # ── 全局 ──
+  - pgid: home
+    desc: 首页（四业务线聚合入口）
+    domain: common
+    params: []
+    elements: [banner, search_box, bottom_tab, video_card, play_btn, like_btn, match_card, odds_btn, market_card, outcome_btn, article_card, share_btn]
+    owner: client-team
+  - pgid: search
+    desc: 搜索页（含搜索结果）
+    domain: common
+    params: [kw]
+    elements: [search_box, video_card, match_card, market_card, article_card]
+    owner: client-team
+  - pgid: mine
+    desc: 我的/个人中心
+    domain: common
+    params: []
+    owner: client-team
+  - pgid: login
+    desc: 登录/注册页
+    domain: common
+    params: []
+    owner: client-team
+  - pgid: wallet
+    desc: 钱包页（充值提现入口）
+    domain: common
+    params: []
+    owner: client-team
+  - pgid: deposit
+    desc: 充值页
+    domain: common
+    params: []
+    owner: client-team
+  - pgid: withdraw
+    desc: 提现页
+    domain: common
+    params: []
+    owner: client-team
+
+  # ── 长视频 ──
+  - pgid: video_feed
+    desc: 视频推荐流页
+    domain: video
+    params: [tab_name]
+    elements: [banner, bottom_tab, video_card, play_btn, like_btn, cp_avatar, share_btn]
+    owner: client-team
+  - pgid: video_detail
+    desc: 视频详情/播放页
+    domain: video
+    params: [vid, series_id, ep_num]
+    elements: [play_btn, like_btn, cp_avatar, episode_item, fullscreen_btn, share_btn, video_card]
+    owner: client-team
+  - pgid: video_series
+    desc: 剧集合集页
+    domain: video
+    params: [series_id]
+    elements: [episode_item, video_card, play_btn]
+    owner: client-team
+
+  # ── 体育博彩 ──
+  - pgid: bet_lobby
+    desc: 博彩大厅（赛事列表）
+    domain: bet
+    params: [sport_id, tab_name]
+    elements: [banner, sport_tab, match_card, odds_btn]
+    owner: client-team
+  - pgid: bet_match_detail
+    desc: 赛事详情页（盘口列表）
+    domain: bet
+    params: [match_id, sport_id, league_id, is_live]
+    elements: [match_card, odds_btn, share_btn]
+    owner: client-team
+  - pgid: bet_slip
+    desc: 注单确认页/弹层
+    domain: bet
+    params: [bet_type]
+    elements: [bet_confirm_btn, odds_btn]
+    owner: client-team
+  - pgid: bet_history
+    desc: 我的注单页
+    domain: bet
+    params: []
+    owner: client-team
+
+  # ── 预测市场 ──
+  - pgid: pm_lobby
+    desc: 预测市场大厅
+    domain: pm
+    params: [pm_category, tab_name]
+    elements: [banner, market_card, outcome_btn]
+    owner: client-team
+  - pgid: pm_market_detail
+    desc: 市场详情页（K线/订单簿/持仓）
+    domain: pm
+    params: [pm_market_id, pm_category]
+    elements: [market_card, outcome_btn, order_confirm_btn, share_btn]
+    owner: client-team
+  - pgid: pm_portfolio
+    desc: 我的持仓页
+    domain: pm
+    params: []
+    owner: client-team
+
+  # ── 资讯 ──
+  - pgid: news_feed
+    desc: 资讯流页
+    domain: news
+    params: [news_cat, tab_name]
+    elements: [banner, bottom_tab, article_card, share_btn]
+    owner: client-team
+  - pgid: news_article
+    desc: 资讯文章详情页
+    domain: news
+    params: [aid, news_cat]
+    elements: [article_card, related_article, share_btn]
+    owner: client-team

@@ -1,0 +1,65 @@
+# ============================================================
+# GISO 玑源 · 网关告警规则（Prometheus）
+# 抓取配置：job 抓 GET /metrics，建议 scrape_interval: 30s
+# 阈值来源：05-流程治理与质量保障.md 的纸面规则，在此落地为可执行载体
+# ============================================================
+groups:
+  - name: giso-gateway
+    rules:
+      # 网关挂了（抓不到指标）
+      - alert: GatewayDown
+        expr: up{job="giso-gateway"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "GISO 网关不可用"
+          description: "/metrics 连续 2 分钟抓取失败，客户端将走本地缓存重试，尽快恢复。"
+
+      # 事件错误率（进隔离区比例）突增
+      - alert: EventErrorRateHigh
+        expr: >
+          sum(rate(giso_events_total{status="error"}[5m]))
+            / sum(rate(giso_events_total[5m])) > 0.05
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "埋点错误率超过 5%"
+          description: "大量事件进隔离区：大概率是新版本未登记就上报，去管理台「实时联调」按 status=error 过滤定位。"
+
+      # 单版本错误率显著高于大盘（灰度质量门禁）
+      - alert: VersionErrorRateHigh
+        expr: >
+          sum by (version) (rate(giso_events_by_version_total{status="error"}[15m]))
+            / sum by (version) (rate(giso_events_by_version_total[15m])) > 0.10
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "版本 {{ $labels.version }} 埋点错误率超过 10%"
+          description: "新版本埋点回归疑似有问题，灰度放量前先到管理台「质量统计 → 版本维度」核对。"
+
+      # 鉴权失败突增（有人乱打 key 或客户端配置错了）
+      - alert: AuthFailureSpike
+        expr: sum(rate(giso_track_responses_total{code="401"}[5m])) > 10
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "上报鉴权失败 > 10 次/秒"
+          description: "检查是否有客户端 app_key 配错，或恶意流量（结合限流 429 指标看）。"
+
+      # Kafka spill 持续增长 = broker 故障
+      - alert: KafkaSpilling
+        expr: sum(increase(giso_kafka_spilled_total[10m])) > 0
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "Kafka 发送失败，事件正在 spill 本地兜底"
+          description: "broker 不可用或网络故障。数据不丢（恢复后每 60s 自动回放），但要尽快修 Kafka。"
+
+      # 限流频繁触发（容量预警）
+      - alert: RateLimitTriggered
+        expr: sum(rate(giso_track_responses_total{code="429"}[5m])) > 50
+        for: 10m
+        labels: { severity: info }
+        annotations:
+          summary: "限流频繁触发（429 > 50 次/秒）"
+          description: "可能是流量自然增长（调大 rate_limit_rps）或单 IP 异常打量（看网关日志定位 IP）。"

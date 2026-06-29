@@ -1,0 +1,45 @@
+# GISO 玑源 · 接入网关配置
+port: 8080
+schema_dir: ../../schema
+
+# 出口管道（插拔式）：file=本地JSONL（开发/兜底）  kafka=生产管道（下游 Doris Routine Load）
+# 迁移期可双写: [file, kafka]
+sinks: [file]
+
+file:
+  dir: ./data
+
+kafka:
+  bootstrap_servers: localhost:9092
+  topic_raw: events_raw                 # 正常+缺失事件 → Doris dwd 落地
+  topic_quarantine: events_quarantine   # 错误事件 → 隔离区，可回放
+  spill_dir: ./data/spill               # broker 不可用时本地兜底，恢复后回放
+  properties:                           # 原样透传 producer 配置，可覆盖默认值
+    # acks: all
+    # linger.ms: 20
+    # compression.type: lz4
+
+admin:
+  recent_buffer: 2000                   # 实时联调环形缓冲条数
+
+# ── 安全（生产必配）──
+auth:
+  app_keys: []                          # 上报鉴权白名单，如 [giso-prod-key-xxx]；空=不校验（仅限本地开发）
+  admin_user: ""                        # 管理控制台 Basic Auth；空=不开启（仅限本地开发）
+  admin_password: ""
+  viewer_user: ""                       # 只读账号：可看联调/统计/注册表，不能改注册表/清缓冲
+  viewer_password: ""
+
+# ── 防护 ──
+limits:
+  max_body_bytes: 1048576               # 单请求解压后上限 1MB，超出 413
+  rate_limit_rps: 0                     # 单 IP 每秒请求上限，0=不限流；生产建议 100
+  rate_limit_burst: 0                   # 令牌桶突发容量，默认 2×rps
+
+# SDK 远程配置（GET /v1/config 下发；客户端启动时拉取并覆盖本地默认口径）
+sdk_config:
+  exposure_ratio: 0.5
+  exposure_duration_ms: 500
+  exposure_max_per_page: 3
+  batch_size: 20
+  flush_interval_ms: 15000

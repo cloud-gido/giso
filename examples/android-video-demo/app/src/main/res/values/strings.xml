@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">玑源长视频</string>
+    <string name="tab_recommend">推荐</string>
+    <string name="tab_series">追剧</string>
+    <string name="tab_home">首页</string>
+    <string name="tab_follow">追剧</string>
+    <string name="tab_mine">我的</string>
+    <string name="play">播放</string>
+    <string name="like">点赞</string>
+    <string name="share">分享</string>
+    <string name="fullscreen">全屏</string>
+    <string name="episodes">选集</string>
+    <string name="view_series">查看全集</string>
+    <string name="demo_hint">GISO 埋点演示 · 管理台 http://localhost:8123/admin/</string>
+    <string name="debug_panel_title">埋点联调</string>
+    <string name="debug_did">设备 did</string>
+    <string name="debug_page">当前页面</string>
+    <string name="debug_mode">debug 实时上报</string>
+</resources>

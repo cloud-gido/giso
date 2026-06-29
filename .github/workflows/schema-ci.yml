@@ -1,0 +1,39 @@
+name: schema-ci
+
+on:
+  pull_request:
+    paths:
+      - 'schema/**'
+      - 'tools/codegen/**'
+      - 'server/gateway/**'
+      - 'sdk/web/src/generated.ts'
+      - 'sdk/android/src/main/java/com/giso/tracker/Pages.java'
+      - 'sdk/android/src/main/java/com/giso/tracker/Elements.java'
+      - 'sdk/android/src/main/java/com/giso/tracker/Params.java'
+      - 'sdk/android/src/main/java/com/giso/tracker/BizEvents.java'
+      - 'sdk/ios/Sources/GISOTracker/Generated.swift'
+
+jobs:
+  validate-and-check-codegen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyyaml
+      # 校验注册表（命名/类型/引用完整性），并确认生成常量与注册表同步
+      - run: python3 tools/codegen/generate.py --check
+
+  gateway-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      # 网关单测（注册表校验 / 限流 / 指标）+ 打包
+      - run: mvn -B package
+        working-directory: server/gateway

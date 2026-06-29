@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GIDO · 产品导航</title>
+  <link rel="icon" href="/hub/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/hub/css/hub.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="logo">
+        <img src="/hub/assets/logo-mark.svg" alt="">
+      </div>
+      <h1>GIDO 数据产品族</h1>
+      <p class="tagline">GISO = Gi Is the Source Of data · 本地开发栈一键导航</p>
+      <span class="family">GIDO · 埋点 · 监控 · 分析</span>
+    </header>
+
+    <h2 class="section-title">数据产品线</h2>
+    <div class="pipelines">
+      <div class="pipeline">
+        <span class="pipeline-tag ch">本地轻量栈</span>
+        <h3>ClickHouse 分析线</h3>
+        <p class="pipeline-flow">SDK → Gateway → Kafka → <strong>event-bridge</strong> → ClickHouse</p>
+        <ul>
+          <li>默认随 <code>docker compose up</code> 启动</li>
+          <li>Metabase 看板：<strong>GISO 埋点总览</strong></li>
+          <li>适合本地开发、联调、BI 验证</li>
+        </ul>
+      </div>
+      <div class="pipeline">
+        <span class="pipeline-tag doris">生产对齐栈</span>
+        <h3>Doris 数仓线</h3>
+        <p class="pipeline-flow">SDK → Gateway → Kafka → <strong>Routine Load</strong> → Doris ODS</p>
+        <ul>
+          <li><code>docker compose --profile doris up -d</code> 可选启动</li>
+          <li>与 <code>server/doris/</code> 生产 DDL 一致</li>
+          <li>Metabase 看板：<strong>GISO 埋点总览（Doris）</strong></li>
+        </ul>
+      </div>
+    </div>
+    <p class="pipeline-note">两条线共享 Kafka <code>events_raw</code>，可同时跑、对比落地结果。</p>
+
+    <h2 class="section-title">埋点治理</h2>
+    <div class="grid" id="grid-tracking"></div>
+
+    <h2 class="section-title">监控运维</h2>
+    <div class="grid" id="grid-ops"></div>
+
+    <h2 class="section-title">数据 &amp; 分析</h2>
+    <div class="grid" id="grid-data"></div>
+
+    <div class="status" id="status">
+      网关地址：<strong id="gw-url">—</strong> · 点击卡片在新标签页打开各产品
+    </div>
+
+    <p class="foot">GISO 玑源 · Schema 驱动埋点平台 · Apache 2.0</p>
+  </div>
+
+  <script>
+  (function () {
+    const host = location.hostname || 'localhost';
+    const port = location.port || '8123';
+    const gw = location.origin;
+
+    document.getElementById('gw-url').textContent = gw;
+
+    const products = {
+      tracking: [
+        {
+          title: '资讯 Web Demo',
+          desc: '资讯流 / 文章详情 · did 联调浮层 · news_read 阅读结算',
+          href: 'http://' + host + ':5180/',
+          url: ':5180',
+          badge: 'demo',
+          badgeClass: 'data',
+          external: true
+        },
+        {
+          title: 'GISO 管理控制台',
+          desc: '实时联调 · 注册表 · 质量统计 · 用例断言',
+          href: gw + '/admin/',
+          url: '/admin/',
+          badge: 'GISO',
+          external: false
+        },
+        {
+          title: '大同对比评审',
+          desc: 'GISO vs 腾讯大同能力对齐度矩阵',
+          href: gw + '/admin/datong-gap.html',
+          url: '/admin/datong-gap.html',
+          badge: 'GISO',
+          external: false
+        },
+        {
+          title: 'Prometheus 指标',
+          desc: '网关原始 metrics（文本格式，供抓取）',
+          href: gw + '/metrics',
+          url: '/metrics',
+          badge: 'API',
+          external: false
+        }
+      ],
+      ops: [
+        {
+          title: 'Grafana',
+          desc: '预置看板：事件速率、错误率、Kafka spill、版本灰度',
+          href: 'http://' + host + ':3001/',
+          url: ':3001',
+          badge: 'ops',
+          badgeClass: 'ops',
+          external: true
+        },
+        {
+          title: 'Prometheus',
+          desc: '指标查询 · 告警规则 · Target 状态',
+          href: 'http://' + host + ':9090/',
+          url: ':9090',
+          badge: 'ops',
+          badgeClass: 'ops',
+          external: true
+        },
+        {
+          title: 'Alertmanager',
+          desc: '告警分组 · 静默 · 与 Prometheus 规则联动',
+          href: 'http://' + host + ':9093/',
+          url: ':9093',
+          badge: 'ops',
+          badgeClass: 'ops',
+          external: true
+        }
+      ],
+      data: [
+        {
+          title: 'event-bridge',
+          desc: 'Kafka → ClickHouse 落地桥 · 幂等去重 · :9100/metrics',
+          href: 'http://' + host + ':9100/metrics',
+          url: ':9100/metrics',
+          badge: 'data',
+          badgeClass: 'data',
+          external: true
+        },
+        {
+          title: 'ClickHouse',
+          desc: '本地轻量 OLAP · event-bridge 写入 · Play :8124',
+          href: 'http://' + host + ':8124/play',
+          url: ':8124',
+          badge: 'CH',
+          badgeClass: 'data',
+          external: true
+        },
+        {
+          title: 'Doris FE',
+          desc: '生产对齐数仓 · Routine Load 消费 Kafka · MySQL :9030',
+          href: 'http://' + host + ':8030/',
+          url: ':8030 / :9030',
+          badge: 'Doris',
+          badgeClass: 'data',
+          external: true
+        },
+        {
+          title: 'Metabase',
+          desc: 'BI 看板：推荐「GISO 数据总览」（CH + Doris 对照）',
+          href: 'http://' + host + ':3000/',
+          url: ':3000',
+          badge: 'bi',
+          badgeClass: 'bi',
+          external: true
+        },
+        {
+          title: 'Kafka',
+          desc: '消息管道 events_raw / events_quarantine（无 Web UI，端口 9092）',
+          href: '#',
+          url: host + ':9092',
+          badge: 'data',
+          badgeClass: 'data',
+          external: false,
+          noop: true
+        }
+      ]
+    };
+
+    function render(gridId, items) {
+      const el = document.getElementById(gridId);
+      el.innerHTML = items.map(function (p) {
+        const cls = 'card' + (p.external ? ' external' : '') + (p.noop ? ' noop' : '');
+        const tag = '<span class="badge ' + (p.badgeClass || '') + '">' + p.badge + '</span>';
+        const href = p.noop ? 'javascript:void(0)' : p.href;
+        const target = p.noop ? '' : ' target="_blank" rel="noopener"';
+        return '<a class="' + cls + '" href="' + href + '"' + target + '>'
+          + tag
+          + '<h3>' + p.title + '</h3>'
+          + '<p>' + p.desc + '</p>'
+          + '<div class="url">' + (p.noop ? p.url : p.url) + '</div>'
+          + '</a>';
+      }).join('');
+    }
+
+    render('grid-tracking', products.tracking);
+    render('grid-ops', products.ops);
+    render('grid-data', products.data);
+  })();
+  </script>
+</body>
+</html>

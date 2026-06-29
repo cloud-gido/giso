@@ -1,0 +1,10 @@
+<!-- 本地开发：允许宿主机 / Docker 网桥通过 HTTP 访问 default 用户（无密码） -->
+<clickhouse>
+  <users>
+    <default>
+      <networks replace="replace">
+        <ip>::/0</ip>
+      </networks>
+    </default>
+  </users>
+</clickhouse>

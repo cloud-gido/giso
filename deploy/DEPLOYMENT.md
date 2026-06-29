@@ -1,0 +1,86 @@
+# GISO → deployment 测试环境发布流程
+
+与 **GIDO / DataEase** 相同的两仓模式：
+
+| 仓库 | 职责 |
+|---|---|
+| **giso**（GitHub） | 源码、CI 构建镜像 → GHCR |
+| **deployment**（GitLab） | K8s 清单、Doppler、Ingress、ArgoCD |
+
+## 首次上线（一次性）
+
+### 1. GitHub：推送源码，产出镜像
+
+```bash
+git push origin dev
+# Actions → ghcr.io/cloud-gido/giso/giso-gateway:dev
+```
+
+在 GitHub Packages 将 `giso-gateway` 设为 **public**（或与集群配置 pull secret）。
+
+### 2. Doppler（project `gamelinelab`, config `dev`）
+
+| Key | 示例 |
+|---|---|
+| `INFRA_GISO_KAFKA_BOOTSTRAP_SERVERS` | `b-1.xxx.kafka.sa-east-1.amazonaws.com:9092,...` |
+| `INFRA_GISO_APP_KEYS` | `dev-android-key,dev-web-key` |
+| `INFRA_GISO_ADMIN_USER` | `admin` |
+| `INFRA_GISO_ADMIN_PASSWORD` | `***` |
+| `INFRA_GISO_VIEWER_USER` | `viewer` |
+| `INFRA_GISO_VIEWER_PASSWORD` | `***` |
+
+### 3. Kafka + Doris
+
+```bash
+# Topic
+KAFKA_BOOTSTRAP=... ./deploy/scripts/create-kafka-topics.sh
+
+# Doris（测试集群 FE）
+mysql -h <doris-fe> -P9030 -uroot < server/doris/01_create_tables.sql
+# 改 broker 后
+mysql -h <doris-fe> -P9030 -uroot < server/doris/02_routine_load.sql
+```
+
+### 4. deployment 仓库
+
+已包含（无需再建）：
+
+- `apps/bigdata/giso/`
+- `environments/dev/br/sync-waves/wave-4-giso.yaml`
+- `apps/system/doppler/giso-secret.yaml`
+- `apps/platform/configs/ingresses/giso-ingress.yaml`
+
+`git push` deployment `main` → ArgoCD 同步。
+
+## 日常发布（改代码后）
+
+```bash
+# 1. giso 仓库：push 触发 CI
+git push origin dev
+
+# 2. 查看 GHCR 新 tag，例如 dev-f3a2b1c
+
+# 3. deployment 仓库：改 tag
+# apps/bigdata/giso/kustomization.yaml
+#   images.newTag: dev-f3a2b1c
+
+git add apps/bigdata/giso/kustomization.yaml
+git commit -m "chore(giso): bump gateway to dev-f3a2b1c"
+git push origin main
+```
+
+ArgoCD 自动滚动 `giso-gateway` Deployment。
+
+## 验证
+
+```bash
+curl -s https://gamelinelab-giso.envir.dev/health
+open https://gamelinelab-giso.envir.dev/admin/
+```
+
+## 本地一键（不经过 ArgoCD）
+
+```bash
+cp k8s/giso-deploy.env.example k8s/giso-deploy.env
+bash k8s/apply-giso-stack.sh
+```

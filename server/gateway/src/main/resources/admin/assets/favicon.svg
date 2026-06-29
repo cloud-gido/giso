@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <defs>
+    <linearGradient id="giso-g" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4f63f0"/>
+      <stop offset="1" stop-color="#7a5cf0"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#giso-g)"/>
+  <path d="M8 21a12 12 0 0 1 16-16" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".75"/>
+  <circle cx="16" cy="14.5" r="3" fill="#fff"/>
+  <path d="M10 26V20M16 26V13M22 26V17.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

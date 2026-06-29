@@ -1,0 +1,139 @@
+# Copyright 2026 GISO Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+name: docker-publish
+
+on:
+  push:
+    branches: [main, master, dev]
+  workflow_dispatch:
+
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  REGISTRY_USER: ${{ github.repository_owner }}
+
+jobs:
+  schema-ci:
+    name: Schema validate + gateway test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - run: python3 tools/codegen/generate.py --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn -B package
+        working-directory: server/gateway
+
+  docker-images:
+    name: Build and push images to GHCR
+    needs: schema-ci
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (gateway)
+        id: meta_gateway
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=sha,prefix=${{ github.ref_name }}-
+
+      - name: Build and push giso-gateway
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: deploy/Dockerfile.gateway
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta_gateway.outputs.tags }}
+          labels: ${{ steps.meta_gateway.outputs.labels }}
+          build-args: |
+            MAVEN_IMAGE=maven:3.9-eclipse-temurin-21
+            JRE_IMAGE=eclipse-temurin:21-jre-alpine
+
+      - name: Extract metadata (lark-webhook)
+        id: meta_lark
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/giso-lark-webhook
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=sha,prefix=${{ github.ref_name }}-
+
+      - name: Build and push giso-lark-webhook
+        uses: docker/build-push-action@v5
+        with:
+          context: deploy/lark-webhook
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta_lark.outputs.tags }}
+          labels: ${{ steps.meta_lark.outputs.labels }}
+
+      - name: Extract metadata (news-demo)
+        id: meta_demo
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/giso-news-demo
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=sha,prefix=${{ github.ref_name }}-
+
+      - name: Build and push giso-news-demo
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: examples/web-news-demo/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta_demo.outputs.tags }}
+          labels: ${{ steps.meta_demo.outputs.labels }}
+
+      - name: Verify gateway image health endpoint
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway:${{ github.ref_name }}-${{ github.sha }}"
+          docker pull "$IMAGE" || docker pull "${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway:dev" || \
+            docker pull "${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway:latest"
+          IMG="$(docker images --format '{{.Repository}}:{{.Tag}}' | grep giso-gateway | head -1)"
+          cid=$(docker run -d -p 18123:8123 \
+            -v "$PWD/schema:/app/schema:ro" \
+            -v "$PWD/deploy/config/gateway-docker.yaml:/app/config/gateway.yaml:ro" \
+            "$IMG")
+          trap 'docker rm -f "$cid"' EXIT
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:18123/health && exit 0
+            sleep 2
+          done
+          echo "::error::gateway /health check failed"
+          docker logs "$cid"
+          exit 1

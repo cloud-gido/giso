@@ -1,0 +1,222 @@
+# =============================================================================
+# GISO 生产最小 K8s 栈：接入网关 + 可选飞书告警适配器
+# =============================================================================
+#
+# 数据链路（生产）：
+#   SDK → Gateway → Kafka → Doris Routine Load → BI
+#
+# 不包含：Kafka/Doris/Metabase（使用外部托管或独立运维）
+#
+# 镜像占位符由 k8s/apply-giso-stack.sh 替换：
+#   __GATEWAY_IMAGE__ / __LARK_WEBHOOK_IMAGE__
+#
+# 一键（本地 Kind）：
+#   cp k8s/giso-deploy.env.example k8s/giso-deploy.env
+#   bash k8s/apply-giso-stack.sh
+#
+# 访问：kubectl -n giso port-forward svc/gateway 8123:8123
+# =============================================================================
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: giso
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: giso-gateway-config
+  namespace: giso
+data:
+  gateway.yaml: |
+    port: 8123
+    schema_dir: /app/schema
+    sinks: [kafka]
+    kafka:
+      bootstrap_servers: __KAFKA_BOOTSTRAP__
+      topic_raw: events_raw
+      topic_raw_test: events_raw_test
+      topic_quarantine: events_quarantine
+      spill_dir: /data/spill
+      properties:
+        acks: all
+        linger.ms: 20
+        compression.type: lz4
+        enable.idempotence: true
+    admin:
+      recent_buffer: 5000
+    auth:
+      app_keys: []
+      admin_user: ""
+      admin_password: ""
+      viewer_user: ""
+      viewer_password: ""
+    limits:
+      max_body_bytes: 1048576
+      rate_limit_rps: 100
+      rate_limit_burst: 200
+    clickhouse:
+      url: ""
+    sdk_config:
+      exposure_ratio: 0.5
+      exposure_duration_ms: 500
+      exposure_max_per_page: 3
+      batch_size: 20
+      flush_interval_ms: 15000
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: giso-gateway-secrets
+  namespace: giso
+type: Opaque
+stringData:
+  GISO_APP_KEYS: "replace-me"
+  GISO_ADMIN_USER: "admin"
+  GISO_ADMIN_PASSWORD: "replace-me"
+  GISO_VIEWER_USER: "viewer"
+  GISO_VIEWER_PASSWORD: "replace-me"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: giso
+  labels:
+    app: giso
+    component: gateway
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: giso
+      component: gateway
+  template:
+    metadata:
+      labels:
+        app: giso
+        component: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: __GATEWAY_IMAGE__
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8123
+              name: http
+          envFrom:
+            - secretRef:
+                name: giso-gateway-secrets
+          env:
+            - name: GISO_GATEWAY_CONFIG
+              value: /app/config/gateway.yaml
+            - name: GISO_SCHEMA_DIR
+              value: /app/schema
+          volumeMounts:
+            - name: config
+              mountPath: /app/config/gateway.yaml
+              subPath: gateway.yaml
+            - name: schema
+              mountPath: /app/schema
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8123
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8123
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+      volumes:
+        - name: config
+          configMap:
+            name: giso-gateway-config
+        - name: schema
+          configMap:
+            name: giso-schema
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: giso
+  labels:
+    app: giso
+    component: gateway
+spec:
+  type: ClusterIP
+  selector:
+    app: giso
+    component: gateway
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: giso-track
+  namespace: giso
+  annotations:
+    # 按集群 Ingress Controller 调整
+    nginx.ingress.kubernetes.io/proxy-body-size: "2m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: t.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 8123
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: giso-reconcile
+  namespace: giso
+spec:
+  schedule: "10 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: reconcile
+              image: curlimages/curl:8.5.0
+              env:
+                - name: GATEWAY
+                  value: http://gateway.giso.svc.cluster.local:8123
+                - name: ADMIN_AUTH
+                  valueFrom:
+                    secretKeyRef:
+                      name: giso-gateway-secrets
+                      key: GISO_ADMIN_USER
+              command:
+                - sh
+                - -c
+                - |
+                  echo "reconcile placeholder — mount server/ops/reconcile.sh in prod image or use sidecar"
+                  curl -sf "$GATEWAY/health"

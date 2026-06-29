@@ -1,0 +1,39 @@
+# GISO 本地 Docker 网关配置（开发/联调栈专用，勿用于生产）
+port: 8123
+schema_dir: /app/schema
+
+sinks: [file, kafka]
+
+file:
+  dir: /data/events
+
+kafka:
+  bootstrap_servers: kafka:9092
+  topic_raw: events_raw
+  topic_raw_test: events_raw_test
+  topic_quarantine: events_quarantine
+  spill_dir: /data/spill
+
+admin:
+  recent_buffer: 2000
+
+auth:
+  app_keys: [demo-key]
+  admin_user: admin
+  admin_password: admin123
+  viewer_user: viewer
+  viewer_password: viewer123
+
+limits:
+  max_body_bytes: 1048576
+  rate_limit_rps: 0
+
+clickhouse:
+  url: http://clickhouse:8123
+
+sdk_config:
+  exposure_ratio: 0.5
+  exposure_duration_ms: 500
+  exposure_max_per_page: 3
+  batch_size: 20
+  flush_interval_ms: 15000

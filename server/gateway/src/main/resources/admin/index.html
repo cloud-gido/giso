@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GISO 玑源 · 管理控制台</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/views.css">
+<link rel="stylesheet" href="css/brand.css">
+</head>
+<body>
+
+<!-- 图标精灵 -->
+<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
+  <symbol id="ico-debug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.5"/><path d="M12 5C5.6 5 2 12 2 12s3.6 7 10 7 10-7 10-7-3.6-7-10-7z"/></symbol>
+  <symbol id="ico-assert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/></symbol>
+  <symbol id="ico-registry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8M8 11h8M8 15h5"/></symbol>
+  <symbol id="ico-stats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></symbol>
+  <symbol id="ico-compare" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".75" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="ico-family" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+</svg>
+
+<!-- ── 侧边导航 ─────────────────────────────── -->
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-mark">
+      <img src="assets/logo-mark.svg" alt="" width="22" height="22">
+    </div>
+    <div>
+      <div class="brand-text">GISO 玑源<span>GIDO 的数据源头</span></div>
+      <div class="brand-family"><svg><use href="#ico-family"/></svg>GIDO · 数据产品族</div>
+    </div>
+  </div>
+
+  <nav>
+    <div class="nav-group">联调验证</div>
+    <button class="nav-item active" data-view="debug">
+      <svg><use href="#ico-debug"/></svg>
+      实时联调
+    </button>
+    <button class="nav-item" data-view="assert">
+      <svg><use href="#ico-assert"/></svg>
+      用例断言
+    </button>
+    <div class="nav-group">治理配置</div>
+    <button class="nav-item" data-view="registry">
+      <svg><use href="#ico-registry"/></svg>
+      注册表配置
+    </button>
+    <button class="nav-item" data-view="stats">
+      <svg><use href="#ico-stats"/></svg>
+      质量统计
+    </button>
+    <div class="nav-group">参考</div>
+    <a class="nav-item nav-link" href="/" target="_blank">
+      <svg><use href="#ico-family"/></svg>
+      产品导航
+    </a>
+    <a class="nav-item nav-link" href="/admin/datong-gap.html" target="_blank">
+      <svg><use href="#ico-compare"/></svg>
+      大同对比评审
+    </a>
+  </nav>
+
+  <div class="conn" id="conn"><span class="conn-dot"></span>连接中…</div>
+  <div class="sidebar-foot">
+    <div class="family-line">GIDO</div>
+    <div class="family-desc">埋点 · 分析 · 治理</div>
+  </div>
+</aside>
+
+<!-- ── 主内容区 ─────────────────────────────── -->
+<div class="main">
+  <header class="topbar">
+    <div>
+      <div class="product-meta">
+        <span class="family-tag">GIDO</span>
+        <span class="product-tag">GISO · 埋点治理</span>
+      </div>
+      <h1 id="page-title">实时联调</h1>
+      <p id="page-desc"></p>
+    </div>
+  </header>
+
+  <!-- 实时联调 -->
+  <section id="view-debug" class="view active">
+    <div class="stat-row">
+      <div class="stat-card ok"><span class="stat-label">正常</span><b id="cnt-ok">0</b></div>
+      <div class="stat-card missing"><span class="stat-label">缺失</span><b id="cnt-missing">0</b></div>
+      <div class="stat-card error"><span class="stat-label">错误</span><b id="cnt-error">0</b></div>
+      <div class="stat-card"><span class="stat-label">异常率</span><b id="cnt-rate">—</b></div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <input id="f-did" placeholder="按 did 过滤（设备 ID，支持模糊）">
+        <select id="f-event">
+          <option value="">全部事件</option>
+          <option>page_enter</option><option>page_exit</option>
+          <option>element_exposure</option><option>element_click</option>
+          <option>biz_event</option>
+          <option>app_install</option><option>app_launch</option>
+          <option>app_foreground</option><option>app_background</option>
+        </select>
+        <select id="f-status">
+          <option value="">全部状态</option>
+          <option value="ok">正常</option>
+          <option value="missing">缺失</option>
+          <option value="error">错误</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="f-pause"> 暂停滚动</label>
+        <span class="spacer"></span>
+        <button id="btn-clear" class="danger">清空缓冲</button>
+      </div>
+      <div id="event-list" class="event-list"></div>
+      <div id="debug-empty" class="empty">
+        <p>暂无事件 —— 设备开 <code>debug: true</code> 后上报会实时滚动出现在这里</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 用例断言 -->
+  <section id="view-assert" class="view">
+    <div class="card">
+      <div class="card-title">期望事件序列</div>
+      <p class="hint">每行一条：<code>事件名 [pgid=xx] [eid=xx] [code=xx]</code>，按时间正序与该设备实报做<b>有序子序列</b>匹配。</p>
+      <div class="toolbar">
+        <input id="assert-did" placeholder="设备 did（精确匹配）">
+        <button id="btn-assert-run" class="primary">运行比对</button>
+      </div>
+      <textarea id="assert-input" rows="6" spellcheck="false">page_enter pgid=video_feed
+element_click eid=video_card
+biz_event code=video_play_start</textarea>
+    </div>
+    <div id="assert-summary"></div>
+    <div id="assert-result" class="card-flat"></div>
+  </section>
+
+  <!-- 注册表 -->
+  <section id="view-registry" class="view">
+    <div class="card">
+      <div class="toolbar">
+        <div class="seg" id="reg-kinds">
+          <button class="seg-btn active" data-kind="params">参数池</button>
+          <button class="seg-btn" data-kind="pages">页面池</button>
+          <button class="seg-btn" data-kind="elements">元素池</button>
+          <button class="seg-btn" data-kind="events">业务事件</button>
+        </div>
+        <input id="reg-search" placeholder="搜索条目…">
+        <span class="muted" id="reg-count"></span>
+        <span class="spacer"></span>
+        <button id="btn-add" class="primary">＋ 新增</button>
+      </div>
+      <div id="reg-table" class="table-wrap"></div>
+    </div>
+  </section>
+
+  <!-- 质量统计 -->
+  <section id="view-stats" class="view">
+    <div class="stat-row">
+      <div class="stat-card"><span class="stat-label">总上报量</span><b id="kpi-total">—</b></div>
+      <div class="stat-card missing"><span class="stat-label">缺失量</span><b id="kpi-missing">—</b></div>
+      <div class="stat-card error"><span class="stat-label">错误量</span><b id="kpi-error">—</b></div>
+      <div class="stat-card"><span class="stat-label">总异常率</span><b id="kpi-rate">—</b></div>
+    </div>
+    <div class="toolbar" style="justify-content: flex-end">
+      <button id="btn-stats-refresh">刷新</button>
+    </div>
+    <div class="stats-grid">
+      <div class="card"><div class="card-title">事件维度</div><div id="stats-events" class="table-wrap"></div></div>
+      <div class="card"><div class="card-title">参数维度（异常明细）</div><div id="stats-params" class="table-wrap"></div></div>
+      <div class="card span-2"><div class="card-title">版本维度（新版本灰度埋点回归监控）</div><div id="stats-versions" class="table-wrap"></div></div>
+      <div class="card span-2">
+        <div class="card-title">登记覆盖率（live 条目 vs 进程内已见上报）</div>
+        <div class="stat-row" style="margin-bottom:12px">
+          <div class="stat-card"><span class="stat-label">页面未覆盖</span><b id="cov-pages-missing">—</b></div>
+          <div class="stat-card"><span class="stat-label">元素未覆盖</span><b id="cov-elements-missing">—</b></div>
+          <div class="stat-card"><span class="stat-label">业务事件未覆盖</span><b id="cov-events-missing">—</b></div>
+        </div>
+        <div id="stats-coverage" class="table-wrap"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 编辑弹窗 -->
+<dialog id="editor">
+  <form method="dialog" id="editor-form">
+    <h3 id="editor-title">编辑</h3>
+    <div id="editor-fields"></div>
+    <div class="dialog-actions">
+      <button value="cancel" class="ghost">取消</button>
+      <button value="ok" class="primary" id="editor-save">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toasts"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

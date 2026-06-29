@@ -1,0 +1,48 @@
+# GISO 接入网关 — 多阶段构建（Maven → JRE）
+# 生产：运行时挂载 gateway.yaml + schema ConfigMap，敏感项用 GISO_* 环境变量覆盖
+ARG MAVEN_IMAGE=maven:3.9-eclipse-temurin-21
+ARG JRE_IMAGE=eclipse-temurin:21-jre-alpine
+
+FROM ${MAVEN_IMAGE} AS build
+WORKDIR /src
+
+COPY deploy/maven/settings.xml /root/.m2/settings.xml
+COPY pom.xml /src/pom.xml
+COPY server/gateway/pom.xml /src/server/gateway/pom.xml
+RUN cd /src/server/gateway && \
+    for i in 1 2 3; do \
+      mvn -q -s /root/.m2/settings.xml dependency:go-offline -DskipTests && break; \
+      echo "[gateway-build] dependency retry $i..."; sleep 5; \
+    done || true
+
+COPY schema/ /src/schema/
+COPY server/gateway/ /src/server/gateway/
+RUN cd /src/server/gateway && \
+    for i in 1 2 3; do \
+      mvn -q -s /root/.m2/settings.xml package -DskipTests && exit 0; \
+      echo "[gateway-build] package retry $i..."; sleep 5; \
+    done; \
+    exit 1
+
+FROM ${JRE_IMAGE}
+WORKDIR /app
+
+RUN addgroup -S giso && adduser -S giso -G giso \
+    && mkdir -p /app/config /app/schema /data/events /data/spill \
+    && chown -R giso:giso /app /data
+
+COPY --from=build /src/server/gateway/target/giso-gateway.jar /app/gateway.jar
+COPY --from=build /src/schema /app/schema
+COPY deploy/config/gateway-docker.yaml /app/config/gateway-dev.yaml
+
+ENV GISO_GATEWAY_CONFIG=/app/config/gateway.yaml
+ENV GISO_SCHEMA_DIR=/app/schema
+
+EXPOSE 8123
+USER giso
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -q -O- http://127.0.0.1:8123/health || exit 1
+
+ENTRYPOINT ["java", "-jar", "/app/gateway.jar"]
+CMD ["--config", "/app/config/gateway.yaml", "--schema", "/app/schema"]

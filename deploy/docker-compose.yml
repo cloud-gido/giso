@@ -1,0 +1,363 @@
+# GISO 玑源 本地全栈（Gateway + Kafka + ClickHouse + event-bridge + Prometheus + Alertmanager + Grafana + Metabase）
+# 用法：cd deploy && docker compose up -d
+# 管理台   http://localhost:8123/admin/     (admin / admin123)
+# 产品导航 http://localhost:8123/           (一键跳转各产品)
+# Grafana  http://localhost:3001/            (admin / admin123)
+# Prometheus http://localhost:9090/
+# Alertmanager http://localhost:9093/
+# ClickHouse HTTP http://localhost:8124/     (原生协议 localhost:9000)
+# Metabase http://localhost:3000             (首次打开需初始化账号)
+#
+# Doris（可选）：docker compose --profile doris up -d
+#   MySQL 9030 · FE UI 8030 · Routine Load 消费 Kafka（无需 event-bridge）
+#
+# Doris 较重，默认不启动；见 deploy/README.md「Doris 试用」
+#
+# 资讯 Web Demo（可选）：docker compose --profile demo up -d news-web-demo
+#   http://localhost:5180
+
+services:
+  kafka:
+    # bitnami/kafka 版本标签已下线（2025+），改用 Apache 官方镜像
+    image: apache/kafka:3.9.0
+    hostname: kafka
+    container_name: qy-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # 监听用 :port（勿写 0.0.0.0，否则镜像会把 advertised 也设成 0.0.0.0 导致启动失败）
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: qy-clickhouse
+    ports:
+      # 宿主机 8123 已被 gateway 占用，ClickHouse HTTP 映射到 8124
+      - "8124:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/users.d:/etc/clickhouse-server/users.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+
+  clickhouse-init:
+    image: clickhouse/clickhouse-server:latest
+    container_name: qy-clickhouse-init
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./clickhouse/init:/init:ro
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        for f in /init/*.sql; do
+          echo "[clickhouse-init] applying $$f"
+          clickhouse-client --host clickhouse --multiquery < "$$f"
+        done
+        echo "[clickhouse-init] done"
+    restart: "no"
+
+  event-bridge:
+    build:
+      context: ./event-bridge
+    container_name: qy-event-bridge
+    ports:
+      - "9100:9100"
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      CLICKHOUSE_URL: http://clickhouse:8123
+      KAFKA_TOPICS: events_raw,events_raw_test,events_quarantine
+      METRICS_PORT: "9100"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      clickhouse-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  gateway:
+    image: ${GISO_IMAGE_REGISTRY:-giso}/giso-gateway:${GISO_IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.gateway
+      args:
+        MAVEN_IMAGE: ${MAVEN_IMAGE:-maven:3.9-eclipse-temurin-21}
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre-alpine}
+    container_name: qy-gateway
+    ports:
+      - "8123:8123"
+    volumes:
+      - gateway-data:/data
+      - ../schema:/app/schema:ro
+      - ./config/gateway-docker.yaml:/app/config/gateway.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8123/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    depends_on:
+      kafka:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: qy-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../server/ops/prometheus-rules.yml:/etc/prometheus/rules/giso.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - gateway
+      - alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    container_name: qy-grafana
+    ports:
+      # Grafana 用 3001，3000 留给 Metabase
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3001
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+
+  lark-webhook:
+    image: ${GISO_IMAGE_REGISTRY:-giso}/giso-lark-webhook:${GISO_IMAGE_TAG:-local}
+    build:
+      context: ./lark-webhook
+    container_name: qy-lark-webhook
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: qy-alertmanager
+    ports:
+      - "9093:9093"
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    depends_on:
+      - lark-webhook
+    restart: unless-stopped
+
+  metabase-setup:
+    build:
+      context: ./metabase-setup
+    container_name: qy-metabase-setup
+    environment:
+      METABASE_URL: http://metabase:3000
+      MB_ADMIN_EMAIL: admin@giso.local
+      MB_ADMIN_PASSWORD: Giso@Metabase2026
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      DORIS_FE_HOST: doris-fe
+      DORIS_FE_PORT: "9030"
+    depends_on:
+      metabase:
+        condition: service_healthy
+      clickhouse-init:
+        condition: service_completed_successfully
+    restart: "no"
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: qy-metabase
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+      JAVA_TIMEZONE: Asia/Shanghai
+    volumes:
+      - metabase-data:/metabase-data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 90s
+    restart: unless-stopped
+
+  # ── Doris（profile: doris）生产对齐链路：Kafka → Routine Load → ods_events ──
+  doris-fe:
+    profiles: [doris]
+    image: apache/doris:fe-ubuntu-2.1.7
+    # 不设 platform：Apple Silicon 自动用 arm64 原生镜像，避免 QEMU 卡死
+    container_name: qy-doris-fe
+    hostname: doris-fe
+    environment:
+      FE_SERVERS: fe1:172.28.0.2:9010
+      FE_ID: 1
+    ports:
+      - "8030:8030"
+      - "9030:9030"
+    volumes:
+      - doris-fe-data:/opt/apache-doris/fe/doris-meta
+    networks:
+      default: {}
+      doris-net:
+        ipv4_address: 172.28.0.2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8030/api/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 90s
+    restart: unless-stopped
+
+  doris-be:
+    profiles: [doris]
+    build:
+      context: ./doris
+      dockerfile: Dockerfile.be
+    # 不设 platform：Mac ARM 用原生 arm64，Linux x86 用 amd64
+    container_name: qy-doris-be
+    hostname: doris-be
+    privileged: true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 655350
+        hard: 655350
+    environment:
+      FE_SERVERS: fe1:172.28.0.2:9010
+      BE_ADDR: 172.28.0.3:9050
+      BE_HEARTBEAT_PORT: 9050
+      SKIP_CHECK_ULIMIT: "true"
+    ports:
+      - "8040:8040"
+    volumes:
+      - doris-be-data:/opt/apache-doris/be/storage
+    depends_on:
+      doris-fe:
+        condition: service_healthy
+    networks:
+      default: {}
+      doris-net:
+        ipv4_address: 172.28.0.3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8040/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 60
+      start_period: 1200s
+    restart: unless-stopped
+
+  doris-init:
+    profiles: [doris]
+    build:
+      context: ./doris
+    container_name: qy-doris-init
+    environment:
+      DORIS_BE_IP: 172.28.0.3
+      DORIS_BE_WAIT_MAX: "360"
+      DORIS_BE_STABLE_ROUNDS: "24"
+    volumes:
+      - ../server/doris/01_create_tables.sql:/sql/01_create_tables.sql:ro
+      - ./doris/02_routine_load.docker.sql:/sql/02_routine_load.docker.sql:ro
+      - ./doris/02_routine_load_events.docker.sql:/sql/02_routine_load_events.docker.sql:ro
+      - ./doris/03_alter_add_env.sql:/sql/03_alter_add_env.sql:ro
+    depends_on:
+      doris-fe:
+        condition: service_healthy
+      doris-be:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    restart: "no"
+
+  news-web-demo:
+    profiles: [demo]
+    image: ${GISO_IMAGE_REGISTRY:-giso}/giso-news-demo:${GISO_IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: examples/web-news-demo/Dockerfile
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:20-alpine}
+        NGINX_IMAGE: ${NGINX_IMAGE:-nginx:alpine}
+    container_name: qy-news-web-demo
+    ports:
+      - "5180:5180"
+    restart: unless-stopped
+
+volumes:
+  kafka-data:
+  gateway-data:
+  clickhouse-data:
+  prometheus-data:
+  grafana-data:
+  metabase-data:
+  alertmanager-data:
+  doris-fe-data:
+  doris-be-data:
+
+networks:
+  doris-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

@@ -1,0 +1,52 @@
+### IntelliJ IDEA ###
+out/
+.idea/workspace.xml
+.idea/shelf/
+!**/src/main/**/out/
+!**/src/test/**/out/
+.kotlin
+
+### Maven ###
+target/
+**/target/
+dependency-reduced-pom.xml
+
+### Python ###
+.venv/
+
+### Gateway runtime data ###
+server/gateway/data/
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+### Deploy secrets ###
+deploy/.env
+
+### Local SDK / build caches ###
+.android-sdk/
+node_modules/
+**/node_modules/
+examples/web-news-demo/dist/

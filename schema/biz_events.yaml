@@ -1,0 +1,121 @@
+# 业务事件字典：无法用曝光/点击建模的领域事件
+# source: client=客户端行为流  server=服务端事实流（资金/结算类强制 server）
+version: "1.0"
+events:
+  # ── 长视频 ──
+  - code: video_play_start
+    desc: 开始播放（首帧渲染成功）
+    domain: video
+    source: client
+    params: [vid, series_id, ep_num, is_auto, definition]
+    owner: client-team
+  - code: video_play_heartbeat
+    desc: 播放心跳（每30s + 暂停/退出时补报）
+    domain: video
+    source: client
+    params: [vid, play_dur, play_pos, speed, definition]
+    owner: client-team
+  - code: video_play_end
+    desc: 播放结束（退出/切集/播完）
+    domain: video
+    source: client
+    params: [vid, play_dur, play_pos, video_dur]
+    owner: client-team
+  - code: video_play_error
+    desc: 播放失败
+    domain: video
+    source: client
+    params: [vid, fail_reason]
+    owner: client-team
+
+  # ── 体育博彩 ──
+  - code: bet_slip_add
+    desc: 加入注单（点击赔率后成功加入）
+    domain: bet
+    source: client
+    params: [match_id, market_type, selection_id, odds, is_live]
+    owner: client-team
+  - code: bet_submit
+    desc: 提交投注（客户端意图，点击确认后发起请求）
+    domain: bet
+    source: client
+    params: [bet_id, bet_type, stake_amt, currency, is_live]
+    owner: client-team
+  - code: bet_placed
+    desc: 投注成功（服务端事实，事务提交后发出）
+    domain: bet
+    source: server
+    params: [bet_id, match_id, market_type, selection_id, odds, bet_type, stake_amt, currency, is_live]
+    owner: backend-team
+  - code: bet_rejected
+    desc: 投注被拒（风控/赔率变化/余额不足）
+    domain: bet
+    source: server
+    params: [bet_id, fail_reason]
+    owner: backend-team
+  - code: bet_settled
+    desc: 注单结算（服务端事实）
+    domain: bet
+    source: server
+    params: [bet_id, payout_amt, currency]
+    owner: backend-team
+
+  # ── 预测市场 ──
+  - code: pm_order_submit
+    desc: 提交订单（客户端意图）
+    domain: pm
+    source: client
+    params: [pm_market_id, outcome_id, order_side, price, shares]
+    owner: client-team
+  - code: pm_order_filled
+    desc: 订单成交（服务端事实）
+    domain: pm
+    source: server
+    params: [order_id, pm_market_id, outcome_id, order_side, price, shares, currency]
+    owner: backend-team
+  - code: pm_order_cancelled
+    desc: 订单撤销
+    domain: pm
+    source: server
+    params: [order_id, pm_market_id]
+    owner: backend-team
+  - code: pm_market_resolved
+    desc: 市场结算（出结果）
+    domain: pm
+    source: server
+    params: [pm_market_id, outcome_id]
+    owner: backend-team
+
+  # ── 资讯 ──
+  - code: news_read
+    desc: 文章阅读结算（离开文章页时一次性上报）
+    domain: news
+    source: client
+    params: [aid, news_cat, read_dur, read_pct]
+    owner: client-team
+
+  # ── 账务/生命周期 ──
+  - code: signup_completed
+    desc: 注册成功
+    domain: common
+    source: server
+    params: [channel]
+    owner: backend-team
+  - code: deposit_completed
+    desc: 充值到账（服务端事实）
+    domain: common
+    source: server
+    params: [deposit_amt, currency, pay_method]
+    owner: backend-team
+  - code: deposit_failed
+    desc: 充值失败
+    domain: common
+    source: server
+    params: [deposit_amt, currency, pay_method, fail_reason]
+    owner: backend-team
+  - code: withdraw_completed
+    desc: 提现完成（服务端事实）
+    domain: common
+    source: server
+    params: [withdraw_amt, currency, pay_method]
+    owner: backend-team

@@ -1,0 +1,13 @@
+{
+  "name": "@giso/tracker-web",
+  "version": "1.0.0",
+  "description": "GISO 玑源 Web SDK: 9-event convergence, param inheritance, registry-driven",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

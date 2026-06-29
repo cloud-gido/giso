@@ -1,0 +1,255 @@
+# 参数池：全局参数字典（唯一事实源）
+# 规则见 docs/tracking/03-命名与登记规范.md
+version: "1.0"
+params:
+  # ── 通用 ──
+  - key: pos
+    type: int
+    desc: 元素在所在模块中的位置
+    rule: 0-based，相对父模块；信息流中为去重后的真实展示位
+    owner: data-team
+    since: "1.0"
+  - key: kw
+    type: string
+    desc: 搜索词
+    rule: 用户输入原文，未分词
+    owner: data-team
+    since: "1.0"
+  - key: tab_name
+    type: string
+    desc: 页签名
+    rule: 英文标识，非展示文案
+    owner: data-team
+    since: "1.0"
+  - key: env
+    type: string
+    desc: 上报环境
+    rule: prod=生产 test=联调/测试，网关按 env 路由到独立 Kafka topic
+    owner: data-team
+    since: "1.0"
+  - key: rec_trace_id
+    type: string
+    desc: 推荐请求追踪ID
+    rule: 推荐服务下发，用于推荐效果归因
+    owner: backend-team
+    since: "1.0"
+  - key: currency
+    type: string
+    desc: 货币
+    rule: ISO 4217 大写，如 USD
+    owner: backend-team
+    since: "1.0"
+  - key: channel
+    type: string
+    desc: 获客渠道
+    rule: 服务端事件用；客户端信封 common.channel 同义
+    owner: backend-team
+    since: "1.0"
+
+  # ── 长视频 ──
+  - key: vid
+    type: string
+    desc: 视频ID
+    rule: 服务端视频主键，正片/预告片通用
+    owner: data-team
+    since: "1.0"
+  - key: cp_id
+    type: string
+    desc: 创作者/内容提供方ID
+    owner: data-team
+    since: "1.0"
+  - key: series_id
+    type: string
+    desc: 剧集ID（多集内容的合集）
+    owner: data-team
+    since: "1.0"
+  - key: ep_num
+    type: int
+    desc: 集数
+    rule: 1-based
+    owner: data-team
+    since: "1.0"
+  - key: play_dur
+    type: int
+    desc: 播放时长
+    rule: 毫秒，单条心跳区间内的累计值
+    owner: client-team
+    since: "1.0"
+  - key: video_dur
+    type: int
+    desc: 视频总时长（毫秒）
+    owner: data-team
+    since: "1.0"
+  - key: play_pos
+    type: int
+    desc: 当前播放进度（毫秒）
+    owner: client-team
+    since: "1.0"
+  - key: is_auto
+    type: bool
+    desc: 是否自动播放
+    rule: 1=自动 0=手动
+    owner: client-team
+    since: "1.0"
+  - key: speed
+    type: float
+    desc: 播放倍速
+    owner: client-team
+    since: "1.0"
+  - key: definition
+    type: string
+    desc: 清晰度
+    rule: 枚举 480p/720p/1080p/4k
+    owner: client-team
+    since: "1.0"
+
+  # ── 体育博彩 ──
+  - key: sport_id
+    type: string
+    desc: 运动项目ID
+    rule: 枚举，football/basketball/...
+    owner: data-team
+    since: "1.0"
+  - key: match_id
+    type: string
+    desc: 赛事ID
+    owner: data-team
+    since: "1.0"
+  - key: league_id
+    type: string
+    desc: 联赛ID
+    owner: data-team
+    since: "1.0"
+  - key: market_type
+    type: string
+    desc: 盘口类型
+    rule: 枚举 1x2/handicap/over_under/...
+    owner: data-team
+    since: "1.0"
+  - key: selection_id
+    type: string
+    desc: 投注选项ID
+    owner: data-team
+    since: "1.0"
+  - key: odds
+    type: float
+    desc: 赔率
+    rule: 欧赔小数格式，下注瞬间快照
+    owner: backend-team
+    since: "1.0"
+  - key: stake_amt
+    type: int
+    desc: 投注金额
+    rule: 最小货币单位整数（cent），配 currency
+    owner: backend-team
+    since: "1.0"
+  - key: bet_id
+    type: string
+    desc: 注单ID
+    rule: 服务端注单主键，客户端 bet_submit 与服务端 bet_placed 用它关联
+    owner: backend-team
+    since: "1.0"
+  - key: bet_type
+    type: string
+    desc: 注单类型
+    rule: 枚举 single/combo/system
+    owner: data-team
+    since: "1.0"
+  - key: is_live
+    type: bool
+    desc: 是否滚球（赛中投注）
+    owner: data-team
+    since: "1.0"
+  - key: payout_amt
+    type: int
+    desc: 派彩金额（cent）
+    owner: backend-team
+    since: "1.0"
+
+  # ── 预测市场 ──
+  - key: pm_market_id
+    type: string
+    desc: 预测市场ID
+    owner: data-team
+    since: "1.0"
+  - key: pm_category
+    type: string
+    desc: 市场类目
+    rule: 枚举 politics/crypto/sports/entertainment/...
+    owner: data-team
+    since: "1.0"
+  - key: outcome_id
+    type: string
+    desc: 结果选项ID（YES/NO 或多结果）
+    owner: data-team
+    since: "1.0"
+  - key: order_id
+    type: string
+    desc: 订单ID
+    owner: backend-team
+    since: "1.0"
+  - key: order_side
+    type: string
+    desc: 买卖方向
+    rule: 枚举 buy/sell
+    owner: data-team
+    since: "1.0"
+  - key: price
+    type: int
+    desc: 价格
+    rule: 概率份额价格，cent（0-100）
+    owner: backend-team
+    since: "1.0"
+  - key: shares
+    type: int
+    desc: 份额数量
+    owner: backend-team
+    since: "1.0"
+
+  # ── 资讯 ──
+  - key: aid
+    type: string
+    desc: 资讯文章ID
+    owner: data-team
+    since: "1.0"
+  - key: news_cat
+    type: string
+    desc: 资讯分类
+    rule: 枚举，与后台分类字典一致
+    owner: data-team
+    since: "1.0"
+  - key: read_dur
+    type: int
+    desc: 阅读时长（毫秒）
+    owner: client-team
+    since: "1.0"
+  - key: read_pct
+    type: float
+    desc: 阅读完成度
+    rule: 0-1，最大滚动深度/正文高度
+    owner: client-team
+    since: "1.0"
+
+  # ── 账务/转化 ──
+  - key: deposit_amt
+    type: int
+    desc: 充值金额（cent）
+    owner: backend-team
+    since: "1.0"
+  - key: withdraw_amt
+    type: int
+    desc: 提现金额（cent）
+    owner: backend-team
+    since: "1.0"
+  - key: pay_method
+    type: string
+    desc: 支付方式
+    rule: 枚举 card/crypto/ewallet/...
+    owner: backend-team
+    since: "1.0"
+  - key: fail_reason
+    type: string
+    desc: 失败原因码
+    rule: 枚举，见后端错误码字典
+    owner: backend-team
+    since: "1.0"

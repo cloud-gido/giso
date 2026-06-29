@@ -1,0 +1,44 @@
+# GISO 生产网关配置示例 — 复制为 gateway.yaml 并由 K8s ConfigMap / compose 挂载
+# 敏感项（app_keys、admin 密码）建议用 GISO_* 环境变量注入，勿提交明文
+port: 8123
+schema_dir: /app/schema
+
+# 生产仅 Kafka 出口（勿启用 file sink）
+sinks: [kafka]
+
+kafka:
+  bootstrap_servers: kafka-broker1:9092,kafka-broker2:9092,kafka-broker3:9092
+  topic_raw: events_raw
+  topic_raw_test: events_raw_test
+  topic_quarantine: events_quarantine
+  spill_dir: /data/spill
+  properties:
+    acks: all
+    linger.ms: 20
+    compression.type: lz4
+    enable.idempotence: true
+
+admin:
+  recent_buffer: 5000
+
+auth:
+  app_keys: []          # 用 GISO_APP_KEYS=key1,key2 注入
+  admin_user: ""        # 用 GISO_ADMIN_USER / GISO_ADMIN_PASSWORD
+  viewer_user: ""
+  viewer_password: ""
+
+limits:
+  max_body_bytes: 1048576
+  rate_limit_rps: 100
+  rate_limit_burst: 200
+
+# 可选：管理台登记覆盖率反算（无 ClickHouse 时留空）
+clickhouse:
+  url: ""
+
+sdk_config:
+  exposure_ratio: 0.5
+  exposure_duration_ms: 500
+  exposure_max_per_page: 3
+  batch_size: 20
+  flush_interval_ms: 15000
