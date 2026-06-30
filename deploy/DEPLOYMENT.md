@@ -16,13 +16,13 @@ git push origin main
 # Actions → ghcr.io/cloud-gido/giso/giso-gateway:latest
 ```
 
-在 GitHub Packages 将 `giso-gateway` 设为 **public**（或与集群配置 pull secret）。
+在 GitHub Packages 将 `giso-gateway` 设为 **public**（推荐；私有包见下方 GHCR pull secret），或与集群配置 pull secret。
 
 ### 2. Doppler（project `gamelinelab`, config `dev`）
 
 | Key | 示例 |
 |---|---|
-| `INFRA_GISO_KAFKA_BOOTSTRAP_SERVERS` | `b-1.xxx.kafka.sa-east-1.amazonaws.com:9092,...` |
+| `INFRA_KAFKA_BOOTSTRAP_SERVERS` | `b-1.xxx.kafka...:9092,b-2...`（平台共用 key，通常已存在） |
 | `INFRA_GISO_APP_KEYS` | `video-android-beta,video-android-prod,video-ios-beta,video-ios-prod` |
 | `INFRA_GISO_ADMIN_USER` | `admin` |
 | `INFRA_GISO_ADMIN_PASSWORD` | `***` |
