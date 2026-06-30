@@ -17,7 +17,7 @@ from kafka import KafkaConsumer
 
 KAFKA = os.environ.get("KAFKA_BOOTSTRAP", "kafka:9092")
 CH_URL = os.environ.get("CLICKHOUSE_URL", "http://clickhouse:8123")
-TOPICS = os.environ.get("KAFKA_TOPICS", "events_raw,events_raw_test,events_quarantine").split(",")
+TOPICS = os.environ.get("KAFKA_TOPICS", "giso_events_raw,giso_events_raw_test,giso_events_quarantine").split(",")
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "50"))
 FLUSH_SEC = float(os.environ.get("FLUSH_SEC", "2"))
 METRICS_PORT = int(os.environ.get("METRICS_PORT", "9100"))
@@ -54,9 +54,9 @@ def flatten(raw: dict, topic: str) -> tuple[str, dict]:
     biz = raw.get("biz") or {}
     stime_ms = int(raw.get("stime") or int(time.time() * 1000))
     env = common.get("env") or ("test" if topic.endswith("_test") else "prod")
-    quarantine = topic == "events_quarantine" or raw.get("_issues") is not None
+    quarantine = topic == "giso_events_quarantine" or raw.get("_issues") is not None
 
-    if topic == "events_quarantine":
+    if topic == "giso_events_quarantine":
         row = {
             "event_date": time.strftime("%Y-%m-%d", time.gmtime(stime_ms / 1000)),
             "stime": ms_to_dt(stime_ms),

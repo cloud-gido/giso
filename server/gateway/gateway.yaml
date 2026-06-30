@@ -11,8 +11,8 @@ file:
 
 kafka:
   bootstrap_servers: localhost:9092
-  topic_raw: events_raw                 # 正常+缺失事件 → Doris dwd 落地
-  topic_quarantine: events_quarantine   # 错误事件 → 隔离区，可回放
+  topic_raw: giso_events_raw                 # 正常+缺失事件 → Doris dwd 落地
+  topic_quarantine: giso_events_quarantine   # 错误事件 → 隔离区，可回放
   spill_dir: ./data/spill               # broker 不可用时本地兜底，恢复后回放
   properties:                           # 原样透传 producer 配置，可覆盖默认值
     # acks: all

@@ -25,7 +25,7 @@ PROPERTIES (
 )
 FROM KAFKA (
     "kafka_broker_list" = "kafka:9092",
-    "kafka_topic" = "events_raw",
+    "kafka_topic" = "giso_events_raw",
     "property.kafka_default_offsets" = "OFFSET_BEGINNING",
     "property.group.id" = "doris_ods_events"
 );
@@ -54,7 +54,7 @@ PROPERTIES (
 )
 FROM KAFKA (
     "kafka_broker_list" = "kafka:9092",
-    "kafka_topic" = "events_raw_test",
+    "kafka_topic" = "giso_events_raw_test",
     "property.kafka_default_offsets" = "OFFSET_BEGINNING",
     "property.group.id" = "doris_ods_events_test"
 );

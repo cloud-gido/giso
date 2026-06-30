@@ -30,9 +30,9 @@ create_topic() {
     --config retention.ms=604800000
 }
 
-create_topic events_raw "$PARTITIONS_RAW"
-create_topic events_raw_test "$PARTITIONS_TEST"
-create_topic events_quarantine "$PARTITIONS_QUAR"
+create_topic giso_events_raw "$PARTITIONS_RAW"
+create_topic giso_events_raw_test "$PARTITIONS_TEST"
+create_topic giso_events_quarantine "$PARTITIONS_QUAR"
 
 echo "[kafka] topics:"
 kafka_cmd --list

@@ -11,7 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 
-/** 本地 JSONL 出口：按天滚动（events_raw-2026-06-10.jsonl），适合本地开发与小流量兜底。 */
+/** 本地 JSONL 出口：按天滚动（giso_events_raw-2026-06-10.jsonl），适合本地开发与小流量兜底。 */
 public final class FileSink implements EventSink {
     private final Path dir;
     private LocalDate curDate;
@@ -41,8 +41,8 @@ public final class FileSink implements EventSink {
         if (raw != null) raw.close();
         if (quarantine != null) quarantine.close();
         curDate = LocalDate.now();
-        raw = open("events_raw-" + curDate + ".jsonl");
-        quarantine = open("events_quarantine-" + curDate + ".jsonl");
+        raw = open("giso_events_raw-" + curDate + ".jsonl");
+        quarantine = open("giso_events_quarantine-" + curDate + ".jsonl");
     }
 
     private BufferedWriter open(String name) throws IOException {

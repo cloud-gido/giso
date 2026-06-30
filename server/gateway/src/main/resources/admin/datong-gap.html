@@ -78,7 +78,7 @@
   <details class="gap"><summary>隔离区修复回放工具<span class="effort">约 1 周</span></summary>
     <div class="body">
       <p><strong>为什么重要：</strong>补登记后，之前进隔离区的数据需要手工捞回，流程断在「修复后回灌」。</p>
-      <p><strong>建议做法：</strong>ops 脚本消费 events_quarantine，剥离 _issues 后重新过网关校验，通过即写回 events_raw。</p>
+      <p><strong>建议做法：</strong>ops 脚本消费 giso_events_quarantine，剥离 _issues 后重新过网关校验，通过即写回 giso_events_raw。</p>
     </div>
   </details>
   <details class="gap"><summary>采样率与降级下发<span class="effort">约 1 周</span></summary>
@@ -129,7 +129,7 @@ const CAPS = [
   { domain: "校验与联调", name: "测试/生产环境分流", align: "missing", datong: "测试流量与生产数据物理隔离", ours: "单一管道；debug 模式只是不攒批，联调数据会混进生产表" },
   { domain: "数据链路", name: "高可靠上报", align: "aligned", datong: "攒批、重试、本地持久化", ours: "三端攒批 + 指数退避 + 本地持久化；网关 acks=all + spill 自动回放" },
   { domain: "数据链路", name: "数据落地与分层", align: "aligned", datong: "实时入仓，分层建模", ours: "Kafka → Doris Routine Load → ODS → DWD → ADS 看板 SQL" },
-  { domain: "数据链路", name: "隔离区修复回放", align: "partial", datong: "错误数据修复后回灌", ours: "events_quarantine 带 _issues 明细，缺一键重校验回灌工具" },
+  { domain: "数据链路", name: "隔离区修复回放", align: "partial", datong: "错误数据修复后回灌", ours: "giso_events_quarantine 带 _issues 明细，缺一键重校验回灌工具" },
   { domain: "数据链路", name: "采样与降级", align: "missing", datong: "按事件配置采样率，高峰降级", ours: "远程配置只覆盖曝光/攒批，无 per-event 采样率" },
   { domain: "质量监控", name: "质量报表", align: "aligned", datong: "校验明细报表", ours: "事件/参数/版本三维度 + Prometheus + 6 条告警规则" },
   { domain: "质量监控", name: "数据对账", align: "aligned", datong: "链路丢数监控", ours: "网关小时计数 vs Doris 落地行数对账脚本" },

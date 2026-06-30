@@ -7,7 +7,7 @@
 ```
 SDK / ServerReporter
     → HTTPS → Gateway (×N, 无状态)
-    → Kafka (events_raw | events_raw_test | events_quarantine)
+    → Kafka (giso_events_raw | giso_events_raw_test | giso_events_quarantine)
     → Doris Routine Load → tracking.ods_events
     → Metabase / 自研 BI
 ```
@@ -82,9 +82,9 @@ KAFKA_REPLICATION_FACTOR=3 \
 
 | Topic | 分区建议 | 用途 |
 |---|---|---|
-| `events_raw` | 8 | 生产埋点 |
-| `events_raw_test` | 4 | 联调/debug |
-| `events_quarantine` | 2 | 校验失败隔离 |
+| `giso_events_raw` | 8 | 生产埋点 |
+| `giso_events_raw_test` | 4 | 联调/debug |
+| `giso_events_quarantine` | 2 | 校验失败隔离 |
 
 ---
 

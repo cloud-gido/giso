@@ -28,8 +28,8 @@ import java.util.regex.Pattern;
 
 /**
  * Kafka 出口（生产管道）：
- *   raw → topic events_raw（下游 Doris Routine Load 消费落地）
- *   quarantine → topic events_quarantine
+ *   raw → topic giso_events_raw（下游 Doris Routine Load 消费落地）
+ *   quarantine → topic giso_events_quarantine
  *
  * 可靠性：
  *   · 分区 key = did，同设备事件保序
@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
  *   · 后台线程每 60s 扫描 spill 目录自动回放，broker 恢复后无需人工重灌
  */
 public final class KafkaSink implements EventSink {
-    /** spill 文件名形如 events_raw-2026-06-10.jsonl，捕获组 1 = topic */
+    /** spill 文件名形如 giso_events_raw-2026-06-10.jsonl，捕获组 1 = topic */
     private static final Pattern SPILL_NAME = Pattern.compile("^(.+)-\\d{4}-\\d{2}-\\d{2}\\.jsonl$");
     private static final ObjectMapper M = new ObjectMapper();
 

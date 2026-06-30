@@ -5,7 +5,7 @@
 | 文件 | 内容 |
 |---|---|
 | `01_create_tables.sql` | ODS 建表：`ods_events`（含 `env` 列，动态分区365天）+ `ods_events_quarantine` |
-| `02_routine_load.sql` | Routine Load：`events_raw`（prod）、`events_raw_test`（test）、`events_quarantine` |
+| `02_routine_load.sql` | Routine Load：`giso_events_raw`（prod）、`giso_events_raw_test`（test）、`giso_events_quarantine` |
 | `03_alter_add_env.sql` | 已有表补 `env` 列（与 ClickHouse 对齐） |
 | `03_example_queries.sql` | CTR、播放时长、投注漏斗、双链路对账、质量监控等示例查询 |
 
@@ -13,8 +13,8 @@
 
 | SDK | Kafka Topic | Doris `env` |
 |---|---|---|
-| `debug=false`（默认） | `events_raw` | prod |
-| `debug=true` | `events_raw_test` | test |
+| `debug=false`（默认） | `giso_events_raw` | prod |
+| `debug=true` | `giso_events_raw_test` | test |
 
 本地 Docker：`deploy/scripts/apply-doris-test-pipeline.sh` 可为已有集群补 test 链路。
 
@@ -25,9 +25,9 @@
 #    sinks: [kafka]   # 或迁移期双写 [file, kafka]
 
 # 2. 建 Kafka topic
-kafka-topics --create --topic events_raw --partitions 8 --replication-factor 3 ...
-kafka-topics --create --topic events_raw_test --partitions 4 --replication-factor 3 ...
-kafka-topics --create --topic events_quarantine --partitions 2 --replication-factor 3 ...
+kafka-topics --create --topic giso_events_raw --partitions 8 --replication-factor 3 ...
+kafka-topics --create --topic giso_events_raw_test --partitions 4 --replication-factor 3 ...
+kafka-topics --create --topic giso_events_quarantine --partitions 2 --replication-factor 3 ...
 
 # 3. Doris 建表 + 启动 Routine Load（改 broker 地址后执行）
 mysql -h <doris-fe> -P 9030 -u root < 01_create_tables.sql

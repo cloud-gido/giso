@@ -111,5 +111,5 @@ examples/web-news-demo/
 ## 埋点要点
 
 - 全部使用 `@giso/tracker-web` 生成常量（`Pages` / `Elements` / `BizEvents` / `Params`）
-- `debug: true` → `env=test`，事件进 `events_raw_test`，不污染生产分析
+- `debug: true` → `env=test`，事件进 `giso_events_raw_test`，不污染生产分析
 - `news_read` 在离开详情页前上报（`read_dur` 前台累计毫秒，`read_pct` 最大滚动深度 0~1）

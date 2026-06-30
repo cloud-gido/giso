@@ -24,9 +24,9 @@ public final class GatewayConfig {
 
     // kafka sink
     public String kafkaBootstrapServers = "localhost:9092";
-    public String kafkaTopicRaw = "events_raw";
-    public String kafkaTopicRawTest = "events_raw_test";
-    public String kafkaTopicQuarantine = "events_quarantine";
+    public String kafkaTopicRaw = "giso_events_raw";
+    public String kafkaTopicRawTest = "giso_events_raw_test";
+    public String kafkaTopicQuarantine = "giso_events_quarantine";
     /** kafka producer 附加属性（acks/linger.ms/compression.type...），原样透传 */
     public Map<String, Object> kafkaProperties = Map.of();
     /** kafka 不可用时本地兜底目录（spill 文件，恢复后可回放） */

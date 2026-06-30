@@ -33,10 +33,10 @@ git push origin main
 
 | Key | 端 | 包类型 | SDK `env` | Kafka |
 |-----|-----|--------|-----------|-------|
-| `video-android-beta` | Android | debug/内测 | `test` | `events_raw_test` |
-| `video-android-prod` | Android | release | `prod` | `events_raw` |
-| `video-ios-beta` | iOS | TestFlight | `test` | `events_raw_test` |
-| `video-ios-prod` | iOS | App Store | `prod` | `events_raw` |
+| `video-android-beta` | Android | debug/内测 | `test` | `giso_events_raw_test` |
+| `video-android-prod` | Android | release | `prod` | `giso_events_raw` |
+| `video-ios-beta` | iOS | TestFlight | `test` | `giso_events_raw_test` |
+| `video-ios-prod` | iOS | App Store | `prod` | `giso_events_raw` |
 
 ### 3. Kafka + Doris
 

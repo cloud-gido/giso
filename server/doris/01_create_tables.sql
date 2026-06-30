@@ -1,6 +1,6 @@
 -- ============================================================
 -- 埋点数据 Doris 落地层（ODS）
--- 链路：SDK → 网关（校验）→ Kafka(events_raw / events_quarantine) → Routine Load → Doris
+-- 链路：SDK → 网关（校验）→ Kafka(giso_events_raw / giso_events_quarantine) → Routine Load → Doris
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS tracking;

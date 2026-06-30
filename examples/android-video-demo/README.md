@@ -20,8 +20,8 @@ App 默认连 **EKS 测试网关**，无需局域网：
 
 | 构建 | endpoint | App Key | env | Kafka topic |
 |------|----------|---------|-----|-------------|
-| debug | `https://gamelinelab-giso.envir.dev/v1/track` | `video-android-beta` | test | `events_raw_test` |
-| release | 同上 | `video-android-prod` | prod | `events_raw` |
+| debug | `https://gamelinelab-giso.envir.dev/v1/track` | `video-android-beta` | test | `giso_events_raw_test` |
+| release | 同上 | `video-android-prod` | prod | `giso_events_raw` |
 
 1. 确认 Doppler 已配置 `INFRA_GISO_APP_KEYS`（含上述 key，见 `deploy/DEPLOYMENT.md`）
 2. Android Studio 打开 `examples/android-video-demo`，运行 debug 包到真机（4G 即可）

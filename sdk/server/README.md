@@ -15,7 +15,7 @@
 
 ```java
 // 业务服务内单例（Spring 注册成 Bean，shutdown 时 close）
-ServerReporter reporter = new ServerReporter("kafka:9092", "events_raw", "giso");
+ServerReporter reporter = new ServerReporter("kafka:9092", "giso_events_raw", "giso");
 
 // 事务提交后调用（异步返回 Future，事实流建议对失败打日志+告警）
 reporter.report(

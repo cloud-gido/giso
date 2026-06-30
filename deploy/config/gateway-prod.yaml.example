@@ -8,9 +8,9 @@ sinks: [kafka]
 
 kafka:
   bootstrap_servers: kafka-broker1:9092,kafka-broker2:9092,kafka-broker3:9092
-  topic_raw: events_raw
-  topic_raw_test: events_raw_test
-  topic_quarantine: events_quarantine
+  topic_raw: giso_events_raw
+  topic_raw_test: giso_events_raw_test
+  topic_quarantine: giso_events_quarantine
   spill_dir: /data/spill
   properties:
     acks: all

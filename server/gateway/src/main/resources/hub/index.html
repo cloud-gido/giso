@@ -41,7 +41,7 @@
         </ul>
       </div>
     </div>
-    <p class="pipeline-note">两条线共享 Kafka <code>events_raw</code>，可同时跑、对比落地结果。</p>
+    <p class="pipeline-note">两条线共享 Kafka <code>giso_events_raw</code>，可同时跑、对比落地结果。</p>
 
     <h2 class="section-title">埋点治理</h2>
     <div class="grid" id="grid-tracking"></div>
@@ -171,7 +171,7 @@
         },
         {
           title: 'Kafka',
-          desc: '消息管道 events_raw / events_quarantine（无 Web UI，端口 9092）',
+          desc: '消息管道 giso_events_raw / giso_events_quarantine（无 Web UI，端口 9092）',
           href: '#',
           url: host + ':9092',
           badge: 'data',

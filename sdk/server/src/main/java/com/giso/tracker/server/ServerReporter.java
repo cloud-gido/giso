@@ -26,7 +26,7 @@ import java.util.concurrent.Future;
  *     端上冒充上报 server 事件会被网关判 error 进隔离区
  *
  * 用法（业务服务内单例复用）：
- *   var reporter = new ServerReporter("kafka:9092", "events_raw", "giso");
+ *   var reporter = new ServerReporter("kafka:9092", "giso_events_raw", "giso");
  *   reporter.report(uid, "bet_placed", Map.of("bet_id", "b1", "stake_amt", 100), null);
  *   // 关闭服务时 reporter.close()
  */

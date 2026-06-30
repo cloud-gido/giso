@@ -43,7 +43,7 @@ curl -s http://localhost:8123/metrics | head -5
 
 ```
 SDK / curl → Gateway :8123/v1/track
-    → Kafka (events_raw | events_raw_test | events_quarantine)
+    → Kafka (giso_events_raw | giso_events_raw_test | giso_events_quarantine)
     → event-bridge（幂等 + :9100/metrics）→ ClickHouse tracking.ods_events
     → Doris Routine Load（--profile doris）→ tracking.ods_events
     → Metabase 预置看板 / ClickHouse Play
@@ -99,7 +99,7 @@ SDK / curl → Gateway :8123/v1/track
 # 起 Doris（FE+BE）+ 建表 + Routine Load 消费 Kafka（prod + test + quarantine）
 docker compose --profile doris up -d --build
 
-# 已有 Doris 卷、仅缺 test 链路时（补 env 列 + events_raw_test Routine Load）
+# 已有 Doris 卷、仅缺 test 链路时（补 env 列 + giso_events_raw_test Routine Load）
 ./scripts/apply-doris-test-pipeline.sh
 
 # 验证：上报 → Kafka → Doris（无需 event-bridge）
@@ -108,11 +108,11 @@ docker compose --profile doris up -d --build
 
 | Kafka Topic | Routine Load | env 默认 |
 |---|---|---|
-| `events_raw` | `load_ods_events` | prod |
-| `events_raw_test` | `load_ods_events_test` | test |
-| `events_quarantine` | `load_ods_quarantine` | — |
+| `giso_events_raw` | `load_ods_events` | prod |
+| `giso_events_raw_test` | `load_ods_events_test` | test |
+| `giso_events_quarantine` | `load_ods_quarantine` | — |
 
-Web/Android 联调：`debug=true` → `env=test` → `events_raw_test`，与 ClickHouse 栈一致。
+Web/Android 联调：`debug=true` → `env=test` → `giso_events_raw_test`，与 ClickHouse 栈一致。
 
 | 入口 | 地址 | 账号 |
 |---|---|---|
@@ -157,7 +157,7 @@ docker compose --profile doris up -d doris-be --force-recreate
 
 ## 生产部署（Kafka + Doris）
 
-1. **Kafka**：创建 `events_raw`（8 分区）、`events_quarantine`（2 分区），副本 ≥ 3
+1. **Kafka**：创建 `giso_events_raw`（8 分区）、`giso_events_quarantine`（2 分区），副本 ≥ 3
 2. **Gateway**：参考 `server/gateway/gateway.yaml`，`sinks: [kafka]`，配置 `auth` 和 `limits`
 3. **Doris**：执行 `server/doris/01_create_tables.sql` + `02_routine_load.sql`（改 broker 地址）
 4. **监控**：Prometheus 抓 `/metrics`，加载 `server/ops/prometheus-rules.yml`；Grafana 接 Prometheus

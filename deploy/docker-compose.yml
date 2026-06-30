@@ -94,7 +94,7 @@ services:
     environment:
       KAFKA_BOOTSTRAP: kafka:9092
       CLICKHOUSE_URL: http://clickhouse:8123
-      KAFKA_TOPICS: events_raw,events_raw_test,events_quarantine
+      KAFKA_TOPICS: giso_events_raw,giso_events_raw_test,giso_events_quarantine
       METRICS_PORT: "9100"
     depends_on:
       kafka:

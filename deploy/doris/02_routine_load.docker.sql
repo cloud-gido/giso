@@ -1,7 +1,7 @@
 -- 本地 Docker：Kafka broker 使用 compose 服务名
 USE tracking;
 
--- prod 主事件流（events_raw）
+-- prod 主事件流（giso_events_raw）
 CREATE ROUTINE LOAD tracking.load_ods_events ON ods_events
 COLUMNS(
     stime_ms, ctime, log_id, event,
@@ -26,12 +26,12 @@ PROPERTIES (
 )
 FROM KAFKA (
     "kafka_broker_list" = "kafka:9092",
-    "kafka_topic" = "events_raw",
+    "kafka_topic" = "giso_events_raw",
     "property.kafka_default_offsets" = "OFFSET_BEGINNING",
     "property.group.id" = "doris_ods_events"
 );
 
--- test / 联调事件流（events_raw_test，与 event-bridge 一致）
+-- test / 联调事件流（giso_events_raw_test，与 event-bridge 一致）
 CREATE ROUTINE LOAD tracking.load_ods_events_test ON ods_events
 COLUMNS(
     stime_ms, ctime, log_id, event,
@@ -56,7 +56,7 @@ PROPERTIES (
 )
 FROM KAFKA (
     "kafka_broker_list" = "kafka:9092",
-    "kafka_topic" = "events_raw_test",
+    "kafka_topic" = "giso_events_raw_test",
     "property.kafka_default_offsets" = "OFFSET_BEGINNING",
     "property.group.id" = "doris_ods_events_test"
 );
@@ -76,7 +76,7 @@ PROPERTIES (
 )
 FROM KAFKA (
     "kafka_broker_list" = "kafka:9092",
-    "kafka_topic" = "events_quarantine",
+    "kafka_topic" = "giso_events_quarantine",
     "property.kafka_default_offsets" = "OFFSET_BEGINNING",
     "property.group.id" = "doris_ods_quarantine"
 );

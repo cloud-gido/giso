@@ -22,7 +22,7 @@ schema/ (Git) ──► CI codegen ──► SDK + Gateway 校验
                                     │
                     ┌───────────────┼───────────────┐
                     ▼               ▼               ▼
-              events_raw    events_quarantine    /admin
+              giso_events_raw    giso_events_quarantine    /admin
                     │               │
                     └──────► Doris ODS ──► Metabase
 ```
