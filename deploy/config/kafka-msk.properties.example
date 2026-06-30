@@ -1,0 +1,8 @@
+# MSK 联调参考（勿提交含密码的文件）
+# K8s 测试环境：Doppler INFRA_KAFKA_* → giso-secret，见 deploy/DEPLOYMENT.md
+#
+# bootstrap.servers=b-1.xxx:9096,b-2.xxx:9096,b-3.xxx:9096
+# security.protocol=SASL_SSL
+# sasl.mechanism=SCRAM-SHA-512
+# sasl.username=<MSK用户>
+# sasl.password=<MSK密码>

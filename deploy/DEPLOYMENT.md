@@ -22,7 +22,9 @@ git push origin main
 
 | Key | 示例 |
 |---|---|
-| `INFRA_KAFKA_BOOTSTRAP_SERVERS` | `b-1.xxx.kafka...:9092,b-2...`（平台共用 key，通常已存在） |
+| `INFRA_KAFKA_BOOTSTRAP_SERVERS` | `b-1...amazonaws.com:9096,b-2...,b-3...` |
+| `INFRA_KAFKA_SASL_USERNAME` | MSK SCRAM 用户名（→ `GISO_KAFKA_SASL_USERNAME`） |
+| `INFRA_KAFKA_SASL_PASSWORD` | MSK SCRAM 密码（→ `GISO_KAFKA_SASL_PASSWORD`） |
 | `INFRA_GISO_APP_KEYS` | `video-android-beta,video-android-prod,video-ios-beta,video-ios-prod` |
 | `INFRA_GISO_ADMIN_USER` | `admin` |
 | `INFRA_GISO_ADMIN_PASSWORD` | `***` |

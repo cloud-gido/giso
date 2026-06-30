@@ -5,6 +5,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -86,7 +87,9 @@ public final class GatewayConfig {
         c.kafkaTopicRawTest = (String) kafka.getOrDefault("topic_raw_test", c.kafkaTopicRawTest);
         c.kafkaTopicQuarantine = (String) kafka.getOrDefault("topic_quarantine", c.kafkaTopicQuarantine);
         c.kafkaSpillDir = (String) kafka.getOrDefault("spill_dir", c.kafkaSpillDir);
-        if (kafka.get("properties") instanceof Map<?, ?> p) c.kafkaProperties = (Map<String, Object>) p;
+        if (kafka.get("properties") instanceof Map<?, ?> p) {
+            c.kafkaProperties = new HashMap<>((Map<String, Object>) p);
+        }
 
         Map<String, Object> admin = (Map<String, Object>) doc.getOrDefault("admin", Map.of());
         c.adminRecentBuffer = (int) admin.getOrDefault("recent_buffer", c.adminRecentBuffer);
@@ -131,6 +134,32 @@ public final class GatewayConfig {
         envLong("GISO_MAX_BODY_BYTES").ifPresent(v -> c.maxBodyBytes = v);
         env("GISO_CLICKHOUSE_URL").ifPresent(v -> c.clickhouseUrl = v);
         envCsv("GISO_SINKS").ifPresent(v -> c.sinks = v);
+        applyKafkaSaslFromEnv(c);
+    }
+
+    /** MSK SASL/SCRAM：用户名密码走环境变量，组装 sasl.jaas.config（勿写入镜像/ConfigMap）。 */
+    static void applyKafkaSaslFromEnv(GatewayConfig c) {
+        env("GISO_KAFKA_SASL_JAAS").ifPresent(jaas -> {
+            var props = new HashMap<>(c.kafkaProperties);
+            props.put("sasl.jaas.config", jaas);
+            c.kafkaProperties = props;
+        });
+        var user = env("GISO_KAFKA_SASL_USERNAME");
+        var pass = env("GISO_KAFKA_SASL_PASSWORD");
+        if (user.isEmpty() || pass.isEmpty()) return;
+
+        var props = new HashMap<>(c.kafkaProperties);
+        props.putIfAbsent("security.protocol", "SASL_SSL");
+        props.putIfAbsent("sasl.mechanism", "SCRAM-SHA-512");
+        props.put("sasl.jaas.config",
+                "org.apache.kafka.common.security.scram.ScramLoginModule required "
+                        + "username=\"" + jaasEscape(user.get()) + "\" "
+                        + "password=\"" + jaasEscape(pass.get()) + "\";");
+        c.kafkaProperties = props;
+    }
+
+    private static String jaasEscape(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private static java.util.Optional<String> env(String key) {

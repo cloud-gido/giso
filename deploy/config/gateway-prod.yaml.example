@@ -13,6 +13,8 @@ kafka:
   topic_quarantine: giso_events_quarantine
   spill_dir: /data/spill
   properties:
+    security.protocol: SASL_SSL
+    sasl.mechanism: SCRAM-SHA-512
     acks: all
     linger.ms: 20
     compression.type: lz4
