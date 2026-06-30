@@ -13,16 +13,20 @@ android {
         versionCode 1
         versionName '1.0.1-demo'
 
-        // 真机联调：用电脑局域网 IP（手机与电脑须同一 Wi-Fi）
-        // 模拟器请改回 http://10.0.2.2:8123/v1/track
-        buildConfigField 'String', 'TRACK_ENDPOINT', '"http://192.168.1.183:8123/v1/track"'
-        buildConfigField 'String', 'APP_KEY', '"demo-key"'
+        // 测试环境（全国网络 HTTPS）；本地 docker compose 见 README「本地联调」
+        buildConfigField 'String', 'TRACK_ENDPOINT',
+                '"https://gamelinelab-giso.envir.dev/v1/track"'
+        // 与 Doppler INFRA_GISO_APP_KEYS 白名单一致（见 deploy/DEPLOYMENT.md）
+        buildConfigField 'String', 'APP_KEY', '"video-android-beta"'
+        buildConfigField 'String', 'TRACK_ENV', '"test"'
         buildConfigField 'boolean', 'TRACK_DEBUG', 'true'
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            buildConfigField 'String', 'APP_KEY', '"video-android-prod"'
+            buildConfigField 'String', 'TRACK_ENV', '"prod"'
             buildConfigField 'boolean', 'TRACK_DEBUG', 'false'
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

@@ -23,11 +23,20 @@ git push origin main
 | Key | 示例 |
 |---|---|
 | `INFRA_GISO_KAFKA_BOOTSTRAP_SERVERS` | `b-1.xxx.kafka.sa-east-1.amazonaws.com:9092,...` |
-| `INFRA_GISO_APP_KEYS` | `dev-android-key,dev-web-key` |
+| `INFRA_GISO_APP_KEYS` | `video-android-beta,video-android-prod,video-ios-beta,video-ios-prod` |
 | `INFRA_GISO_ADMIN_USER` | `admin` |
 | `INFRA_GISO_ADMIN_PASSWORD` | `***` |
 | `INFRA_GISO_VIEWER_USER` | `viewer` |
 | `INFRA_GISO_VIEWER_PASSWORD` | `***` |
+
+**App Key 命名（长视频等业务接入）：**
+
+| Key | 端 | 包类型 | SDK `env` | Kafka |
+|-----|-----|--------|-----------|-------|
+| `video-android-beta` | Android | debug/内测 | `test` | `events_raw_test` |
+| `video-android-prod` | Android | release | `prod` | `events_raw` |
+| `video-ios-beta` | iOS | TestFlight | `test` | `events_raw_test` |
+| `video-ios-prod` | iOS | App Store | `prod` | `events_raw` |
 
 ### 3. Kafka + Doris
 

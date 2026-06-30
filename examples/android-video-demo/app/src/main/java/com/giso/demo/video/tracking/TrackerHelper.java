@@ -44,8 +44,8 @@ public final class TrackerHelper {
             endpoint.setText("endpoint: " + BuildConfig.TRACK_ENDPOINT);
         }
         if (mode != null) {
-            mode.setText(BuildConfig.TRACK_DEBUG ? "debug 实时上报"
-                    : "生产模式 · 攒批上报");
+            mode.setText((BuildConfig.TRACK_DEBUG ? "debug 实时上报" : "生产模式 · 攒批上报")
+                    + " · env=" + BuildConfig.TRACK_ENV);
         }
         if (net != null) {
             net.setText("网关: 检测中…");

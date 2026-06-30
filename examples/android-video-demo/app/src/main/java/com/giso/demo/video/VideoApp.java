@@ -14,6 +14,7 @@ public final class VideoApp extends Application {
                         BuildConfig.TRACK_ENDPOINT)
                 .channel("demo")
                 .debug(BuildConfig.TRACK_DEBUG)
+                .env(BuildConfig.TRACK_ENV)
                 .exposureDurationMs(500L)
                 .batchSize(5)
                 .flushIntervalMs(8000L)

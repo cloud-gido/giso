@@ -12,32 +12,43 @@
 
 底部浮层显示 **设备 did** 和当前 **pgid**，方便在管理台过滤。
 
-## 快速演示（推荐）
+## 快速演示
 
-### 1. 启动 GISO 网关
+### 方式 A：测试环境（默认，全国任意网络）
+
+App 默认连 **EKS 测试网关**，无需局域网：
+
+| 构建 | endpoint | App Key | env | Kafka topic |
+|------|----------|---------|-----|-------------|
+| debug | `https://gamelinelab-giso.envir.dev/v1/track` | `video-android-beta` | test | `events_raw_test` |
+| release | 同上 | `video-android-prod` | prod | `events_raw` |
+
+1. 确认 Doppler 已配置 `INFRA_GISO_APP_KEYS`（含上述 key，见 `deploy/DEPLOYMENT.md`）
+2. Android Studio 打开 `examples/android-video-demo`，运行 debug 包到真机（4G 即可）
+3. 管理台：https://gamelinelab-giso.envir.dev/admin/
+4. **实时联调** → 粘贴 App 底部 **did** 过滤事件
+
+### 方式 B：本地 docker compose（开发网关）
 
 ```bash
 cd deploy && docker compose up -d --build
 # 管理台 http://localhost:8123/admin/  (admin / admin123)
 ```
 
-### 2. 用 Android Studio 打开工程
+修改 `app/build.gradle`：
 
+```gradle
+buildConfigField 'String', 'TRACK_ENDPOINT', '"http://10.0.2.2:8123/v1/track"'  // 模拟器
+// 真机：'"http://192.168.x.x:8123/v1/track"'
+buildConfigField 'String', 'APP_KEY', '"demo-key"'
+buildConfigField 'String', 'TRACK_ENV', '"test"'
 ```
-File → Open → examples/android-video-demo
-```
 
-首次打开会同步 Gradle；若提示缺少 SDK，按向导安装 Android SDK 34。
+手机与电脑须同一 Wi-Fi。
 
-### 3. 运行到模拟器
+### 管理台联调
 
-- 默认上报地址：`http://10.0.2.2:8123/v1/track`（模拟器访问宿主机）
-- App Key：`demo-key`（与 docker compose 配置一致）
-- **debug 模式已开启**：事件实时上报，不攒批
-
-### 4. 管理台联调
-
-1. 打开 http://localhost:8123/admin/
+1. 打开管理台（见上方链接）
 2. 进入 **实时联调**
 3. 复制 App 底部浮层的 **did**，粘贴到过滤框
 4. 在 App 中：滚动推荐流 → 点视频卡片 → 播放 → 点赞/分享/切集
@@ -50,11 +61,11 @@ app_launch → page_enter(video_feed) → element_exposure(video_card)
 → biz_event(video_play_start) → biz_event(video_play_heartbeat) ...
 ```
 
-### 5. 断言 API（可选）
+### 断言 API（可选）
 
 ```bash
-curl -s -X POST http://localhost:8123/admin/api/assert \
-  -u admin:admin123 \
+curl -s -X POST https://gamelinelab-giso.envir.dev/admin/api/assert \
+  -u admin:<密码> \
   -H 'Content-Type: application/json' \
   -d '{
     "did": "你的did",
@@ -67,15 +78,20 @@ curl -s -X POST http://localhost:8123/admin/api/assert \
   }'
 ```
 
-## 真机演示
+## App Key 命名（Doppler 白名单）
 
-修改 `app/build.gradle` 中的 `TRACK_ENDPOINT` 为电脑局域网 IP：
+| Key | 用途 |
+|-----|------|
+| `video-android-beta` | Android debug / 内测包，`env=test` |
+| `video-android-prod` | Android release，`env=prod` |
+| `video-ios-beta` | iOS 内测（预留） |
+| `video-ios-prod` | iOS 正式（预留） |
 
-```gradle
-buildConfigField 'String', 'TRACK_ENDPOINT', '"http://192.168.x.x:8123/v1/track"'
+Doppler 一行配置：
+
 ```
-
-确保手机与电脑在同一 Wi-Fi，且网关端口已开放。
+INFRA_GISO_APP_KEYS=video-android-beta,video-android-prod,video-ios-beta,video-ios-prod
+```
 
 ## 工程结构
 
