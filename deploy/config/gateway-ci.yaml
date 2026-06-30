@@ -1,0 +1,21 @@
+# CI 镜像冒烟：仅 file sink，不依赖 Kafka / ClickHouse
+port: 8123
+schema_dir: /app/schema
+
+sinks: [file]
+
+file:
+  dir: /data/events
+
+admin:
+  recent_buffer: 100
+
+auth:
+  app_keys: [demo-key]
+
+limits:
+  max_body_bytes: 1048576
+  rate_limit_rps: 0
+
+clickhouse:
+  url: ""

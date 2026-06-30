@@ -122,7 +122,7 @@ jobs:
           docker pull "$IMAGE"
           cid=$(docker run -d -p 18123:8123 \
             -v "$PWD/schema:/app/schema:ro" \
-            -v "$PWD/deploy/config/gateway-docker.yaml:/app/config/gateway.yaml:ro" \
+            -v "$PWD/deploy/config/gateway-ci.yaml:/app/config/gateway.yaml:ro" \
             "$IMAGE")
           trap 'docker rm -f "$cid"' EXIT
           for i in $(seq 1 30); do

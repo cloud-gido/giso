@@ -1,6 +1,18 @@
 # GISO · K8s 部署
 
-生产推荐路径：**GHCR 镜像 + 外部 Kafka + Doris 集群 + 本清单仅部署 Gateway**。
+## k3s 局域网一键部署（GHCR 镜像）
+
+```bash
+bash k8s/deploy-k3s.sh
+```
+
+默认拉起 Gateway + 单节点 Kafka，NodePort `30123`。GHCR 镜像为 private 时：
+
+```bash
+GISO_GHCR_TOKEN=<GitHub PAT> bash k8s/deploy-k3s.sh
+```
+
+---
 
 ## 快速开始（Kind 本地验证）
 

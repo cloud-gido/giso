@@ -1,0 +1,219 @@
+# GISO · k3s 一键栈（Gateway + 单节点 Kafka）
+# 由 k8s/deploy-k3s.sh 渲染占位符后 apply
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: giso
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: giso
+  labels:
+    app: kafka
+spec:
+  selector:
+    app: kafka
+  ports:
+    - port: 9092
+      targetPort: 9092
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: giso
+  labels:
+    app: kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: bitnami/kafka:3.7
+          ports:
+            - containerPort: 9092
+          env:
+            - name: ALLOW_PLAINTEXT_LISTENER
+              value: "yes"
+            - name: KAFKA_ENABLE_KRAFT
+              value: "yes"
+            - name: KAFKA_CFG_NODE_ID
+              value: "0"
+            - name: KAFKA_CFG_PROCESS_ROLES
+              value: controller,broker
+            - name: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
+              value: 0@127.0.0.1:9093
+            - name: KAFKA_CFG_LISTENERS
+              value: PLAINTEXT://:9092,CONTROLLER://:9093
+            - name: KAFKA_CFG_ADVERTISED_LISTENERS
+              value: PLAINTEXT://kafka.giso.svc.cluster.local:9092
+            - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+              value: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+            - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
+              value: CONTROLLER
+            - name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: giso-gateway-config
+  namespace: giso
+data:
+  gateway.yaml: |
+    port: 8123
+    schema_dir: /app/schema
+    sinks: [kafka]
+    kafka:
+      bootstrap_servers: kafka.giso.svc.cluster.local:9092
+      topic_raw: events_raw
+      topic_raw_test: events_raw_test
+      topic_quarantine: events_quarantine
+      spill_dir: /data/spill
+      properties:
+        acks: all
+        linger.ms: 20
+        compression.type: lz4
+        enable.idempotence: true
+    admin:
+      recent_buffer: 5000
+    auth:
+      app_keys: []
+      admin_user: ""
+      admin_password: ""
+      viewer_user: ""
+      viewer_password: ""
+    limits:
+      max_body_bytes: 2097152
+      rate_limit_rps: 100
+      rate_limit_burst: 200
+    clickhouse:
+      url: ""
+    sdk_config:
+      exposure_ratio: 0.5
+      exposure_duration_ms: 500
+      exposure_max_per_page: 3
+      batch_size: 20
+      flush_interval_ms: 15000
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: giso-gateway-secrets
+  namespace: giso
+type: Opaque
+stringData:
+  GISO_APP_KEYS: "__APP_KEYS__"
+  GISO_ADMIN_USER: "__ADMIN_USER__"
+  GISO_ADMIN_PASSWORD: "__ADMIN_PASSWORD__"
+  GISO_VIEWER_USER: "__VIEWER_USER__"
+  GISO_VIEWER_PASSWORD: "__VIEWER_PASSWORD__"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: giso
+  labels:
+    app: giso
+    component: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: giso
+      component: gateway
+  template:
+    metadata:
+      labels:
+        app: giso
+        component: gateway
+    spec:
+      __IMAGE_PULL_SECRETS__
+      containers:
+        - name: gateway
+          image: __GATEWAY_IMAGE__
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8123
+              name: http
+          envFrom:
+            - secretRef:
+                name: giso-gateway-secrets
+          env:
+            - name: GISO_GATEWAY_CONFIG
+              value: /app/config/gateway.yaml
+            - name: GISO_SCHEMA_DIR
+              value: /app/schema
+          volumeMounts:
+            - name: config
+              mountPath: /app/config/gateway.yaml
+              subPath: gateway.yaml
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8123
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8123
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: config
+          configMap:
+            name: giso-gateway-config
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: giso
+  labels:
+    app: giso
+    component: gateway
+spec:
+  type: NodePort
+  selector:
+    app: giso
+    component: gateway
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+      nodePort: __NODE_PORT__
