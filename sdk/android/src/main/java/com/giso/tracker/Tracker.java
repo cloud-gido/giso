@@ -77,7 +77,7 @@ public final class Tracker {
                 conn.setConnectTimeout(5000);
                 conn.setReadTimeout(5000);
                 if (conn.getResponseCode() != 200) return;
-                byte[] body = conn.getInputStream().readAllBytes();
+                byte[] body = readBytes(conn.getInputStream());
                 JSONObject c = new JSONObject(new String(body, java.nio.charset.StandardCharsets.UTF_8));
                 exposure.updateThresholds(
                         (float) c.optDouble("exposure_ratio", config.exposureRatio),
@@ -305,5 +305,16 @@ public final class Tracker {
 
     private void emit(String event, JSONObject page, JSONObject element, JSONObject biz, JSONObject pt) {
         queue.push(TrackEvent.of(event, common.snapshot(), page, element, biz, pt));
+    }
+
+    /** API 33 以下无 InputStream.readAllBytes()，华为等旧系统会因此闪退。 */
+    private static byte[] readBytes(java.io.InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+        byte[] chunk = new byte[4096];
+        int n;
+        while ((n = in.read(chunk)) != -1) {
+            buf.write(chunk, 0, n);
+        }
+        return buf.toByteArray();
     }
 }

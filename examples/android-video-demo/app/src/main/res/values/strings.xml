@@ -14,6 +14,7 @@
     <string name="view_series">查看全集</string>
     <string name="demo_hint">GISO 长视频 · 管理台 https://gamelinelab-giso.envir.dev/admin/</string>
     <string name="debug_panel_title">埋点联调</string>
+    <string name="debug_copy_did">复制 did</string>
     <string name="debug_did">设备 did</string>
     <string name="debug_page">当前页面</string>
     <string name="debug_mode">debug 实时上报</string>

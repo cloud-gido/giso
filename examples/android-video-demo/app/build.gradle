@@ -16,6 +16,8 @@ android {
         // 测试环境（全国网络 HTTPS）；本地 docker compose 见 README「本地联调」
         buildConfigField 'String', 'TRACK_ENDPOINT',
                 '"https://gamelinelab-giso.envir.dev/v1/track"'
+        buildConfigField 'String', 'ADMIN_URL',
+                '"https://gamelinelab-giso.envir.dev/admin/"'
         // 与 Doppler INFRA_GISO_APP_KEYS 白名单一致（见 deploy/DEPLOYMENT.md）
         buildConfigField 'String', 'APP_KEY', '"video-android-beta"'
         buildConfigField 'String', 'TRACK_ENV', '"test"'

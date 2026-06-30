@@ -14,4 +14,5 @@
     <color name="debug_accent">#4FC3F7</color>
     <color name="debug_ok">#66BB6A</color>
     <color name="debug_bad">#EF5350</color>
+    <color name="ic_launcher_background">#FF6B35</color>
 </resources>

@@ -16,7 +16,13 @@
 
 ### 方式 A：测试环境（默认，全国任意网络）
 
-App 默认连 **EKS 测试网关**，无需局域网：
+App 默认连 **EKS 测试网关**，无需局域网。已构建 debug APK：
+
+```bash
+cd examples/android-video-demo
+./gradlew :app:assembleDebug
+# 安装包：app/build/outputs/apk/debug/app-debug.apk
+```
 
 | 构建 | endpoint | App Key | env | Kafka topic |
 |------|----------|---------|-----|-------------|
@@ -24,9 +30,9 @@ App 默认连 **EKS 测试网关**，无需局域网：
 | release | 同上 | `video-android-prod` | prod | `giso_events_raw` |
 
 1. 确认 Doppler 已配置 `INFRA_GISO_APP_KEYS`（含上述 key，见 `deploy/DEPLOYMENT.md`）
-2. Android Studio 打开 `examples/android-video-demo`，运行 debug 包到真机（4G 即可）
-3. 管理台：https://gamelinelab-giso.envir.dev/admin/
-4. **实时联调** → 粘贴 App 底部 **did** 过滤事件
+2. 真机安装 `app-debug.apk`（或 Android Studio Run debug 包，4G 即可）
+3. 底部浮层点 **复制 did** → 管理台 **实时联调** 粘贴过滤
+4. 管理台：https://gamelinelab-giso.envir.dev/admin/（办公室 IP / VPN）
 
 ### 方式 B：本地 docker compose（开发网关）
 
@@ -112,6 +118,33 @@ examples/android-video-demo/
 3. **元素** — `Tracker.bind(view, ElementMeta.of(...))` 使用生成常量
 4. **播放** — `PlaybackTracker` 上报 `BizEvents.VIDEO_PLAY_*`
 5. **禁止手写字符串** — 全部使用 `Pages` / `Elements` / `Params` / `BizEvents`
+
+## 华为 / 荣耀手机安装说明
+
+本 Demo **只申请联网权限**（`INTERNET`），不读通讯录、定位、相册等敏感权限。
+
+若安装后 **弹窗提示风险** 或 **点图标闪退**，按下面排查：
+
+### 1. 华为安全提示（最常见）
+
+侧载 debug 包会触发 **「风险应用」/「纯净模式」** 提示，不是 App 要了额外权限：
+
+1. 安装时选择 **「继续安装」**（不要只点取消）
+2. **设置 → 系统 → 纯净模式** → 关闭，或把本 App 加入信任
+3. **设置 → 应用和服务 → 应用管控** → 找到「玑源长视频」→ **允许运行**
+4. **设置 → 应用 → 玑源长视频 → 流量使用情况** → 允许 **WLAN 和移动数据**
+
+### 2. 闪退（已修复）
+
+旧版 SDK 在 **Android 12 及以下** 启动时会闪退（`readAllBytes` 兼容性）。请重新安装最新 `app-debug.apk`。
+
+### 3. 仍打不开
+
+用数据线连电脑执行，把崩溃日志发开发：
+
+```bash
+adb logcat -d | grep -E "AndroidRuntime|giso.demo"
+```
 
 ## 样片来源
 

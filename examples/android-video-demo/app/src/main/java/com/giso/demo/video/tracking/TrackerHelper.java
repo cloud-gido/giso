@@ -1,10 +1,13 @@
 package com.giso.demo.video.tracking;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -24,21 +27,27 @@ public final class TrackerHelper {
 
     public static String deviceId(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(SP, Context.MODE_PRIVATE);
-        String did = prefs.getString(KEY_DID, "");
-        return did.isEmpty() ? "（启动后生成）" : did;
+        return prefs.getString(KEY_DID, "");
     }
 
     public static void bindDebugPanel(Context context, View root, String pageId) {
         TextView did = root.findViewById(R.id.debugDid);
         TextView page = root.findViewById(R.id.debugPage);
+        TextView appKey = root.findViewById(R.id.debugAppKey);
         TextView endpoint = root.findViewById(R.id.debugEndpoint);
         TextView net = root.findViewById(R.id.debugNet);
         TextView mode = root.findViewById(R.id.debugMode);
+        Button copyDid = root.findViewById(R.id.debugCopyDid);
+
+        String didValue = deviceId(context);
         if (did != null) {
-            did.setText("did: " + deviceId(context));
+            did.setText("did: " + (didValue.isEmpty() ? "（启动后生成）" : didValue));
         }
         if (page != null) {
             page.setText("pgid: " + pageId);
+        }
+        if (appKey != null) {
+            appKey.setText("app_key: " + BuildConfig.APP_KEY);
         }
         if (endpoint != null) {
             endpoint.setText("endpoint: " + BuildConfig.TRACK_ENDPOINT);
@@ -47,13 +56,25 @@ public final class TrackerHelper {
             mode.setText((BuildConfig.TRACK_DEBUG ? "debug 实时上报" : "生产模式 · 攒批上报")
                     + " · env=" + BuildConfig.TRACK_ENV);
         }
+        if (copyDid != null) {
+            copyDid.setOnClickListener(v -> {
+                if (didValue.isEmpty()) {
+                    Toast.makeText(context, "did 尚未生成", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                ClipboardManager clipboard = (ClipboardManager)
+                        context.getSystemService(Context.CLIPBOARD_SERVICE);
+                clipboard.setPrimaryClip(ClipData.newPlainText("did", didValue));
+                Toast.makeText(context, "已复制 did", Toast.LENGTH_SHORT).show();
+            });
+        }
         if (net != null) {
             net.setText("网关: 检测中…");
             probeGateway(context, net, true);
         }
     }
 
-    /** 探测手机能否访问电脑上的 GISO 网关。 */
+    /** 探测能否访问 GISO 网关 /v1/config。 */
     public static void probeGateway(Context context, TextView statusView, boolean toastOnFail) {
         String configUrl = BuildConfig.TRACK_ENDPOINT.replaceFirst("/v1/track/?$", "/v1/config");
         new Thread(() -> {
@@ -62,14 +83,17 @@ public final class TrackerHelper {
             HttpURLConnection conn = null;
             try {
                 conn = (HttpURLConnection) new URL(configUrl).openConnection();
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
                 conn.setRequestMethod("GET");
                 int code = conn.getResponseCode();
                 ok = code == 200;
                 result = ok ? "网关: 已连通 ✓" : "网关: HTTP " + code + " ✗";
             } catch (Exception e) {
-                result = "网关: 不可达 ✗（手机访问不到电脑）";
+                boolean remote = BuildConfig.TRACK_ENDPOINT.startsWith("https://");
+                result = remote
+                        ? "网关: 不可达 ✗（检查网络或 App Key 白名单）"
+                        : "网关: 不可达 ✗（手机与电脑须同一 Wi-Fi）";
             } finally {
                 if (conn != null) conn.disconnect();
             }
@@ -83,8 +107,7 @@ public final class TrackerHelper {
                 }
                 if (toastOnFail && !finalOk) {
                     Toast.makeText(context,
-                            "连不上网关，请确认同一 Wi-Fi，并在手机浏览器打开\n"
-                                    + configUrl.replace("/v1/config", "/metrics"),
+                            "连不上网关\n" + configUrl + "\n管理台: " + BuildConfig.ADMIN_URL,
                             Toast.LENGTH_LONG).show();
                 }
             });

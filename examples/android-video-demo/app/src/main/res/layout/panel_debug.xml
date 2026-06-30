@@ -6,13 +6,34 @@
     android:orientation="vertical"
     android:padding="10dp">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/debug_panel_title"
-        android:textColor="@color/debug_accent"
-        android:textSize="12sp"
-        android:textStyle="bold" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/debug_panel_title"
+            android:textColor="@color/debug_accent"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/debugCopyDid"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="@string/debug_copy_did"
+            android:textAllCaps="false"
+            android:textSize="11sp" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/debugDid"
@@ -30,6 +51,15 @@
         android:layout_marginTop="2dp"
         android:textColor="@color/text_muted"
         android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/debugAppKey"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:fontFamily="monospace"
+        android:textColor="@color/text_muted"
+        android:textSize="10sp" />
 
     <TextView
         android:id="@+id/debugEndpoint"
