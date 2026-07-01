@@ -2,6 +2,7 @@ package com.giso.gateway.registry;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.giso.gateway.DbMigrationSql;
 import com.giso.gateway.GatewayConfig;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -336,16 +337,17 @@ public final class PostgresRegistryStore implements RegistryStore {
         runSqlResource("/db/V3__approval.sql");
     }
 
-    /** 本地/超管可自动建 schema；RDS 应用账号无 CREATE 库权限时须 DBA 预建。 */
+    /** 本地/超管可自动建 schema；public（GIDO 默认）无需授权。 */
     private void ensureSchema() throws SQLException {
-        String ident = quoteIdent(dbSchema);
+        if (DbMigrationSql.isBuiltinPublic(dbSchema)) return;
+        String ident = DbMigrationSql.quoteIdent(dbSchema);
         try (Connection c = ds.getConnection(); Statement st = c.createStatement()) {
             st.execute("CREATE SCHEMA IF NOT EXISTS " + ident);
         } catch (SQLException e) {
             if (schemaExists()) return;
             throw new SQLException(
                     "schema '" + dbSchema + "' missing and DB user cannot CREATE SCHEMA; "
-                            + "run tools/registry/bootstrap_schema.sql as RDS master, then redeploy",
+                            + "set GISO_DB_SCHEMA=public (GIDO default) or run tools/registry/bootstrap_schema.sql",
                     e);
         }
     }
@@ -362,18 +364,11 @@ public final class PostgresRegistryStore implements RegistryStore {
     }
 
     private static String quoteIdent(String name) {
-        if (!name.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
-            throw new IllegalArgumentException("invalid schema name: " + name);
-        }
-        return name;
+        return DbMigrationSql.quoteIdent(name);
     }
 
     private void runSqlResource(String resourcePath) throws IOException, SQLException {
-        String sql;
-        try (var in = PostgresRegistryStore.class.getResourceAsStream(resourcePath)) {
-            if (in == null) throw new IOException(resourcePath + " not found on classpath");
-            sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
+        String sql = DbMigrationSql.load(PostgresRegistryStore.class, resourcePath, dbSchema);
         try (Connection c = ds.getConnection(); Statement st = c.createStatement()) {
             st.execute(sql);
         } catch (Exception e) {

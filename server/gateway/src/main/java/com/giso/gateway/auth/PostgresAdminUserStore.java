@@ -1,11 +1,11 @@
 package com.giso.gateway.auth;
 
 import com.giso.gateway.GatewayConfig;
+import com.giso.gateway.DbMigrationSql;
 import com.zaxxer.hikari.HikariDataSource;
 import org.mindrot.jbcrypt.BCrypt;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -166,11 +166,7 @@ public final class PostgresAdminUserStore implements AdminUserStore {
     }
 
     private void runSqlResource(String path) throws IOException, SQLException {
-        String sql;
-        try (var in = PostgresAdminUserStore.class.getResourceAsStream(path)) {
-            if (in == null) throw new IOException(path + " not found");
-            sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
+        String sql = DbMigrationSql.load(PostgresAdminUserStore.class, path, dbSchema);
         try (Connection c = ds.getConnection(); Statement st = c.createStatement()) {
             st.execute(sql);
         }

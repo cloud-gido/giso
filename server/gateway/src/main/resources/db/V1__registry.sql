@@ -1,7 +1,7 @@
 -- GISO 注册表元库（PostgreSQL，与 GIDO/DataEase 共用 RDS，独立库 giso）
--- schema `giso` 须由 DBA 预建（见 tools/registry/bootstrap_schema.sql）；本脚本仅建表。
+-- 默认 schema=public（与 GIDO 一致）；自定义 schema 见 tools/registry/bootstrap_schema.sql
 
-CREATE TABLE IF NOT EXISTS giso.registry_entries (
+CREATE TABLE IF NOT EXISTS ${schema}.registry_entries (
     kind        TEXT NOT NULL CHECK (kind IN ('params', 'pages', 'elements', 'events')),
     entry_key   TEXT NOT NULL,
     body        JSONB NOT NULL,
@@ -17,13 +17,13 @@ CREATE TABLE IF NOT EXISTS giso.registry_entries (
 );
 
 CREATE INDEX IF NOT EXISTS idx_registry_kind_status
-    ON giso.registry_entries (kind, status)
+    ON ${schema}.registry_entries (kind, status)
     WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_registry_updated
-    ON giso.registry_entries (updated_at DESC);
+    ON ${schema}.registry_entries (updated_at DESC);
 
-CREATE TABLE IF NOT EXISTS giso.registry_audit (
+CREATE TABLE IF NOT EXISTS ${schema}.registry_audit (
     id          BIGSERIAL PRIMARY KEY,
     kind        TEXT NOT NULL,
     entry_key   TEXT NOT NULL,
@@ -36,14 +36,14 @@ CREATE TABLE IF NOT EXISTS giso.registry_audit (
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_entry
-    ON giso.registry_audit (kind, entry_key, created_at DESC);
+    ON ${schema}.registry_audit (kind, entry_key, created_at DESC);
 
-CREATE TABLE IF NOT EXISTS giso.registry_meta (
+CREATE TABLE IF NOT EXISTS ${schema}.registry_meta (
     key   TEXT PRIMARY KEY,
     value JSONB NOT NULL
 );
 
-INSERT INTO giso.registry_meta (key, value) VALUES
+INSERT INTO ${schema}.registry_meta (key, value) VALUES
     ('global_revision', '{"revision": 0}'::jsonb),
     ('schema_version', '"1.0"'::jsonb),
     ('export_cursor', '{"last_export_revision": 0}'::jsonb)

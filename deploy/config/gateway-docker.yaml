@@ -22,7 +22,7 @@ registry:
   bootstrap_from_yaml: true
   poll_interval_sec: 10
   postgres:
-    schema: giso
+    schema: public
 
 auth:
   app_keys: [demo-key]

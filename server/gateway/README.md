@@ -123,7 +123,7 @@ registry:
   bootstrap_from_yaml: true    # 空库时从 schema_dir 种子导入
   poll_interval_sec: 10
   postgres:
-    schema: giso
+    schema: public
 ```
 
 环境变量：`GISO_REGISTRY_BACKEND`、`GISO_DB_HOST`、`GISO_DB_PORT`、`GISO_DB_NAME`、`GISO_DB_USER`、`GISO_DB_PASSWORD`。

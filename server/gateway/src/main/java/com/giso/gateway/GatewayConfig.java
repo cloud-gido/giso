@@ -28,7 +28,7 @@ public final class GatewayConfig {
     public String dbName = "giso";
     public String dbUser = "";
     public String dbPassword = "";
-    public String dbSchema = "giso";
+    public String dbSchema = "public";
     /** postgres 且库为空时，从 schema_dir YAML 种子导入 */
     public boolean registryBootstrapFromYaml = true;
     public int registryPollIntervalSec = 10;

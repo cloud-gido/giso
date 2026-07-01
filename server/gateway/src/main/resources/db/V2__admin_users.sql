@@ -1,5 +1,5 @@
 -- 管理台账号（与 GIDO 应用内登录对应层；GISO 使用 HTTP Basic + 本表持久化）
-CREATE TABLE IF NOT EXISTS giso.admin_users (
+CREATE TABLE IF NOT EXISTS ${schema}.admin_users (
     username      TEXT PRIMARY KEY,
     password_hash TEXT NOT NULL,
     role          TEXT NOT NULL CHECK (role IN ('admin', 'viewer')),
@@ -10,4 +10,4 @@ CREATE TABLE IF NOT EXISTS giso.admin_users (
 );
 
 CREATE INDEX IF NOT EXISTS idx_admin_users_role
-    ON giso.admin_users (role) WHERE disabled_at IS NULL;
+    ON ${schema}.admin_users (role) WHERE disabled_at IS NULL;
