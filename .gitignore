@@ -1,10 +1,22 @@
 ### IntelliJ IDEA ###
+.idea/
+*.iml
 out/
-.idea/workspace.xml
-.idea/shelf/
 !**/src/main/**/out/
 !**/src/test/**/out/
 .kotlin
+
+### Android / Gradle ###
+.gradle/
+**/build/
+*.apk
+*.ap_
+*.dex
+local.properties
+.cxx/
+
+### 内部需求文档（含隐私，勿提交）###
+需求/
 
 ### Maven ###
 target/
@@ -50,3 +62,6 @@ deploy/.env
 node_modules/
 **/node_modules/
 examples/web-news-demo/dist/
+examples/android-video-demo.zip
+**/*.zip
+!gradle/wrapper/*.jar
