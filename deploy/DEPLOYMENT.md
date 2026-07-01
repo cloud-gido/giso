@@ -30,6 +30,13 @@ git push origin main
 | `INFRA_GISO_ADMIN_PASSWORD` | `***` |
 | `INFRA_GISO_VIEWER_USER` | `viewer` |
 | `INFRA_GISO_VIEWER_PASSWORD` | `***` |
+| `INFRA_GISO_DB_HOST` | 与 DataEase **同 RDS host** |
+| `INFRA_GISO_DB_PORT` | `5432` |
+| `INFRA_GISO_DB_NAME` | `giso` |
+| `INFRA_GISO_DB_USER` | `giso_app` |
+| `INFRA_GISO_DB_PASSWORD` | `***` |
+
+**RDS 一次性**：`CREATE DATABASE giso`（控制台或 SQL，与 GIDO/DataEase 相同，deployment 不自动建库）。Gateway 启动自动迁表 + 空库种子导入。详见 `tools/registry/README.md`。
 
 **App Key 命名（长视频等业务接入）：**
 
@@ -86,7 +93,8 @@ ArgoCD 自动滚动 `giso-gateway` Deployment。
 
 ```bash
 curl -s https://gamelinelab-giso.envir.dev/health
-open https://gamelinelab-giso.envir.dev/admin/
+# 期望 registry.backend=postgres, entries>0
+open https://gamelinelab-giso.envir.dev/admin/   # 内网 IP
 ```
 
 ## 本地一键（不经过 ArgoCD）

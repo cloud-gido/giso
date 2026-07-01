@@ -1,6 +1,8 @@
 package com.giso.gateway;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.giso.gateway.auth.AdminAuth;
+import com.giso.gateway.registry.PostgresRegistryStore;
 import com.giso.gateway.registry.RegistryWatcher;
 import com.giso.gateway.sink.EventSink;
 import com.giso.gateway.sink.SinkFactory;
@@ -42,6 +44,8 @@ public final class Main {
         if (schemaOverride != null) config.schemaDir = schemaOverride;
 
         Registry registry = Registry.create(config);
+        PostgresRegistryStore pgStore = registry.store() instanceof PostgresRegistryStore pg ? pg : null;
+        AdminAuth adminAuth = new AdminAuth(config, pgStore);
         RegistryWatcher registryWatcher = new RegistryWatcher(
                 registry, registry.store(), config.registryPollIntervalSec);
         registryWatcher.start();
@@ -67,7 +71,10 @@ public final class Main {
                     "registry", Map.of(
                             "backend", registry.backendName(),
                             "revision", registry.globalRevision(),
-                            "entries", registry.entryCount())));
+                            "entries", registry.entryCount()),
+                    "auth", Map.of(
+                            "enabled", adminAuth.authEnabled(),
+                            "backend", pgStore != null ? "postgres" : "config")));
             Http.json(ex, 200, body);
         });
         server.createContext("/ready", ex -> {
@@ -92,8 +99,8 @@ public final class Main {
             ex.getResponseBody().write(body);
             ex.close();
         });
-        server.createContext("/admin/api", new AdminHandler(registry, store, sse, config));
-        server.createContext("/admin", new StaticHandler(config));
+        server.createContext("/admin/api", new AdminHandler(registry, store, sse, adminAuth, config));
+        server.createContext("/admin", new StaticHandler(adminAuth));
         server.createContext("/", new HubHandler());
         server.start();
 

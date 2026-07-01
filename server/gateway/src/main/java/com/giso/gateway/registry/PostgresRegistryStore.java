@@ -59,6 +59,11 @@ public final class PostgresRegistryStore implements RegistryStore {
         return ds.getJdbcUrl();
     }
 
+    /** 与 admin_users 共用连接池（勿重复建池）。 */
+    public HikariDataSource dataSource() {
+        return ds;
+    }
+
     public String dbUser() {
         return ds.getUsername();
     }
@@ -255,16 +260,26 @@ public final class PostgresRegistryStore implements RegistryStore {
 
     @Override
     public WriteResult publish(String kind, String key, String operator) throws Exception {
-        return transitionStatus(kind, key, operator, "live", "publish");
+        return transitionStatus(kind, key, operator, "live", "publish", null);
     }
 
     @Override
     public WriteResult deprecate(String kind, String key, String operator) throws Exception {
-        return transitionStatus(kind, key, operator, "deprecated", "deprecate");
+        return transitionStatus(kind, key, operator, "deprecated", "deprecate", null);
+    }
+
+    @Override
+    public WriteResult approve(String kind, String key, String operator) throws Exception {
+        return transitionStatus(kind, key, operator, "live", "approve", "pending");
+    }
+
+    @Override
+    public WriteResult reject(String kind, String key, String operator) throws Exception {
+        return transitionStatus(kind, key, operator, "draft", "reject", "pending");
     }
 
     private WriteResult transitionStatus(String kind, String key, String operator,
-            String targetStatus, String action) throws Exception {
+            String targetStatus, String action, String requiredFrom) throws Exception {
         try (Connection c = ds.getConnection()) {
             c.setAutoCommit(false);
             try {
@@ -272,6 +287,11 @@ public final class PostgresRegistryStore implements RegistryStore {
                 if (before == null) {
                     c.rollback();
                     return WriteResult.fail("不存在: " + key);
+                }
+                String current = String.valueOf(before.getOrDefault("status", "live"));
+                if (requiredFrom != null && !requiredFrom.equals(current)) {
+                    c.rollback();
+                    return WriteResult.fail("状态不符：需要 " + requiredFrom + "，当前 " + current);
                 }
                 Map<String, Object> after = new LinkedHashMap<>(before);
                 after.put("status", targetStatus);
@@ -311,15 +331,20 @@ public final class PostgresRegistryStore implements RegistryStore {
     }
 
     private void migrate() throws IOException, SQLException {
+        runSqlResource("/db/V1__registry.sql");
+        runSqlResource("/db/V3__approval.sql");
+    }
+
+    private void runSqlResource(String resourcePath) throws IOException, SQLException {
         String sql;
-        try (var in = PostgresRegistryStore.class.getResourceAsStream("/db/V1__registry.sql")) {
-            if (in == null) throw new IOException("V1__registry.sql not found on classpath");
+        try (var in = PostgresRegistryStore.class.getResourceAsStream(resourcePath)) {
+            if (in == null) throw new IOException(resourcePath + " not found on classpath");
             sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
         try (Connection c = ds.getConnection(); Statement st = c.createStatement()) {
             st.execute(sql);
         } catch (Exception e) {
-            throw new SQLException("registry schema migration failed: " + e.getMessage(), e);
+            throw new SQLException("schema migration failed (" + resourcePath + "): " + e.getMessage(), e);
         }
     }
 

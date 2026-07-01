@@ -19,6 +19,8 @@
   <symbol id="ico-registry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8M8 11h8M8 15h5"/></symbol>
   <symbol id="ico-stats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></symbol>
   <symbol id="ico-compare" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".75" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="ico-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="ico-approval" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></symbol>
   <symbol id="ico-family" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><circle cx="12" cy="12" r="2.5"/></symbol>
 </svg>
 
@@ -45,6 +47,10 @@
       用例断言
     </button>
     <div class="nav-group">治理配置</div>
+    <button class="nav-item nav-admin-only" data-view="approval">
+      <svg><use href="#ico-approval"/></svg>
+      待审批 <span class="nav-badge" id="nav-pending-badge" hidden>0</span>
+    </button>
     <button class="nav-item" data-view="registry">
       <svg><use href="#ico-registry"/></svg>
       注册表配置
@@ -52,6 +58,10 @@
     <button class="nav-item" data-view="stats">
       <svg><use href="#ico-stats"/></svg>
       质量统计
+    </button>
+    <button class="nav-item nav-admin-only" data-view="users">
+      <svg><use href="#ico-users"/></svg>
+      账号管理
     </button>
     <div class="nav-group">参考</div>
     <a class="nav-item nav-link" href="/" target="_blank">
@@ -65,6 +75,7 @@
   </nav>
 
   <div class="conn" id="conn"><span class="conn-dot"></span>连接中…</div>
+  <div class="user-pill" id="user-pill" hidden></div>
   <div class="sidebar-foot">
     <div class="family-line">GIDO</div>
     <div class="family-desc">埋点 · 分析 · 治理</div>
@@ -138,6 +149,18 @@ biz_event code=video_play_start</textarea>
     <div id="assert-result" class="card-flat"></div>
   </section>
 
+  <!-- 待审批 -->
+  <section id="view-approval" class="view">
+    <div class="card">
+      <div class="toolbar">
+        <span class="muted" id="approval-count">—</span>
+        <span class="spacer"></span>
+        <button id="btn-approval-refresh">刷新</button>
+      </div>
+      <div id="approval-list" class="table-wrap"></div>
+    </div>
+  </section>
+
   <!-- 注册表 -->
   <section id="view-registry" class="view">
     <div class="card">
@@ -182,6 +205,28 @@ biz_event code=video_play_start</textarea>
         </div>
         <div id="stats-coverage" class="table-wrap"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- 账号管理 -->
+  <section id="view-users" class="view">
+    <div class="card">
+      <div class="card-title">新增账号</div>
+      <form id="user-form" class="user-form">
+        <input name="username" placeholder="用户名" required pattern="[a-z][a-z0-9_]{2,31}">
+        <input name="password" type="password" placeholder="密码（至少 6 位）" required minlength="6">
+        <input name="display_name" placeholder="显示名（可选）">
+        <select name="role">
+          <option value="editor">编辑员 · 可提交待审批</option>
+          <option value="viewer">只读 · 联调/统计</option>
+          <option value="admin">管理员</option>
+        </select>
+        <button type="submit" class="primary">创建</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="card-title">有效账号</div>
+      <div id="users-table" class="table-wrap"></div>
     </div>
   </section>
 </div>

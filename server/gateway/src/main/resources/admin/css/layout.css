@@ -45,6 +45,20 @@ a.nav-link:hover { color: var(--accent); background: var(--panel2); }
 .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .conn:not(.off) .conn-dot { animation: pulse 2s infinite; }
 .conn.off { color: var(--red); background: var(--red-soft); }
+.user-pill {
+  margin: 8px 10px 0; padding: 6px 10px; font-size: 11.5px;
+  color: var(--muted); background: var(--panel2); border-radius: 8px;
+  border: 1px solid var(--border); text-align: center;
+}
+.nav-badge {
+  margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px;
+  font-size: 10px; font-weight: 700; line-height: 18px; text-align: center;
+  background: #c2410c; color: #fff; border-radius: 9px;
+}
+.user-form {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+.user-form input, .user-form select { min-width: 140px; }
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(20, 145, 83, .4); }
   50% { box-shadow: 0 0 0 5px rgba(20, 145, 83, 0); }

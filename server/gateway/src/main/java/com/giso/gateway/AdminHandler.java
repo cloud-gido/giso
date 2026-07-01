@@ -2,6 +2,8 @@ package com.giso.gateway;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.giso.gateway.auth.AdminAuth;
+import com.giso.gateway.auth.AdminPermissions;
 import com.giso.gateway.registry.RegistryKinds;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -10,16 +12,11 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * 管理 REST API：
- *   GET    /admin/api/registry                  四张注册表
- *   POST   /admin/api/registry/{kind}           新增/编辑条目（写回 YAML）
- *   DELETE /admin/api/registry/{kind}?key=xxx   删除条目
- *   GET    /admin/api/events?limit=&did=&event=&status=   近期事件（含校验结果）
- *   GET    /admin/api/stats                     质量统计
- *   GET    /admin/api/coverage                  登记覆盖率（live 条目 vs 已见上报）
- *   GET    /admin/api/stream                    SSE 实时事件流
- *   POST   /admin/api/clear                     清空联调缓冲
- *   POST   /admin/api/assert                    联调用例断言（期望序列 vs 实报）
+ * 管理 REST API（角色：admin / editor / viewer）。
+ *   GET    /admin/api/me
+ *   GET/POST/PUT/DELETE /admin/api/users[/{username}]
+ *   GET    /admin/api/registry/pending
+ *   POST   /admin/api/registry/{kind}/approve|reject|publish|deprecate
  */
 public final class AdminHandler implements HttpHandler {
     private static final ObjectMapper M = new ObjectMapper();
@@ -27,42 +24,100 @@ public final class AdminHandler implements HttpHandler {
     private final Registry registry;
     private final EventStore store;
     private final SseHub sse;
-    private final GatewayConfig config;
+    private final AdminAuth auth;
     private final ClickHouseCoverage clickhouse;
 
-    public AdminHandler(Registry registry, EventStore store, SseHub sse, GatewayConfig config) {
+    public AdminHandler(Registry registry, EventStore store, SseHub sse, AdminAuth auth,
+                        GatewayConfig config) {
         this.registry = registry;
         this.store = store;
         this.sse = sse;
-        this.config = config;
+        this.auth = auth;
         this.clickhouse = new ClickHouseCoverage(config.clickhouseUrl);
     }
 
     @Override
     public void handle(HttpExchange ex) throws IOException {
         if (Http.handlePreflight(ex)) return;
-        String role = Http.adminRole(ex, config);
-        if (role == null) {
+        if (auth.unauthorized(ex)) {
             Http.unauthorizedBasic(ex);
             return;
         }
+        String role = auth.role(ex);
         String path = ex.getRequestURI().getPath().substring("/admin/api".length());
         String method = ex.getRequestMethod();
-        // 写操作（注册表增删改/发布/废弃、清缓冲）仅限 admin；viewer 只读
-        boolean isWrite = (path.startsWith("/registry/") && !method.equals("GET"))
-                || path.equals("/clear");
-        if (isWrite && !role.equals("admin")) {
-            Http.json(ex, 403, "{\"error\":\"只读账号无权修改，请用管理员账号\"}");
-            return;
-        }
         try {
-            route(ex, method, path);
+            if (!authorize(ex, role, method, path)) return;
+            route(ex, method, path, role);
         } catch (Exception e) {
             Http.json(ex, 500, M.writeValueAsString(Map.of("error", String.valueOf(e.getMessage()))));
         }
     }
 
-    private void route(HttpExchange ex, String method, String path) throws Exception {
+    private boolean authorize(HttpExchange ex, String role, String method, String path) throws IOException {
+        if (path.equals("/me") && method.equals("GET")) return true;
+        if (path.startsWith("/users")) {
+            if (method.equals("GET") && path.equals("/users")) {
+                return require(ex, role, AdminPermissions.canManageUsers(role));
+            }
+            if (!AdminPermissions.canManageUsers(role)) {
+                Http.json(ex, 403, "{\"error\":\"仅管理员可管理账号\"}");
+                return false;
+            }
+            return true;
+        }
+        if (path.equals("/registry/pending") && method.equals("GET")) return true;
+        if (path.equals("/clear") && method.equals("POST")) {
+            return require(ex, role, AdminPermissions.canClearBuffer(role));
+        }
+        if (path.startsWith("/registry/")) {
+            String rest = path.substring("/registry/".length());
+            String action = rest.contains("/") ? rest.substring(rest.indexOf('/') + 1) : null;
+            if ("approve".equals(action) || "reject".equals(action)) {
+                return require(ex, role, AdminPermissions.canApproveRegistry(role));
+            }
+            if ("publish".equals(action) || "deprecate".equals(action)) {
+                return require(ex, role, AdminPermissions.canPublishRegistry(role));
+            }
+            if (path.equals("/registry/reload") && method.equals("POST")) {
+                return require(ex, role, AdminPermissions.canPublishRegistry(role));
+            }
+            if (method.equals("POST") && action == null) {
+                return require(ex, role, AdminPermissions.canEditRegistry(role));
+            }
+            if (method.equals("DELETE")) {
+                return require(ex, role, AdminPermissions.canEditRegistry(role));
+            }
+            return true;
+        }
+        return true;
+    }
+
+    private static boolean require(HttpExchange ex, String role, boolean ok) throws IOException {
+        if (ok) return true;
+        Http.json(ex, 403, "{\"error\":\"当前角色（" + role + "）无权执行此操作\"}");
+        return false;
+    }
+
+    private void route(HttpExchange ex, String method, String path, String role) throws Exception {
+        if (path.equals("/me") && method.equals("GET")) {
+            var me = auth.me(ex);
+            if (me == null) {
+                Http.unauthorizedBasic(ex);
+                return;
+            }
+            me.put("pending_count", registry.pendingCount());
+            Http.json(ex, 200, M.writeValueAsString(me));
+            return;
+        }
+        if (path.startsWith("/users")) {
+            routeUsers(ex, method, path);
+            return;
+        }
+        if (path.equals("/registry/pending") && method.equals("GET")) {
+            Http.json(ex, 200, M.writeValueAsString(registry.pending()));
+            return;
+        }
         if (path.equals("/registry") && method.equals("GET")) {
             Http.json(ex, 200, M.writeValueAsString(registry.all()));
 
@@ -80,46 +135,7 @@ public final class AdminHandler implements HttpHandler {
             Http.json(ex, 200, "{\"ok\":true}");
 
         } else if (path.startsWith("/registry/")) {
-            String rest = path.substring("/registry/".length());
-            String[] slash = rest.split("/", 2);
-            String kind = slash[0];
-            String action = slash.length > 1 ? slash[1] : null;
-            if (!RegistryKinds.isKnown(kind)) {
-                Http.json(ex, 404, "{\"error\":\"unknown kind\"}");
-                return;
-            }
-            String operator = Http.adminOperator(ex, config);
-            if ("publish".equals(action) && method.equals("POST")) {
-                String key = Http.query(ex).getOrDefault("key", "");
-                String err = registry.publish(kind, key, operator);
-                if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
-                else Http.json(ex, 200, "{\"ok\":true}");
-                return;
-            }
-            if ("deprecate".equals(action) && method.equals("POST")) {
-                String key = Http.query(ex).getOrDefault("key", "");
-                String err = registry.deprecate(kind, key, operator);
-                if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
-                else Http.json(ex, 200, "{\"ok\":true}");
-                return;
-            }
-            if (action != null) {
-                Http.json(ex, 404, "{\"error\":\"unknown action\"}");
-                return;
-            }
-            if (method.equals("POST")) {
-                Map<String, Object> item = M.readValue(Http.readBody(ex), new TypeReference<>() { });
-                String err = registry.upsert(kind, item, operator);
-                if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
-                else Http.json(ex, 200, "{\"ok\":true}");
-            } else if (method.equals("DELETE")) {
-                String key = Http.query(ex).getOrDefault("key", "");
-                String err = registry.delete(kind, key, operator);
-                if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
-                else Http.json(ex, 200, "{\"ok\":true}");
-            } else {
-                Http.empty(ex, 405);
-            }
+            routeRegistry(ex, method, path, role);
 
         } else if (path.equals("/events") && method.equals("GET")) {
             var q = Http.query(ex);
@@ -145,7 +161,7 @@ public final class AdminHandler implements HttpHandler {
             assertCase(ex);
 
         } else if (path.equals("/stream") && method.equals("GET")) {
-            sse.subscribe(ex); // 长连接，不关闭
+            sse.subscribe(ex);
 
         } else if (path.equals("/clear") && method.equals("POST")) {
             store.clearRecent();
@@ -156,21 +172,111 @@ public final class AdminHandler implements HttpHandler {
         }
     }
 
+    private void routeUsers(HttpExchange ex, String method, String path) throws Exception {
+        if (path.equals("/users") && method.equals("GET")) {
+            Http.json(ex, 200, M.writeValueAsString(auth.listUsers()));
+            return;
+        }
+        if (path.equals("/users") && method.equals("POST")) {
+            Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+            String err = auth.saveUser(
+                    str(body, "username"),
+                    str(body, "password"),
+                    str(body, "role"),
+                    str(body, "display_name"));
+            if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+            else Http.json(ex, 200, "{\"ok\":true}");
+            return;
+        }
+        if (path.startsWith("/users/")) {
+            String username = path.substring("/users/".length());
+            if (username.isBlank()) {
+                Http.empty(ex, 404);
+                return;
+            }
+            if (method.equals("PUT")) {
+                Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+                String pass = body.containsKey("password") ? str(body, "password") : null;
+                if (pass != null && pass.isBlank()) pass = null;
+                String err = auth.saveUser(username, pass, str(body, "role"), str(body, "display_name"));
+                if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+                else Http.json(ex, 200, "{\"ok\":true}");
+                return;
+            }
+            if (method.equals("DELETE")) {
+                String err = auth.disableUser(username);
+                if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+                else Http.json(ex, 200, "{\"ok\":true}");
+                return;
+            }
+        }
+        Http.empty(ex, 405);
+    }
+
+    private void routeRegistry(HttpExchange ex, String method, String path, String role) throws Exception {
+        String rest = path.substring("/registry/".length());
+        String[] slash = rest.split("/", 2);
+        String kind = slash[0];
+        String action = slash.length > 1 ? slash[1] : null;
+        if (!RegistryKinds.isKnown(kind)) {
+            Http.json(ex, 404, "{\"error\":\"unknown kind\"}");
+            return;
+        }
+        String operator = auth.operator(ex);
+        String key = Http.query(ex).getOrDefault("key", "");
+        if ("approve".equals(action) && method.equals("POST")) {
+            String err = registry.approve(kind, key, operator);
+            if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+            else Http.json(ex, 200, "{\"ok\":true}");
+            return;
+        }
+        if ("reject".equals(action) && method.equals("POST")) {
+            String err = registry.reject(kind, key, operator);
+            if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+            else Http.json(ex, 200, "{\"ok\":true}");
+            return;
+        }
+        if ("publish".equals(action) && method.equals("POST")) {
+            String err = registry.publish(kind, key, operator);
+            if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+            else Http.json(ex, 200, "{\"ok\":true}");
+            return;
+        }
+        if ("deprecate".equals(action) && method.equals("POST")) {
+            String err = registry.deprecate(kind, key, operator);
+            if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+            else Http.json(ex, 200, "{\"ok\":true}");
+            return;
+        }
+        if (action != null) {
+            Http.json(ex, 404, "{\"error\":\"unknown action\"}");
+            return;
+        }
+        if (method.equals("POST")) {
+            Map<String, Object> item = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+            String err = registry.upsert(kind, item, operator, role);
+            if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+            else Http.json(ex, 200, "{\"ok\":true}");
+        } else if (method.equals("DELETE")) {
+            String err = registry.delete(kind, key, operator, role);
+            if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+            else Http.json(ex, 200, "{\"ok\":true}");
+        } else {
+            Http.empty(ex, 405);
+        }
+    }
+
+    private static String str(Map<String, Object> m, String key) {
+        Object v = m.get(key);
+        return v == null ? "" : String.valueOf(v).trim();
+    }
+
     private static java.util.Set<String> merge(java.util.Set<String> a, java.util.Set<String> b) {
         var out = new java.util.HashSet<>(a);
         out.addAll(b);
         return out;
     }
 
-    /**
-     * 联调用例断言：声明期望事件序列，与该设备实报事件按序比对（有序子序列匹配）。
-     *
-     * 请求: { "did": "...", "expect": [ { "event":"page_enter", "pgid":"home" },
-     *                                   { "event":"element_click", "eid":"video_card" },
-     *                                   { "event":"biz_event", "code":"video_play_start" } ] }
-     * 响应: { "pass": bool, "matched": n, "expected": m,
-     *         "detail": [ { "expect":..., "hit": true, "at": 实报序号 } | { "expect":..., "hit": false } ] }
-     */
     private void assertCase(HttpExchange ex) throws IOException {
         var req = M.readTree(Http.readBody(ex));
         String did = req.path("did").asText("");
@@ -201,7 +307,7 @@ public final class AdminHandler implements HttpHandler {
             d.put("hit", hitAt >= 0);
             if (hitAt >= 0) {
                 d.put("at", hitAt);
-                cursor = hitAt + 1; // 有序匹配：下一条期望只能命中其后的实报
+                cursor = hitAt + 1;
                 matched++;
             }
             detail.add(d);

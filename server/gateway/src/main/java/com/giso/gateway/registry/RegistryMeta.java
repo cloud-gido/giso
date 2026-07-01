@@ -14,4 +14,8 @@ public interface RegistryMeta {
     WriteResult publish(String kind, String key, String operator) throws Exception;
 
     WriteResult deprecate(String kind, String key, String operator) throws Exception;
+
+    WriteResult approve(String kind, String key, String operator) throws Exception;
+
+    WriteResult reject(String kind, String key, String operator) throws Exception;
 }

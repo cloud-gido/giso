@@ -3,6 +3,8 @@ package com.giso.gateway;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.giso.gateway.auth.AdminPermissions;
+import com.giso.gateway.auth.AdminUser;
 import com.giso.gateway.registry.RegistryKinds;
 import com.giso.gateway.registry.RegistrySnapshot;
 import com.giso.gateway.registry.RegistryStore;
@@ -73,12 +75,28 @@ public final class Registry {
     }
 
     public synchronized String upsert(String kind, Map<String, Object> item, String operator) throws Exception {
+        return upsert(kind, item, operator, AdminUser.ROLE_ADMIN);
+    }
+
+    public synchronized String upsert(String kind, Map<String, Object> item, String operator, String role)
+            throws Exception {
         String idField = RegistryKinds.idField(kind);
         String key = String.valueOf(item.get(idField));
-        if ("postgres".equals(store.backendName()) && !tables.get(kind).containsKey(key)) {
-            item = new LinkedHashMap<>(item);
+        Map<String, Object> existing = tables.get(kind).get(key);
+        item = new LinkedHashMap<>(item);
+
+        if (AdminUser.ROLE_EDITOR.equals(role)) {
+            if (existing != null) {
+                String est = String.valueOf(existing.getOrDefault("status", "live"));
+                if (!AdminPermissions.editorMayEditStatus(est)) {
+                    return "编辑员只能修改「待审批/登记中」条目，已生效条目请联系管理员审批";
+                }
+            }
+            item.put("status", "pending");
+        } else if ("postgres".equals(store.backendName()) && existing == null) {
             item.putIfAbsent("status", "draft");
         }
+
         String err = validateUpsert(kind, item);
         if (err != null) return err;
         WriteResult wr = store.upsert(kind, item, operator);
@@ -88,6 +106,17 @@ public final class Registry {
     }
 
     public synchronized String delete(String kind, String key, String operator) throws Exception {
+        return delete(kind, key, operator, AdminUser.ROLE_ADMIN);
+    }
+
+    public synchronized String delete(String kind, String key, String operator, String role) throws Exception {
+        Map<String, Object> existing = tables.get(kind).get(key);
+        if (AdminUser.ROLE_EDITOR.equals(role) && existing != null) {
+            String est = String.valueOf(existing.getOrDefault("status", "live"));
+            if (!AdminPermissions.editorMayEditStatus(est)) {
+                return "编辑员只能删除「待审批/登记中」条目";
+            }
+        }
         WriteResult wr = store.delete(kind, key, operator);
         if (wr.error() != null) return wr.error();
         reload();
@@ -124,6 +153,39 @@ public final class Registry {
         return null;
     }
 
+    public synchronized String approve(String kind, String key, String operator) throws Exception {
+        WriteResult wr = store.approve(kind, key, operator);
+        if (wr.error() != null) return wr.error();
+        reload();
+        return null;
+    }
+
+    public synchronized String reject(String kind, String key, String operator) throws Exception {
+        WriteResult wr = store.reject(kind, key, operator);
+        if (wr.error() != null) return wr.error();
+        reload();
+        return null;
+    }
+
+    /** 各表 status=pending 的条目（审批收件箱）。 */
+    public synchronized Map<String, List<Map<String, Object>>> pending() {
+        Map<String, List<Map<String, Object>>> out = new LinkedHashMap<>();
+        tables.forEach((kind, map) -> {
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (Map<String, Object> item : map.values()) {
+                if ("pending".equals(String.valueOf(item.get("status")))) {
+                    rows.add(item);
+                }
+            }
+            out.put(kind, rows);
+        });
+        return out;
+    }
+
+    public synchronized int pendingCount() {
+        return pending().values().stream().mapToInt(List::size).sum();
+    }
+
     private String validateUpsert(String kind, Map<String, Object> item) {
         String idField = RegistryKinds.idField(kind);
         String key = String.valueOf(item.get(idField));
@@ -152,9 +214,9 @@ public final class Registry {
             }
         }
         Object st = item.get("status");
-        if (st != null && !java.util.Set.of("draft", "dev", "testing", "live", "deprecated")
+        if (st != null && !java.util.Set.of("draft", "dev", "testing", "pending", "live", "deprecated")
                 .contains(String.valueOf(st))) {
-            return "status 非法: " + st + "（draft/dev/testing/live/deprecated）";
+            return "status 非法: " + st + "（draft/dev/testing/pending/live/deprecated）";
         }
         return null;
     }

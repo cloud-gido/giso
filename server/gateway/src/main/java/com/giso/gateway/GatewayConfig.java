@@ -1,11 +1,14 @@
 package com.giso.gateway;
 
+import com.giso.gateway.auth.AdminUser;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -58,6 +61,11 @@ public final class GatewayConfig {
     /** 只读账号（看联调/统计/注册表，不能改注册表/清缓冲）；空 = 不提供只读账号 */
     public String viewerUser = "";
     public String viewerPassword = "";
+    /**
+     * 扩展多账号（yaml auth.users 或 GISO_ADMIN_USERS）。
+     * 生产 postgres 模式下仅作<strong>首次种子</strong>，落库后改 Doppler 不会自动覆盖已有用户。
+     */
+    public List<Map<String, String>> authUsers = List.of();
 
     // ── 防护 ──
     /** 单次请求 body 解压后字节上限 */
@@ -113,6 +121,21 @@ public final class GatewayConfig {
         c.adminPassword = (String) auth.getOrDefault("admin_password", c.adminPassword);
         c.viewerUser = (String) auth.getOrDefault("viewer_user", c.viewerUser);
         c.viewerPassword = (String) auth.getOrDefault("viewer_password", c.viewerPassword);
+        if (auth.get("users") instanceof List<?> users) {
+            List<Map<String, String>> parsed = new ArrayList<>();
+            for (Object o : users) {
+                if (!(o instanceof Map<?, ?> raw)) continue;
+                Map<String, Object> m = new HashMap<>();
+                raw.forEach((k, v) -> m.put(String.valueOf(k), v));
+                String u = String.valueOf(m.getOrDefault("username", "")).trim();
+                String p = String.valueOf(m.getOrDefault("password", ""));
+                String r = String.valueOf(m.getOrDefault("role", AdminUser.ROLE_ADMIN)).trim();
+                if (!u.isEmpty() && !p.isEmpty()) {
+                    parsed.add(Map.of("username", u, "password", p, "role", r));
+                }
+            }
+            c.authUsers = parsed;
+        }
 
         Map<String, Object> limits = (Map<String, Object>) doc.getOrDefault("limits", Map.of());
         c.maxBodyBytes = ((Number) limits.getOrDefault("max_body_bytes", c.maxBodyBytes)).longValue();
@@ -169,6 +192,7 @@ public final class GatewayConfig {
         env("GISO_ADMIN_PASSWORD").ifPresent(v -> c.adminPassword = v);
         env("GISO_VIEWER_USER").ifPresent(v -> c.viewerUser = v);
         env("GISO_VIEWER_PASSWORD").ifPresent(v -> c.viewerPassword = v);
+        env("GISO_ADMIN_USERS").ifPresent(v -> c.authUsers = parseAdminUsersEnv(v));
         envInt("GISO_RATE_LIMIT_RPS").ifPresent(v -> c.rateLimitRps = v);
         envInt("GISO_RATE_LIMIT_BURST").ifPresent(v -> c.rateLimitBurst = v);
         envLong("GISO_MAX_BODY_BYTES").ifPresent(v -> c.maxBodyBytes = v);
@@ -229,5 +253,38 @@ public final class GatewayConfig {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .toList());
+    }
+
+    /** 合并 legacy admin/viewer 与 auth.users，供配置种子或 PG bootstrap。 */
+    public static List<AdminUser> resolveAuthUsers(GatewayConfig c) {
+        Map<String, AdminUser> byName = new LinkedHashMap<>();
+        if (c.adminUser != null && !c.adminUser.isBlank() && c.adminPassword != null) {
+            byName.put(c.adminUser, new AdminUser(c.adminUser, c.adminPassword, AdminUser.ROLE_ADMIN));
+        }
+        if (c.viewerUser != null && !c.viewerUser.isBlank() && c.viewerPassword != null) {
+            byName.put(c.viewerUser, new AdminUser(c.viewerUser, c.viewerPassword, AdminUser.ROLE_VIEWER));
+        }
+        for (Map<String, String> m : c.authUsers) {
+            String u = m.get("username");
+            String p = m.get("password");
+            String r = m.getOrDefault("role", AdminUser.ROLE_ADMIN);
+            if (u != null && p != null && !u.isBlank()) {
+                byName.put(u, new AdminUser(u, p, r));
+            }
+        }
+        return List.copyOf(byName.values());
+    }
+
+    private static List<Map<String, String>> parseAdminUsersEnv(String raw) {
+        List<Map<String, String>> out = new ArrayList<>();
+        for (String part : raw.split(",")) {
+            String[] seg = part.trim().split(":", 3);
+            if (seg.length < 2 || seg[0].isBlank()) continue;
+            out.add(Map.of(
+                    "username", seg[0].trim(),
+                    "password", seg[1],
+                    "role", seg.length > 2 ? seg[2].trim() : AdminUser.ROLE_ADMIN));
+        }
+        return out;
     }
 }

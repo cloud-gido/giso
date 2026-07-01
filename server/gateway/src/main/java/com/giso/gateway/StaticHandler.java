@@ -1,5 +1,6 @@
 package com.giso.gateway;
 
+import com.giso.gateway.auth.AdminAuth;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
@@ -15,15 +16,15 @@ public final class StaticHandler implements HttpHandler {
             "css", "text/css; charset=utf-8",
             "svg", "image/svg+xml");
 
-    private final GatewayConfig config;
+    private final AdminAuth auth;
 
-    public StaticHandler(GatewayConfig config) {
-        this.config = config;
+    public StaticHandler(AdminAuth auth) {
+        this.auth = auth;
     }
 
     @Override
     public void handle(HttpExchange ex) throws IOException {
-        if (Http.adminRole(ex, config) == null) {
+        if (auth.unauthorized(ex)) {
             Http.unauthorizedBasic(ex);
             return;
         }

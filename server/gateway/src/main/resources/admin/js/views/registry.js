@@ -1,6 +1,7 @@
 /* 注册表配置：参数池/页面池/元素池/业务事件 CRUD + 表头列拖拽排序 */
 import { $, $$, esc, toast } from '../util.js';
 import { api } from '../api.js';
+import { getMe, isAdmin, isEditor, canEditRegistry } from '../session.js';
 
 let registry = { params: [], pages: [], elements: [], events: [] };
 let curKind = 'params';
@@ -21,7 +22,10 @@ const KIND_META = {
 };
 const LIST_COLS = ['params', 'children', 'elements'];
 const TEXTAREA_COLS = ['desc'];
-const STATUS_LABEL = { draft: '登记中', dev: '开发中', testing: '测试中', live: '线上', deprecated: '已废弃' };
+const STATUS_LABEL = {
+  draft: '登记中', dev: '开发中', testing: '测试中', pending: '待审批',
+  live: '线上', deprecated: '已废弃',
+};
 
 function colKey() { return `reg-cols-${curKind}`; }
 
@@ -97,10 +101,17 @@ function bindColDrag(table, meta) {
   });
 }
 
+function canModifyRow(it) {
+  if (!canEditRegistry()) return false;
+  if (isAdmin()) return true;
+  const s = it.status || 'live';
+  return s === 'pending' || s === 'draft' || !s;
+}
+
 export async function renderRegistry() {
-  const meta = await api('/registry/meta').catch(() => ({}));
-  if (meta.revision != null) {
-    $('#reg-meta').textContent = `revision ${meta.revision} · ${meta.entries ?? '—'} 条 · ${meta.backend || '—'}`;
+  const regMeta = await api('/registry/meta').catch(() => ({}));
+  if (regMeta.revision != null) {
+    $('#reg-meta').textContent = `revision ${regMeta.revision} · ${regMeta.entries ?? '—'} 条 · ${regMeta.backend || '—'}`;
   }
   registry = await api('/registry');
   const meta = KIND_META[curKind];
@@ -115,10 +126,10 @@ export async function renderRegistry() {
     <tbody>${rows.map((it) => `<tr>
       ${cols.map((c) => `<td>${cell(it, c, meta)}</td>`).join('')}
       <td class="row-actions">
-        <button data-act="edit" data-key="${esc(it[meta.id])}">编辑</button>
+        ${canModifyRow(it) ? `<button data-act="edit" data-key="${esc(it[meta.id])}">编辑</button>` : ''}
         ${actionBtns(it, meta)}
         <button data-act="audit" data-key="${esc(it[meta.id])}">审计</button>
-        <button data-act="del" data-key="${esc(it[meta.id])}" class="danger">删除</button>
+        ${canModifyRow(it) ? `<button data-act="del" data-key="${esc(it[meta.id])}" class="danger">删除</button>` : ''}
       </td></tr>`).join('') || `<tr><td colspan="${cols.length + 1}" class="muted empty-cell">没有匹配的条目</td></tr>`}
     </tbody></table>`;
   $('#reg-table').querySelectorAll('button[data-act]').forEach((b) => {
@@ -130,6 +141,8 @@ export async function renderRegistry() {
       else if (act === 'audit') openAudit(key);
       else if (act === 'pub') doPublish(key);
       else if (act === 'dep') doDeprecate(key);
+      else if (act === 'approve') doApprove(key);
+      else if (act === 'reject') doReject(key);
     };
   });
   $('#btn-reset-cols')?.addEventListener('click', () => {
@@ -142,14 +155,36 @@ export async function renderRegistry() {
 
 function actionBtns(it, meta) {
   const s = it.status || 'live';
+  const me = getMe();
   let html = '';
-  if (s !== 'live' && s !== 'deprecated') {
-    html += `<button data-act="pub" data-key="${esc(it[meta.id])}" class="primary">发布</button>`;
+  if (isAdmin()) {
+    if (s === 'pending') {
+      html += `<button data-act="approve" data-key="${esc(it[meta.id])}" class="primary">批准</button>`;
+      html += `<button data-act="reject" data-key="${esc(it[meta.id])}">驳回</button>`;
+    } else if (s !== 'live' && s !== 'deprecated') {
+      html += `<button data-act="pub" data-key="${esc(it[meta.id])}" class="primary">发布</button>`;
+    }
+    if (s === 'live' || s === 'testing') {
+      html += `<button data-act="dep" data-key="${esc(it[meta.id])}">废弃</button>`;
+    }
   }
-  if (s === 'live' || s === 'testing') {
-    html += `<button data-act="dep" data-key="${esc(it[meta.id])}">废弃</button>`;
-  }
+  if (!canEditRegistry()) return html;
+  if (isEditor() && s !== 'pending' && s !== 'draft' && s) return html;
   return html;
+}
+
+async function doApprove(key) {
+  if (!confirm(`批准 ${key} 上线？`)) return;
+  const r = await api(`/registry/${curKind}/approve?key=${encodeURIComponent(key)}`, { method: 'POST' });
+  if (r.error) toast(r.error, 'error');
+  else { toast(`已批准 ${key}`); renderRegistry(); document.dispatchEvent(new CustomEvent('giso:pending-changed')); }
+}
+
+async function doReject(key) {
+  if (!confirm(`驳回 ${key}？`)) return;
+  const r = await api(`/registry/${curKind}/reject?key=${encodeURIComponent(key)}`, { method: 'POST' });
+  if (r.error) toast(r.error, 'error');
+  else { toast(`已驳回 ${key}`); renderRegistry(); }
 }
 
 async function doPublish(key) {
@@ -197,8 +232,12 @@ function editorField(c, meta, item, key) {
       .map((t) => `<option ${t === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`);
   }
   if (c === 'status') {
-    return field(meta.labels[c], `<select name="status">${['', 'draft', 'dev', 'testing', 'live', 'deprecated']
-      .map((t) => `<option value="${t}" ${t === v ? 'selected' : ''}>${t ? `${t} · ${STATUS_LABEL[t]}` : '（缺省 = live 线上）'}</option>`).join('')}</select>`);
+    if (isEditor()) {
+      return field(meta.labels[c], `<input name="status" value="pending" readonly title="编辑员提交后进入待审批">`
+        + `<span class="hint-inline">保存后进入「待审批」，管理员批准后生效</span>`);
+    }
+    return field(meta.labels[c], `<select name="status">${['', 'draft', 'dev', 'testing', 'pending', 'live', 'deprecated']
+      .map((t) => `<option value="${t}" ${t === (v || '') ? 'selected' : ''}>${t ? `${t} · ${STATUS_LABEL[t]}` : '（缺省 = live 线上）'}</option>`).join('')}</select>`);
   }
   if (c === 'screenshot') {
     return field(meta.labels[c], `
@@ -241,7 +280,11 @@ function openEditor(key) {
     });
     const r = await api('/registry/' + curKind, { method: 'POST', body: JSON.stringify(out) });
     if (r.error) { toast(r.error, 'error'); e.preventDefault(); }
-    else { toast('已保存'); renderRegistry(); }
+    else {
+      toast(isEditor() ? '已提交待审批' : '已保存');
+      renderRegistry();
+      if (isEditor()) document.dispatchEvent(new CustomEvent('giso:pending-changed'));
+    }
   };
 }
 
@@ -256,4 +299,5 @@ export function initRegistry() {
   });
   $('#reg-search').addEventListener('input', renderRegistry);
   $('#btn-add').onclick = () => openEditor(null);
+  if (!canEditRegistry()) $('#btn-add')?.setAttribute('hidden', '');
 }

@@ -30,6 +30,10 @@ auth:
   admin_password: admin123
   viewer_user: viewer
   viewer_password: viewer123
+  users:
+    - username: editor1
+      password: editor123
+      role: editor
 
 limits:
   max_body_bytes: 1048576

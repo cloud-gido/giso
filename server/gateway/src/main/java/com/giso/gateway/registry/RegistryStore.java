@@ -42,4 +42,14 @@ public interface RegistryStore extends RegistryMeta {
     default WriteResult deprecate(String kind, String key, String operator) throws Exception {
         return WriteResult.fail("当前后端不支持 deprecate（仅 postgres）");
     }
+
+    @Override
+    default WriteResult approve(String kind, String key, String operator) throws Exception {
+        return WriteResult.fail("当前后端不支持 approve（仅 postgres）");
+    }
+
+    @Override
+    default WriteResult reject(String kind, String key, String operator) throws Exception {
+        return WriteResult.fail("当前后端不支持 reject（仅 postgres）");
+    }
 }
