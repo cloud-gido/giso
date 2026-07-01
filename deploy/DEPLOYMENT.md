@@ -30,11 +30,9 @@ git push origin main
 | `INFRA_GISO_ADMIN_PASSWORD` | `***` |
 | `INFRA_GISO_VIEWER_USER` | `viewer` |
 | `INFRA_GISO_VIEWER_PASSWORD` | `***` |
-| `INFRA_GISO_DB_HOST` | 与 DataEase **同 RDS host** |
-| `INFRA_GISO_DB_PORT` | `5432` |
-| `INFRA_GISO_DB_NAME` | `giso` |
-| `INFRA_GISO_DB_USER` | `giso_app` |
-| `INFRA_GISO_DB_PASSWORD` | `***` |
+| `INFRA_GISO_DB_SERVICE_URL` | `postgresql://...:5432/giso` | → `GISO_DB_URL` |
+| `INFRA_GISO_DB_SERVICE_USER` | `giso-user` | → `GISO_DB_USER` |
+| `INFRA_GISO_DB_SERVICE_PASSWORD` | `***` | → `GISO_DB_PASSWORD` |
 
 **RDS 一次性**：`CREATE DATABASE giso`（控制台或 SQL，与 GIDO/DataEase 相同，deployment 不自动建库）。Gateway 启动自动迁表 + 空库种子导入。详见 `tools/registry/README.md`。
 

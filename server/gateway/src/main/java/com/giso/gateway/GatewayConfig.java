@@ -165,9 +165,13 @@ public final class GatewayConfig {
         return c;
     }
 
-    /** JDBC URL：优先 dbUrl，否则由 host/port/database 拼装。 */
+    /** JDBC URL：优先 dbUrl，否则由 host/port/database 拼装。支持 Doppler 的 postgresql:// 格式。 */
     public String jdbcUrl() {
-        if (dbUrl != null && !dbUrl.isBlank()) return dbUrl.trim();
+        if (dbUrl != null && !dbUrl.isBlank()) {
+            String u = dbUrl.trim();
+            if (u.startsWith("postgresql://")) return "jdbc:" + u;
+            return u;
+        }
         if (dbHost == null || dbHost.isBlank()) {
             throw new IllegalStateException("postgres registry requires GISO_DB_URL or GISO_DB_HOST");
         }
