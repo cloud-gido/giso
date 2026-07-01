@@ -17,6 +17,13 @@ kafka:
 admin:
   recent_buffer: 2000
 
+registry:
+  backend: postgres
+  bootstrap_from_yaml: true
+  poll_interval_sec: 10
+  postgres:
+    schema: giso
+
 auth:
   app_keys: [demo-key]
   admin_user: admin

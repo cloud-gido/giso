@@ -1,0 +1,20 @@
+-- =============================================================================
+-- GISO 注册表元库 — 与 GIDO / DataEase 共用 RDS，独立库 giso
+-- =============================================================================
+--
+-- 1. 以 RDS 主账号连接 postgres 库，执行下方「建库」
+-- 2. 连接 giso 库，执行 server/gateway/src/main/resources/db/V1__registry.sql
+--    （或 Gateway 首次启动时自动迁移）
+-- 3. 种子：python3 tools/registry/import_yaml.py
+--
+-- Doppler（host 与 INFRA_DATAEASE_DB_HOST 相同，库名 giso）：
+--   INFRA_GISO_DB_HOST / PORT / NAME=giso / USER / PASSWORD
+--
+-- =============================================================================
+
+-- CREATE DATABASE giso;
+-- CREATE USER giso_app WITH PASSWORD 'CHANGE_ME';
+-- GRANT ALL PRIVILEGES ON DATABASE giso TO giso_app;
+-- \c giso
+-- GRANT ALL ON SCHEMA giso TO giso_app;
+-- （再执行 V1__registry.sql）

@@ -17,8 +17,11 @@ class RegistryTest {
     private static Registry registry;
 
     @BeforeAll
-    static void setup() throws IOException {
-        registry = new Registry(Path.of("../../schema"));
+    static void setup() throws Exception {
+        GatewayConfig config = new GatewayConfig();
+        config.schemaDir = "../../schema";
+        config.registryBackend = "yaml";
+        registry = Registry.create(config);
     }
 
     private static JsonNode ev(String json) throws IOException {

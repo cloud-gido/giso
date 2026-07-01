@@ -98,6 +98,10 @@ function bindColDrag(table, meta) {
 }
 
 export async function renderRegistry() {
+  const meta = await api('/registry/meta').catch(() => ({}));
+  if (meta.revision != null) {
+    $('#reg-meta').textContent = `revision ${meta.revision} · ${meta.entries ?? '—'} 条 · ${meta.backend || '—'}`;
+  }
   registry = await api('/registry');
   const meta = KIND_META[curKind];
   const cols = getCols(meta);
@@ -112,11 +116,21 @@ export async function renderRegistry() {
       ${cols.map((c) => `<td>${cell(it, c, meta)}</td>`).join('')}
       <td class="row-actions">
         <button data-act="edit" data-key="${esc(it[meta.id])}">编辑</button>
+        ${actionBtns(it, meta)}
+        <button data-act="audit" data-key="${esc(it[meta.id])}">审计</button>
         <button data-act="del" data-key="${esc(it[meta.id])}" class="danger">删除</button>
       </td></tr>`).join('') || `<tr><td colspan="${cols.length + 1}" class="muted empty-cell">没有匹配的条目</td></tr>`}
     </tbody></table>`;
   $('#reg-table').querySelectorAll('button[data-act]').forEach((b) => {
-    b.onclick = () => b.dataset.act === 'edit' ? openEditor(b.dataset.key) : doDelete(b.dataset.key);
+    const key = b.dataset.key;
+    const act = b.dataset.act;
+    b.onclick = () => {
+      if (act === 'edit') openEditor(key);
+      else if (act === 'del') doDelete(key);
+      else if (act === 'audit') openAudit(key);
+      else if (act === 'pub') doPublish(key);
+      else if (act === 'dep') doDeprecate(key);
+    };
   });
   $('#btn-reset-cols')?.addEventListener('click', () => {
     localStorage.removeItem(colKey());
@@ -124,6 +138,42 @@ export async function renderRegistry() {
     toast('已恢复默认列顺序');
   });
   bindColDrag($('#reg-table').querySelector('table'), meta);
+}
+
+function actionBtns(it, meta) {
+  const s = it.status || 'live';
+  let html = '';
+  if (s !== 'live' && s !== 'deprecated') {
+    html += `<button data-act="pub" data-key="${esc(it[meta.id])}" class="primary">发布</button>`;
+  }
+  if (s === 'live' || s === 'testing') {
+    html += `<button data-act="dep" data-key="${esc(it[meta.id])}">废弃</button>`;
+  }
+  return html;
+}
+
+async function doPublish(key) {
+  if (!confirm(`发布 ${key} 为 live？发布后将参与线上校验。`)) return;
+  const r = await api(`/registry/${curKind}/publish?key=${encodeURIComponent(key)}`, { method: 'POST' });
+  if (r.error) toast(r.error, 'error');
+  else { toast(`已发布 ${key}`); renderRegistry(); }
+}
+
+async function doDeprecate(key) {
+  if (!confirm(`废弃 ${key}？`)) return;
+  const r = await api(`/registry/${curKind}/deprecate?key=${encodeURIComponent(key)}`, { method: 'POST' });
+  if (r.error) toast(r.error, 'error');
+  else { toast(`已废弃 ${key}`); renderRegistry(); }
+}
+
+async function openAudit(key) {
+  const rows = await api(`/registry/audit?kind=${curKind}&key=${encodeURIComponent(key)}&limit=30`);
+  const body = (Array.isArray(rows) ? rows : []).map((r) =>
+    `<tr><td>${esc(r.created_at || '')}</td><td>${esc(r.action)}</td><td>${esc(r.operator)}</td></tr>`
+  ).join('') || '<tr><td colspan="3" class="muted">无记录</td></tr>';
+  $('#audit-title').textContent = `审计 · ${key}`;
+  $('#audit-body').innerHTML = `<table><thead><tr><th>时间</th><th>动作</th><th>操作者</th></tr></thead><tbody>${body}</tbody></table>`;
+  $('#audit-dialog').showModal();
 }
 
 async function doDelete(key) {
@@ -191,7 +241,7 @@ function openEditor(key) {
     });
     const r = await api('/registry/' + curKind, { method: 'POST', body: JSON.stringify(out) });
     if (r.error) { toast(r.error, 'error'); e.preventDefault(); }
-    else { toast('已保存并写回 YAML'); renderRegistry(); }
+    else { toast('已保存'); renderRegistry(); }
   };
 }
 

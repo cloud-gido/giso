@@ -150,6 +150,7 @@ biz_event code=video_play_start</textarea>
         </div>
         <input id="reg-search" placeholder="搜索条目…">
         <span class="muted" id="reg-count"></span>
+        <span class="muted" id="reg-meta"></span>
         <span class="spacer"></span>
         <button id="btn-add" class="primary">＋ 新增</button>
       </div>
@@ -195,6 +196,14 @@ biz_event code=video_play_start</textarea>
       <button value="ok" class="primary" id="editor-save">保存</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="audit-dialog">
+  <h3 id="audit-title">审计</h3>
+  <div id="audit-body" class="table-wrap"></div>
+  <div class="dialog-actions">
+    <button type="button" class="primary" onclick="document.getElementById('audit-dialog').close()">关闭</button>
+  </div>
 </dialog>
 
 <div id="toasts"></div>

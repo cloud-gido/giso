@@ -1,6 +1,7 @@
 package com.giso.gateway;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.giso.gateway.registry.RegistryWatcher;
 import com.giso.gateway.sink.EventSink;
 import com.giso.gateway.sink.SinkFactory;
 import com.sun.net.httpserver.HttpServer;
@@ -8,6 +9,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 /**
@@ -39,7 +41,10 @@ public final class Main {
         if (portOverride != null) config.port = portOverride;
         if (schemaOverride != null) config.schemaDir = schemaOverride;
 
-        Registry registry = new Registry(Path.of(config.schemaDir));
+        Registry registry = Registry.create(config);
+        RegistryWatcher registryWatcher = new RegistryWatcher(
+                registry, registry.store(), config.registryPollIntervalSec);
+        registryWatcher.start();
         List<EventSink> sinks = SinkFactory.create(config);
         EventStore store = new EventStore(sinks, config.adminRecentBuffer);
         SseHub sse = new SseHub();
@@ -57,7 +62,24 @@ public final class Main {
                 Http.empty(ex, 405);
                 return;
             }
-            Http.json(ex, 200, "{\"status\":\"ok\"}");
+            String body = new ObjectMapper().writeValueAsString(Map.of(
+                    "status", "ok",
+                    "registry", Map.of(
+                            "backend", registry.backendName(),
+                            "revision", registry.globalRevision(),
+                            "entries", registry.entryCount())));
+            Http.json(ex, 200, body);
+        });
+        server.createContext("/ready", ex -> {
+            if (!ex.getRequestMethod().equals("GET")) {
+                Http.empty(ex, 405);
+                return;
+            }
+            if (!registry.registryReady()) {
+                Http.json(ex, 503, "{\"status\":\"not_ready\",\"reason\":\"registry\"}");
+                return;
+            }
+            Http.json(ex, 200, "{\"status\":\"ready\"}");
         });
         server.createContext("/metrics", ex -> {
             if (!ex.getRequestMethod().equals("GET")) {
@@ -78,6 +100,7 @@ public final class Main {
         // 优雅停机：停收新请求 → 最多等 3s 在途请求处理完 → flush 并关闭 sink
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("shutting down: draining in-flight requests...");
+            registryWatcher.close();
             server.stop(3);
             sinks.forEach(EventSink::close);
             System.out.println("shutdown complete");
@@ -86,7 +109,9 @@ public final class Main {
         System.out.println("giso-gateway listening on http://localhost:" + config.port);
         System.out.println("  product hub   : http://localhost:" + config.port + "/");
         System.out.println("  admin console : http://localhost:" + config.port + "/admin/");
-        System.out.println("  schema dir    : " + Path.of(config.schemaDir).toAbsolutePath().normalize());
+        System.out.println("  registry      : " + registry.backendName()
+                + " (revision=" + registry.globalRevision()
+                + ", entries=" + registry.entryCount() + ")");
         for (EventSink sink : sinks) {
             System.out.println("  sink          : " + sink.name());
         }

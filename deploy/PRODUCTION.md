@@ -162,7 +162,8 @@ K8s 可部署 CronJob 定期执行对账脚本。
 - [ ] Routine Load 三作业 RUNNING
 - [ ] Ingress TLS 已配置
 - [ ] Prometheus 告警 → 飞书
-- [ ] schema 变更走 Git PR + `generate.py --check`
+- [ ] schema 变更：生产走 **管理台 → PostgreSQL**；`tools/registry/import_yaml.py` / 定时 export 同步 Git
+- [ ] RDS 库 `giso` 已建，`INFRA_GISO_DB_*` 已写入 Doppler（与 DataEase 同 host）
 - [ ] 灰度单业务线，断言 API 通过后再全量
 
 ---

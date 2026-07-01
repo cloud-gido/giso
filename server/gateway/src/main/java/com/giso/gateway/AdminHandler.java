@@ -2,6 +2,7 @@ package com.giso.gateway;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.giso.gateway.registry.RegistryKinds;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
@@ -47,7 +48,7 @@ public final class AdminHandler implements HttpHandler {
         }
         String path = ex.getRequestURI().getPath().substring("/admin/api".length());
         String method = ex.getRequestMethod();
-        // 写操作（注册表增删改、清缓冲）仅限 admin；viewer 只读
+        // 写操作（注册表增删改/发布/废弃、清缓冲）仅限 admin；viewer 只读
         boolean isWrite = (path.startsWith("/registry/") && !method.equals("GET"))
                 || path.equals("/clear");
         if (isWrite && !role.equals("admin")) {
@@ -61,24 +62,59 @@ public final class AdminHandler implements HttpHandler {
         }
     }
 
-    private void route(HttpExchange ex, String method, String path) throws IOException {
+    private void route(HttpExchange ex, String method, String path) throws Exception {
         if (path.equals("/registry") && method.equals("GET")) {
             Http.json(ex, 200, M.writeValueAsString(registry.all()));
 
+        } else if (path.equals("/registry/meta") && method.equals("GET")) {
+            Http.json(ex, 200, M.writeValueAsString(registry.meta()));
+
+        } else if (path.equals("/registry/audit") && method.equals("GET")) {
+            var q = Http.query(ex);
+            int limit = Integer.parseInt(q.getOrDefault("limit", "50"));
+            Http.json(ex, 200, M.writeValueAsString(registry.audit(
+                    q.getOrDefault("kind", ""), q.getOrDefault("key", ""), limit)));
+
+        } else if (path.equals("/registry/reload") && method.equals("POST")) {
+            registry.reload();
+            Http.json(ex, 200, "{\"ok\":true}");
+
         } else if (path.startsWith("/registry/")) {
-            String kind = path.substring("/registry/".length());
-            if (!Map.of("params", 1, "pages", 1, "elements", 1, "events", 1).containsKey(kind)) {
+            String rest = path.substring("/registry/".length());
+            String[] slash = rest.split("/", 2);
+            String kind = slash[0];
+            String action = slash.length > 1 ? slash[1] : null;
+            if (!RegistryKinds.isKnown(kind)) {
                 Http.json(ex, 404, "{\"error\":\"unknown kind\"}");
+                return;
+            }
+            String operator = Http.adminOperator(ex, config);
+            if ("publish".equals(action) && method.equals("POST")) {
+                String key = Http.query(ex).getOrDefault("key", "");
+                String err = registry.publish(kind, key, operator);
+                if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+                else Http.json(ex, 200, "{\"ok\":true}");
+                return;
+            }
+            if ("deprecate".equals(action) && method.equals("POST")) {
+                String key = Http.query(ex).getOrDefault("key", "");
+                String err = registry.deprecate(kind, key, operator);
+                if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+                else Http.json(ex, 200, "{\"ok\":true}");
+                return;
+            }
+            if (action != null) {
+                Http.json(ex, 404, "{\"error\":\"unknown action\"}");
                 return;
             }
             if (method.equals("POST")) {
                 Map<String, Object> item = M.readValue(Http.readBody(ex), new TypeReference<>() { });
-                String err = registry.upsert(kind, item);
+                String err = registry.upsert(kind, item, operator);
                 if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
                 else Http.json(ex, 200, "{\"ok\":true}");
             } else if (method.equals("DELETE")) {
                 String key = Http.query(ex).getOrDefault("key", "");
-                String err = registry.delete(kind, key);
+                String err = registry.delete(kind, key, operator);
                 if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
                 else Http.json(ex, 200, "{\"ok\":true}");
             } else {

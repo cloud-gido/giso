@@ -69,6 +69,16 @@ final class Http {
         return null;
     }
 
+    /** 写审计用的操作者名（本地无鉴权时为 admin）。 */
+    static String adminOperator(HttpExchange ex, GatewayConfig cfg) {
+        String role = adminRole(ex, cfg);
+        if (role == null) return null;
+        if (role.equals("admin")) {
+            return cfg.adminUser == null || cfg.adminUser.isEmpty() ? "admin" : cfg.adminUser;
+        }
+        return cfg.viewerUser;
+    }
+
     private static String basicCredentials(HttpExchange ex) {
         String header = ex.getRequestHeaders().getFirst("Authorization");
         if (header == null || !header.startsWith("Basic ")) return null;

@@ -17,6 +17,19 @@ public final class GatewayConfig {
     public int port = 8080;
     public String schemaDir = "../../schema";
 
+    /** 注册表后端：yaml（本地）| postgres（生产，共用 RDS 库 giso） */
+    public String registryBackend = "yaml";
+    public String dbUrl = "";
+    public String dbHost = "";
+    public String dbPort = "5432";
+    public String dbName = "giso";
+    public String dbUser = "";
+    public String dbPassword = "";
+    public String dbSchema = "giso";
+    /** postgres 且库为空时，从 schema_dir YAML 种子导入 */
+    public boolean registryBootstrapFromYaml = true;
+    public int registryPollIntervalSec = 10;
+
     /** 出口管道，可同时启用多个（如迁移期 file + kafka 双写） */
     public List<String> sinks = List.of("file");
 
@@ -111,8 +124,35 @@ public final class GatewayConfig {
 
         Map<String, Object> ch = (Map<String, Object>) doc.getOrDefault("clickhouse", Map.of());
         c.clickhouseUrl = (String) ch.getOrDefault("url", c.clickhouseUrl);
+
+        Map<String, Object> reg = (Map<String, Object>) doc.getOrDefault("registry", Map.of());
+        c.registryBackend = (String) reg.getOrDefault("backend", c.registryBackend);
+        Map<String, Object> pg = (Map<String, Object>) reg.getOrDefault("postgres", Map.of());
+        c.dbUrl = (String) pg.getOrDefault("jdbc_url", c.dbUrl);
+        c.dbHost = (String) pg.getOrDefault("host", c.dbHost);
+        c.dbPort = String.valueOf(pg.getOrDefault("port", c.dbPort));
+        c.dbName = (String) pg.getOrDefault("database", c.dbName);
+        c.dbUser = (String) pg.getOrDefault("user", c.dbUser);
+        c.dbPassword = (String) pg.getOrDefault("password", c.dbPassword);
+        c.dbSchema = (String) pg.getOrDefault("schema", c.dbSchema);
+        if (reg.get("bootstrap_from_yaml") instanceof Boolean b) c.registryBootstrapFromYaml = b;
+        if (reg.get("poll_interval_sec") instanceof Number n) c.registryPollIntervalSec = n.intValue();
+
         applyEnvironmentOverrides(c);
         return c;
+    }
+
+    /** JDBC URL：优先 dbUrl，否则由 host/port/database 拼装。 */
+    public String jdbcUrl() {
+        if (dbUrl != null && !dbUrl.isBlank()) return dbUrl.trim();
+        if (dbHost == null || dbHost.isBlank()) {
+            throw new IllegalStateException("postgres registry requires GISO_DB_URL or GISO_DB_HOST");
+        }
+        String base = "jdbc:postgresql://" + dbHost.trim() + ":" + dbPort.trim() + "/" + dbName.trim();
+        if (dbSchema != null && !dbSchema.isBlank()) {
+            return base + "?currentSchema=" + dbSchema.trim();
+        }
+        return base;
     }
 
     /** 生产环境用环境变量覆盖敏感项（K8s Secret / compose env），不写入镜像。 */
@@ -134,6 +174,15 @@ public final class GatewayConfig {
         envLong("GISO_MAX_BODY_BYTES").ifPresent(v -> c.maxBodyBytes = v);
         env("GISO_CLICKHOUSE_URL").ifPresent(v -> c.clickhouseUrl = v);
         envCsv("GISO_SINKS").ifPresent(v -> c.sinks = v);
+        env("GISO_REGISTRY_BACKEND").ifPresent(v -> c.registryBackend = v);
+        env("GISO_DB_URL").ifPresent(v -> c.dbUrl = v);
+        env("GISO_DB_HOST").ifPresent(v -> c.dbHost = v);
+        env("GISO_DB_PORT").ifPresent(v -> c.dbPort = v);
+        env("GISO_DB_NAME").ifPresent(v -> c.dbName = v);
+        env("GISO_DB_USER").ifPresent(v -> c.dbUser = v);
+        env("GISO_DB_PASSWORD").ifPresent(v -> c.dbPassword = v);
+        env("GISO_DB_SCHEMA").ifPresent(v -> c.dbSchema = v);
+        envInt("GISO_REGISTRY_POLL_SEC").ifPresent(v -> c.registryPollIntervalSec = v);
         applyKafkaSaslFromEnv(c);
     }
 
