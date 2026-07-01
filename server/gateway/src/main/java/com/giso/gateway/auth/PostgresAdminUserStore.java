@@ -30,17 +30,17 @@ public final class PostgresAdminUserStore implements AdminUserStore {
         PostgresAdminUserStore store = new PostgresAdminUserStore(
                 ds, config.dbSchema, GatewayConfig.resolveAuthUsers(config));
         store.bootstrapIfEmpty();
+        if (store.userCount() == 0 && store.seedUsers.isEmpty()) {
+            throw new IllegalStateException(
+                    "postgres admin auth requires at least one account: set GISO_ADMIN_USER/PASSWORD "
+                            + "or GISO_ADMIN_USERS in Doppler (see deploy/DEPLOYMENT.md)");
+        }
         return store;
     }
 
     @Override
     public boolean authEnabled() {
-        try {
-            if (!seedUsers.isEmpty()) return true;
-            return userCount() > 0;
-        } catch (SQLException e) {
-            return true;
-        }
+        return true;
     }
 
     @Override

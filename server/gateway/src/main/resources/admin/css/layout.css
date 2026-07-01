@@ -45,11 +45,19 @@ a.nav-link:hover { color: var(--accent); background: var(--panel2); }
 .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .conn:not(.off) .conn-dot { animation: pulse 2s infinite; }
 .conn.off { color: var(--red); background: var(--red-soft); }
+.user-row {
+  margin: 8px 10px 0; display: flex; flex-direction: column; gap: 6px;
+}
 .user-pill {
-  margin: 8px 10px 0; padding: 6px 10px; font-size: 11.5px;
+  padding: 6px 10px; font-size: 11.5px;
   color: var(--muted); background: var(--panel2); border-radius: 8px;
   border: 1px solid var(--border); text-align: center;
 }
+.btn-logout {
+  padding: 5px 10px; font-size: 11.5px; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--panel); color: var(--muted); cursor: pointer;
+}
+.btn-logout:hover { color: var(--red); border-color: #f5c6cb; background: var(--red-soft); }
 .nav-badge {
   margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px;
   font-size: 10px; font-weight: 700; line-height: 18px; text-align: center;

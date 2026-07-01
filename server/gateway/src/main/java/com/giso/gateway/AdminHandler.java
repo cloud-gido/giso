@@ -39,19 +39,49 @@ public final class AdminHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange ex) throws IOException {
         if (Http.handlePreflight(ex)) return;
-        if (auth.unauthorized(ex)) {
-            Http.unauthorizedBasic(ex);
-            return;
-        }
-        String role = auth.role(ex);
         String path = ex.getRequestURI().getPath().substring("/admin/api".length());
         String method = ex.getRequestMethod();
         try {
+            if (path.equals("/login") && method.equals("POST")) {
+                routeLogin(ex);
+                return;
+            }
+            if (path.equals("/logout") && method.equals("POST")) {
+                auth.logout(ex);
+                Http.json(ex, 200, "{\"ok\":true}");
+                return;
+            }
+            if (auth.unauthorized(ex)) {
+                Http.unauthorizedJson(ex);
+                return;
+            }
+            String role = auth.role(ex);
             if (!authorize(ex, role, method, path)) return;
             route(ex, method, path, role);
         } catch (Exception e) {
             Http.json(ex, 500, M.writeValueAsString(Map.of("error", String.valueOf(e.getMessage()))));
         }
+    }
+
+    private void routeLogin(HttpExchange ex) throws Exception {
+        if (!auth.authEnabled()) {
+            Http.json(ex, 400, "{\"error\":\"当前环境未启用登录\"}");
+            return;
+        }
+        Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+        String username = str(body, "username");
+        String password = str(body, "password");
+        if (username.isBlank() || password.isBlank()) {
+            Http.json(ex, 400, "{\"error\":\"用户名和密码不能为空\"}");
+            return;
+        }
+        if (!auth.login(ex, username, password)) {
+            Http.json(ex, 401, "{\"error\":\"用户名或密码错误\"}");
+            return;
+        }
+        var me = auth.me(ex);
+        me.put("pending_count", registry.pendingCount());
+        Http.json(ex, 200, M.writeValueAsString(me));
     }
 
     private boolean authorize(HttpExchange ex, String role, String method, String path) throws IOException {
@@ -103,7 +133,7 @@ public final class AdminHandler implements HttpHandler {
         if (path.equals("/me") && method.equals("GET")) {
             var me = auth.me(ex);
             if (me == null) {
-                Http.unauthorizedBasic(ex);
+                Http.unauthorizedJson(ex);
                 return;
             }
             me.put("pending_count", registry.pendingCount());

@@ -1,6 +1,6 @@
 /* GISO 玑源 · 管理控制台入口 */
 import { $, $$ } from './util.js';
-import { api } from './api.js';
+import { api, logout } from './api.js';
 import { setMe } from './session.js';
 import { initDebug } from './views/debug.js';
 import { initAssert } from './views/assert.js';
@@ -43,11 +43,19 @@ function updatePendingBadge(count) {
 
 function applyRole(me) {
   const pill = $('#user-pill');
-  if (!me?.username) return;
-  pill.hidden = false;
-  const roleLabel = ROLE_LABEL[me.role] || me.role;
-  pill.textContent = `${me.username} · ${roleLabel}`;
-  pill.title = roleLabel;
+  const logoutBtn = $('#btn-logout');
+  if (!me?.username && me?.auth_enabled) return;
+  if (me?.auth_enabled) {
+    pill.hidden = false;
+    logoutBtn.hidden = false;
+    const roleLabel = ROLE_LABEL[me.role] || me.role;
+    pill.textContent = `${me.username} · ${roleLabel}`;
+    pill.title = roleLabel;
+  } else {
+    pill.hidden = false;
+    pill.textContent = '本地开发 · 免登录';
+    logoutBtn.hidden = true;
+  }
 
   if (me.role === 'viewer') {
     $('#btn-clear')?.setAttribute('hidden', '');
@@ -70,7 +78,11 @@ show('debug');
 api('/me').then((me) => {
   setMe(me);
   applyRole(me);
-}).catch(() => {});
+}).catch(() => {
+  location.href = '/admin/login.html';
+});
+
+$('#btn-logout')?.addEventListener('click', () => logout());
 
 document.addEventListener('giso:pending-changed', () => {
   api('/me').then((me) => {

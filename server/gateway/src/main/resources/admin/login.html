@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · GISO 玑源</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #f4f6fa; --panel: #fff; --border: #e4e9f1; --text: #19243a;
+    --muted: #7c8aa3; --accent: #4f63f0; --red: #d93444;
+    --sans: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    min-height: 100vh; display: grid; place-items: center;
+    background: var(--bg); font: 14px/1.5 var(--sans); color: var(--text);
+  }
+  .card {
+    width: min(400px, 92vw); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px 28px; box-shadow: 0 12px 48px rgba(25,36,58,.08);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .brand img { width: 36px; height: 36px; }
+  .brand h1 { font-size: 18px; font-weight: 600; }
+  .brand p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
+  input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font: inherit;
+  }
+  input:focus { outline: 2px solid #edeffe; border-color: var(--accent); }
+  button {
+    width: 100%; margin-top: 22px; padding: 11px; border: 0; border-radius: 8px;
+    background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  .err { color: var(--red); font-size: 13px; margin-top: 12px; min-height: 1.2em; }
+  .hint { margin-top: 18px; font-size: 12px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <img src="assets/logo-mark.svg" alt="">
+    <div>
+      <h1>GISO 玑源</h1>
+      <p>埋点治理管理台</p>
+    </div>
+  </div>
+  <form id="login-form">
+    <label for="username">用户名</label>
+    <input id="username" name="username" autocomplete="username" required autofocus>
+    <label for="password">密码</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit" id="btn-submit">登录</button>
+    <div class="err" id="err"></div>
+  </form>
+  <p class="hint">账号由管理员在 Doppler 配置或管理台「账号管理」创建</p>
+</div>
+<script type="module" src="js/login.js"></script>
+</body>
+</html>

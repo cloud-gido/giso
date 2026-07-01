@@ -4,12 +4,21 @@ import com.giso.gateway.GatewayConfig;
 import com.giso.gateway.registry.PostgresRegistryStore;
 import com.sun.net.httpserver.HttpExchange;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * 管理台鉴权（对齐 GIDO：Ingress IP 白名单 + 应用层账号）。
  * <p>
- * 生产：Doppler 种子账号 → PostgreSQL admin_users（BCrypt）；本地：yaml/env 明文比对。
+ * 生产：Doppler 种子账号 → PostgreSQL admin_users（BCrypt）；本地 yaml 未配账号时免登录。
  */
 public final class AdminAuth {
+    private static final String SESSION_COOKIE = "giso_admin_sess";
+
     private final AdminUserStore store;
 
     public AdminAuth(GatewayConfig config, PostgresRegistryStore registryStore) throws Exception {
@@ -20,11 +29,11 @@ public final class AdminAuth {
         }
     }
 
-    /** 未配置账号时视为 admin（本地零配置）。 */
+    /** 未配置账号时视为 admin（仅本地 yaml 模式）。 */
     public String role(HttpExchange ex) {
         try {
             if (!store.authEnabled()) return AdminUser.ROLE_ADMIN;
-            String decoded = basicCredentials(ex);
+            String decoded = credentials(ex);
             if (decoded == null) return null;
             int i = decoded.indexOf(':');
             if (i <= 0) return null;
@@ -39,7 +48,7 @@ public final class AdminAuth {
     public String operator(HttpExchange ex) {
         String role = role(ex);
         if (role == null) return null;
-        String decoded = basicCredentials(ex);
+        String decoded = credentials(ex);
         if (decoded == null) return "admin";
         int i = decoded.indexOf(':');
         return i > 0 ? decoded.substring(0, i) : "admin";
@@ -53,18 +62,31 @@ public final class AdminAuth {
         }
     }
 
-    public java.util.Map<String, Object> me(HttpExchange ex) throws Exception {
+    public Map<String, Object> me(HttpExchange ex) throws Exception {
         String role = role(ex);
         if (role == null && store.authEnabled()) return null;
         String username = operator(ex);
-        var out = new java.util.LinkedHashMap<String, Object>();
+        var out = new LinkedHashMap<String, Object>();
         out.put("username", username);
         out.put("role", role == null ? AdminUser.ROLE_ADMIN : role);
         out.put("auth_enabled", store.authEnabled());
         return out;
     }
 
-    public java.util.List<java.util.Map<String, Object>> listUsers() throws Exception {
+    /** 登录成功写入 HttpOnly Cookie（供 SSE 等同源请求携带）。 */
+    public boolean login(HttpExchange ex, String username, String password) throws Exception {
+        if (!store.authEnabled()) return false;
+        String role = store.authenticate(username, password);
+        if (role == null) return false;
+        setSessionCookie(ex, username, password);
+        return true;
+    }
+
+    public void logout(HttpExchange ex) throws IOException {
+        clearSessionCookie(ex);
+    }
+
+    public List<Map<String, Object>> listUsers() throws Exception {
         return store.listUsers();
     }
 
@@ -82,6 +104,39 @@ public final class AdminAuth {
         } catch (Exception e) {
             return true;
         }
+    }
+
+    private static String credentials(HttpExchange ex) {
+        String header = basicCredentials(ex);
+        if (header != null) return header;
+        return sessionCredentials(ex);
+    }
+
+    private static void setSessionCookie(HttpExchange ex, String user, String password) {
+        String val = Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
+        ex.getResponseHeaders().add("Set-Cookie",
+                SESSION_COOKIE + "=" + val + "; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=86400");
+    }
+
+    private static void clearSessionCookie(HttpExchange ex) {
+        ex.getResponseHeaders().add("Set-Cookie", SESSION_COOKIE + "=; Path=/admin; HttpOnly; Max-Age=0");
+    }
+
+    private static String sessionCredentials(HttpExchange ex) {
+        String cookies = ex.getRequestHeaders().getFirst("Cookie");
+        if (cookies == null || cookies.isBlank()) return null;
+        String prefix = SESSION_COOKIE + "=";
+        for (String part : cookies.split(";")) {
+            String trimmed = part.trim();
+            if (!trimmed.startsWith(prefix)) continue;
+            try {
+                return new String(Base64.getDecoder().decode(trimmed.substring(prefix.length())),
+                        StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private static String basicCredentials(HttpExchange ex) {

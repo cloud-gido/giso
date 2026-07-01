@@ -96,11 +96,54 @@ final class Http {
         ex.close();
     }
 
+    /** 管理 API 未登录（配合登录页，不触发浏览器 Basic 弹窗）。 */
+    static void unauthorizedJson(HttpExchange ex) throws IOException {
+        json(ex, 401, "{\"error\":\"unauthorized\"}");
+    }
+
+    static final String SESSION_COOKIE = "giso_admin_sess";
+
+    static void setSessionCookie(HttpExchange ex, String user, String password) {
+        String raw = user + ":" + password;
+        String val = java.util.Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+        ex.getResponseHeaders().add("Set-Cookie",
+                SESSION_COOKIE + "=" + val + "; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=86400");
+    }
+
+    static void clearSessionCookie(HttpExchange ex) {
+        ex.getResponseHeaders().add("Set-Cookie",
+                SESSION_COOKIE + "=; Path=/admin; HttpOnly; Max-Age=0");
+    }
+
+    /** 从登录 Cookie 解析 user:pass；无则 null。 */
+    static String sessionCredentials(HttpExchange ex) {
+        String cookies = ex.getRequestHeaders().getFirst("Cookie");
+        if (cookies == null || cookies.isBlank()) return null;
+        String prefix = SESSION_COOKIE + "=";
+        for (String part : cookies.split(";")) {
+            String trimmed = part.trim();
+            if (!trimmed.startsWith(prefix)) continue;
+            String val = trimmed.substring(prefix.length());
+            try {
+                return new String(java.util.Base64.getDecoder().decode(val), StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    static void redirect(HttpExchange ex, String location) throws IOException {
+        ex.getResponseHeaders().set("Location", location);
+        ex.sendResponseHeaders(302, -1);
+        ex.close();
+    }
+
     static void cors(HttpExchange ex) {
         var h = ex.getResponseHeaders();
         h.set("Access-Control-Allow-Origin", "*");
         h.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        h.set("Access-Control-Allow-Headers", "Content-Type, X-App-Key");
+        h.set("Access-Control-Allow-Headers", "Content-Type, X-App-Key, Authorization");
     }
 
     static boolean handlePreflight(HttpExchange ex) throws IOException {
