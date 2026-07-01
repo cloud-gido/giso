@@ -331,8 +331,41 @@ public final class PostgresRegistryStore implements RegistryStore {
     }
 
     private void migrate() throws IOException, SQLException {
+        ensureSchema();
         runSqlResource("/db/V1__registry.sql");
         runSqlResource("/db/V3__approval.sql");
+    }
+
+    /** 本地/超管可自动建 schema；RDS 应用账号无 CREATE 库权限时须 DBA 预建。 */
+    private void ensureSchema() throws SQLException {
+        String ident = quoteIdent(dbSchema);
+        try (Connection c = ds.getConnection(); Statement st = c.createStatement()) {
+            st.execute("CREATE SCHEMA IF NOT EXISTS " + ident);
+        } catch (SQLException e) {
+            if (schemaExists()) return;
+            throw new SQLException(
+                    "schema '" + dbSchema + "' missing and DB user cannot CREATE SCHEMA; "
+                            + "run tools/registry/bootstrap_schema.sql as RDS master, then redeploy",
+                    e);
+        }
+    }
+
+    private boolean schemaExists() throws SQLException {
+        String sql = "SELECT 1 FROM information_schema.schemata WHERE schema_name = ?";
+        try (Connection c = ds.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, dbSchema);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private static String quoteIdent(String name) {
+        if (!name.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+            throw new IllegalArgumentException("invalid schema name: " + name);
+        }
+        return name;
     }
 
     private void runSqlResource(String resourcePath) throws IOException, SQLException {

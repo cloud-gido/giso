@@ -1,7 +1,5 @@
 -- GISO 注册表元库（PostgreSQL，与 GIDO/DataEase 共用 RDS，独立库 giso）
--- 首次：CREATE DATABASE giso; 再以 giso_app 连接执行本脚本（见 tools/registry/init_rds.sql）
-
-CREATE SCHEMA IF NOT EXISTS giso;
+-- schema `giso` 须由 DBA 预建（见 tools/registry/bootstrap_schema.sql）；本脚本仅建表。
 
 CREATE TABLE IF NOT EXISTS giso.registry_entries (
     kind        TEXT NOT NULL CHECK (kind IN ('params', 'pages', 'elements', 'events')),

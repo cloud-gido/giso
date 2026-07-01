@@ -59,7 +59,23 @@
 bash tools/registry/setup.sh --create-db --migrate --import   # 需 RDS 主账号
 ```
 
-多数团队：**RDS 控制台建库 + Doppler 配 `INFRA_GISO_DB_*` + 发 Gateway 镜像** 即可。
+多数团队：**RDS 控制台建库 + Doppler 配 `INFRA_GISO_DB_SERVICE_*` + 主账号执行 `bootstrap_schema.sql` + 发 Gateway 镜像** 即可。
+
+### Q4b. 启动报 `permission denied for database giso`？
+
+**原因**：应用账号（如 `giso-user`）能连库，但没有在库内 `CREATE SCHEMA` 的权限；迁移脚本需要在 schema `giso` 下建表。
+
+**处理**（RDS 主账号，连接数据库 `giso`，执行一次）：
+
+```sql
+CREATE SCHEMA IF NOT EXISTS giso AUTHORIZATION "giso-user";
+GRANT ALL ON SCHEMA giso TO "giso-user";
+GRANT CREATE ON SCHEMA giso TO "giso-user";
+```
+
+或运行仓库脚本 `tools/registry/bootstrap_schema.sql`（把其中的 `giso-user` 换成 Doppler 里的实际用户名）。完成后重启 Gateway Pod。
+
+**说明**：`SLF4J: Failed to load class org.slf4j.impl.StaticLoggerBinder` 仅为日志实现缺失警告，不影响启动，可忽略。
 
 ---
 

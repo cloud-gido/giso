@@ -2,19 +2,20 @@
 -- GISO 注册表元库 — 与 GIDO / DataEase 共用 RDS，独立库 giso
 -- =============================================================================
 --
--- 1. 以 RDS 主账号连接 postgres 库，执行下方「建库」
--- 2. 连接 giso 库，执行 server/gateway/src/main/resources/db/V1__registry.sql
---    （或 Gateway 首次启动时自动迁移）
--- 3. 种子：python3 tools/registry/import_yaml.py
+-- 1. 以 RDS 主账号连接 postgres 库，执行「建库」
+-- 2. 连接 giso 库，执行 tools/registry/bootstrap_schema.sql（授权应用账号）
+-- 3. 部署 Gateway：启动时自动跑 V1/V2/V3 迁移；库为空时从 /app/schema 种子导入
+-- 4. 可选：python3 tools/registry/import_yaml.py
 --
--- Doppler（host 与 INFRA_DATAEASE_DB_HOST 相同，库名 giso）：
---   INFRA_GISO_DB_HOST / PORT / NAME=giso / USER / PASSWORD
+-- Doppler（与 DataEase 同 RDS 实例）：
+--   INFRA_GISO_DB_SERVICE_URL / USER / PASSWORD
+--   → K8s GISO_DB_URL / GISO_DB_USER / GISO_DB_PASSWORD
 --
 -- =============================================================================
 
+-- 步骤 1：主账号在 postgres 库执行
 -- CREATE DATABASE giso;
--- CREATE USER giso_app WITH PASSWORD 'CHANGE_ME';
--- GRANT ALL PRIVILEGES ON DATABASE giso TO giso_app;
--- \c giso
--- GRANT ALL ON SCHEMA giso TO giso_app;
--- （再执行 V1__registry.sql）
+-- CREATE USER "giso-user" WITH PASSWORD 'CHANGE_ME';
+-- GRANT CONNECT ON DATABASE giso TO "giso-user";
+
+-- 步骤 2：主账号在 giso 库执行 bootstrap_schema.sql（见同目录）
