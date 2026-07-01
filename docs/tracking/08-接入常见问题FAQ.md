@@ -101,7 +101,7 @@ registry:
 
 ### Q6. 管理台怎么登录？有哪些角色？
 
-与 **GIDO** 类似分三层：**Ingress 内网白名单** + **HTTP Basic 登录** +（App 侧独立）**X-App-Key**。
+与 **GIDO** 类似分三层：**Ingress 内网白名单** + **登录页** +（App 侧独立）**X-App-Key**。
 
 | 角色 | 能做什么 |
 |------|----------|
@@ -109,15 +109,11 @@ registry:
 | **editor** | 提交登记（**待审批**），不可直接上线 |
 | **viewer** | 只看联调/统计/注册表、跑断言 |
 
-账号配置在 Doppler：
+**默认管理员**（PostgreSQL 空库、Doppler 未配 `GISO_ADMIN_*` 时自动创建一次）：`admin` / `admin123`。登录后在 **账号管理** 改密并创建 editor/viewer，**不必**先配 Doppler。
 
-- `INFRA_GISO_ADMIN_USER` / `INFRA_GISO_ADMIN_PASSWORD` — 管理员
-- `INFRA_GISO_VIEWER_USER` / `INFRA_GISO_VIEWER_PASSWORD` — 只读（可选）
-- `INFRA_GISO_ADMIN_USERS` — 多账号扩展，格式 `user:pass:role` 逗号分隔
+Doppler 可选：`INFRA_GISO_ADMIN_USER` / `PASSWORD`、`INFRA_GISO_VIEWER_*`、`INFRA_GISO_ADMIN_USERS`。详见 [09-账号与权限体系](09-账号与权限体系.md)。
 
-生产使用 PostgreSQL 时，首次启动会把 Doppler 种子写入 `giso.admin_users`（BCrypt）；之后改密码需同步改库。详见 [09-账号与权限体系](09-账号与权限体系.md)。
-
-浏览器访问 `/admin/` 会弹出 Basic 登录框；侧边栏显示当前用户名。
+访问 `/admin/` 打开登录页；左下角可退出。
 
 ### Q7. `env=test` 和 `env=prod` 有什么区别？
 
