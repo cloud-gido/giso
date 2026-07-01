@@ -1,11 +1,9 @@
 package com.giso.gateway.auth;
 
 import com.giso.gateway.GatewayConfig;
-import com.giso.gateway.DbMigrationSql;
 import com.zaxxer.hikari.HikariDataSource;
 import org.mindrot.jbcrypt.BCrypt;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -31,7 +29,6 @@ public final class PostgresAdminUserStore implements AdminUserStore {
     public static PostgresAdminUserStore create(HikariDataSource ds, GatewayConfig config) throws Exception {
         PostgresAdminUserStore store = new PostgresAdminUserStore(
                 ds, config.dbSchema, GatewayConfig.resolveAuthUsers(config));
-        store.migrate();
         store.bootstrapIfEmpty();
         return store;
     }
@@ -157,18 +154,6 @@ public final class PostgresAdminUserStore implements AdminUserStore {
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getString(1) : null;
             }
-        }
-    }
-
-    private void migrate() throws IOException, SQLException {
-        runSqlResource("/db/V2__admin_users.sql");
-        runSqlResource("/db/V3__approval.sql");
-    }
-
-    private void runSqlResource(String path) throws IOException, SQLException {
-        String sql = DbMigrationSql.load(PostgresAdminUserStore.class, path, dbSchema);
-        try (Connection c = ds.getConnection(); Statement st = c.createStatement()) {
-            st.execute(sql);
         }
     }
 

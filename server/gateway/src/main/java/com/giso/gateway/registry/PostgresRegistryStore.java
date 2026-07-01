@@ -334,6 +334,7 @@ public final class PostgresRegistryStore implements RegistryStore {
     private void migrate() throws IOException, SQLException {
         ensureSchema();
         runSqlResource("/db/V1__registry.sql");
+        runSqlResource("/db/V2__admin_users.sql");
         runSqlResource("/db/V3__approval.sql");
     }
 
