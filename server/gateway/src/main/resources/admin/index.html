@@ -99,16 +99,40 @@
           <a class="top-menu-item" href="/admin/datong-gap.html" target="_blank" data-i18n="nav.gap">大同对比评审</a>
         </div>
       </div>
-      <label class="space-switch">
-        <span class="muted" data-i18n="top.space">空间</span>
-        <select id="space-switcher"></select>
-      </label>
-      <div class="user-pill" id="user-pill" hidden></div>
+      <div class="space-picker" id="space-picker">
+        <button type="button" class="space-picker-btn space-accent--default" id="space-picker-btn" aria-haspopup="listbox" aria-expanded="false">
+          <span class="space-picker-ring"></span>
+          <span class="space-picker-ico"><svg><use href="#ico-space"/></svg></span>
+          <span class="space-picker-text">
+            <span class="space-picker-kicker" data-i18n="top.space">空间</span>
+            <span class="space-picker-name" id="space-picker-name">—</span>
+          </span>
+          <span class="space-picker-chevron">▾</span>
+        </button>
+        <div class="space-picker-panel" id="space-picker-panel" role="listbox" hidden>
+          <div class="space-picker-head" data-i18n="space.pick">选择工作空间</div>
+          <div class="space-picker-list" id="space-picker-list"></div>
+        </div>
+      </div>
+      <div class="user-menu" id="user-menu" hidden>
+        <button type="button" class="user-menu-btn" id="user-menu-btn" aria-haspopup="true" aria-expanded="false">
+          <span class="user-avatar" id="user-avatar">G</span>
+          <span class="user-menu-text">
+            <span class="user-menu-name" id="user-menu-name">—</span>
+            <span class="user-menu-role" id="user-menu-role">—</span>
+          </span>
+          <span class="user-chevron">▾</span>
+        </button>
+        <div class="user-menu-pop" id="user-menu-pop">
+          <div class="user-menu-meta" id="user-menu-meta"></div>
+          <button type="button" class="user-menu-item user-menu-item--danger" id="btn-logout" hidden data-i18n="top.logout">退出登录</button>
+        </div>
+      </div>
       <button type="button" class="top-icon-btn" id="btn-locale" title="Switch language" data-i18n="locale">English</button>
-      <button type="button" class="top-icon-btn top-icon-btn--danger" id="btn-logout" hidden data-i18n="top.logout">退出</button>
     </div>
   </header>
 
+  <div class="main-body">
   <!-- 实时联调 -->
   <section id="view-debug" class="view active">
     <div class="stat-row">
@@ -324,6 +348,16 @@ biz_event code=video_play_start</textarea>
       <div id="users-table" class="table-wrap"></div>
     </div>
   </section>
+  </div>
+</div>
+
+<div id="space-transition" class="space-transition" hidden aria-hidden="true">
+  <div class="space-transition-card">
+    <div class="space-transition-sweep"></div>
+    <span class="space-transition-ico"><svg><use href="#ico-space"/></svg></span>
+    <p class="space-transition-kicker" data-i18n="space.switching">正在切换空间</p>
+    <strong id="space-transition-name">—</strong>
+  </div>
 </div>
 
 <!-- 编辑弹窗 -->

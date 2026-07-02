@@ -8,7 +8,7 @@ import { initRegistry, renderRegistry, invalidateRegistryCache } from './views/r
 import { initStats, loadStats } from './views/stats.js';
 import { initApproval, renderApproval } from './views/approval.js';
 import { initUsers, renderUsers } from './views/users.js';
-import { initSpaceSwitcher, renderSpaces } from './views/spaces.js';
+import { initSpaceSwitcher, renderSpaces, refreshSpaceSwitcher } from './views/spaces.js';
 import { initVisualPicker, renderVisualPicker } from './views/visual-picker.js';
 import { initCopilot, renderCopilot } from './views/copilot.js';
 import { initSettings, renderSettings } from './views/settings.js';
@@ -56,7 +56,7 @@ function initTopMenus() {
     menu.querySelector('.top-menu-btn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       const wasOpen = menu.classList.contains('open');
-      $$('.top-menu.open').forEach((m) => m.classList.remove('open'));
+      $$('.top-menu.open, .space-picker.open, .user-menu.open').forEach((m) => m.classList.remove('open'));
       if (!wasOpen) menu.classList.add('open');
     });
   });
@@ -74,21 +74,50 @@ function updatePendingBadge(count) {
   }
 }
 
+function initUserMenu() {
+  const menu = $('#user-menu');
+  const btn = $('#user-menu-btn');
+  btn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = !menu.classList.contains('open');
+    $$('.top-menu.open, .space-picker.open').forEach((el) => el.classList.remove('open'));
+    menu.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  menu?.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => {
+    menu?.classList.remove('open');
+    btn?.setAttribute('aria-expanded', 'false');
+  });
+  $('#btn-logout')?.addEventListener('click', () => logout());
+}
+
 function applyRole(me) {
-  const pill = $('#user-pill');
+  const userMenu = $('#user-menu');
+  const menuName = $('#user-menu-name');
+  const menuRole = $('#user-menu-role');
+  const avatar = $('#user-avatar');
   const logoutBtn = $('#btn-logout');
+  const meta = $('#user-menu-meta');
   if (!me?.username && me?.auth_enabled) return;
+
+  if (userMenu) userMenu.hidden = false;
+
   if (me?.auth_enabled) {
-    pill.hidden = false;
-    logoutBtn.hidden = false;
     const global = ROLE_LABEL[me.role] || me.role;
     const space = ROLE_LABEL[me.space_role] || me.space_role || '';
-    pill.textContent = `${me.username} · ${space || global}`;
-    pill.title = `全局: ${global} · 本空间: ${space}`;
+    const name = me.username || 'user';
+    if (menuName) menuName.textContent = name;
+    if (menuRole) menuRole.textContent = space || global;
+    if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
+    if (meta) meta.textContent = `全局 · ${global}  ·  本空间 · ${space || '—'}`;
+    if (logoutBtn) logoutBtn.hidden = false;
   } else {
-    pill.hidden = false;
-    pill.textContent = '本地开发 · 免登录';
-    logoutBtn.hidden = true;
+    if (menuName) menuName.textContent = '本地开发';
+    if (menuRole) menuRole.textContent = '免登录';
+    if (avatar) avatar.textContent = 'G';
+    if (meta) meta.textContent = 'auth_enabled=false';
+    if (logoutBtn) logoutBtn.hidden = true;
   }
 
   if (me.space_role === 'viewer') {
@@ -107,6 +136,7 @@ function applyRole(me) {
 
 initNavigation();
 initTopMenus();
+initUserMenu();
 initDebug();
 initAssert();
 initApproval();
@@ -131,19 +161,19 @@ api('/me').then((me) => {
     setSpace(me.current_space);
   }
   setMe(me);
-  initSpaceSwitcher((fresh) => {
+  function onSpaceChange(fresh) {
     setMe(fresh);
     applyRole(fresh);
     invalidateRegistryCache();
+    refreshSpaceSwitcher(fresh, onSpaceChange);
     const active = $$('[data-view].active')[0]?.dataset?.view;
     if (active) VIEWS[active]?.onShow?.();
-  });
+  }
+  initSpaceSwitcher(onSpaceChange);
   applyRole(me);
 }).catch(() => {
   location.href = '/admin/login.html';
 });
-
-$('#btn-logout')?.addEventListener('click', () => logout());
 
 document.addEventListener('giso:pending-changed', () => {
   api('/me').then((me) => {

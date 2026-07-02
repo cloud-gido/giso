@@ -61,11 +61,7 @@
   letter-spacing: .06em;
 }
 
-/* 顶栏产品语境 */
-.topbar {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 16px; margin-bottom: 22px;
-}
+/* 顶栏产品语境（布局见 layout.css sticky topbar） */
 .product-meta {
   display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
 }
