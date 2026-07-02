@@ -6,37 +6,35 @@ import com.giso.gateway.space.SpaceService;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 管理台鉴权（对齐 GIDO：Ingress IP 白名单 + 应用层账号）。
  * <p>
- * 生产：Doppler 种子账号 → PostgreSQL admin_users（BCrypt）；本地 yaml 未配账号时免登录。
+ * 会话模型：opaque session id + HttpOnly Cookie；密码不落 Cookie，退出删服务端会话。
  */
 public final class AdminAuth {
-    private static final String SESSION_COOKIE = "giso_admin_sess";
-    /** 登录后会话缓存，避免每个管理 API 都 BCrypt + 查库（只读浏览注册表时体感接近 yaml 模式）。 */
-    private static final long SESSION_CACHE_TTL_MS = 30 * 60 * 1000L;
-
     private final AdminUserStore store;
     private final SpaceService spaces;
-    private final ConcurrentHashMap<String, CachedSession> sessionCache = new ConcurrentHashMap<>();
-
-    private record CachedSession(String username, String role, long expiresAt) { }
+    private final AdminSessionManager sessions;
 
     public AdminAuth(GatewayConfig config, PostgresRegistryStore registryStore, SpaceService spaces)
             throws Exception {
+        AdminSessionStore sessionStore;
         if ("postgres".equalsIgnoreCase(config.registryBackend) && registryStore != null) {
             this.store = PostgresAdminUserStore.create(registryStore.dataSource(), config);
+            String schema = config.dbSchema == null || config.dbSchema.isBlank()
+                    ? "public" : config.dbSchema;
+            sessionStore = new PostgresAdminSessionStore(registryStore.dataSource(), schema);
         } else {
             this.store = new ConfigAdminUserStore(config);
+            sessionStore = new InMemoryAdminSessionStore();
         }
         this.spaces = spaces;
+        this.sessions = new AdminSessionManager(sessionStore);
     }
 
     public AuthContext resolve(HttpExchange ex) {
@@ -44,24 +42,7 @@ public final class AdminAuth {
             if (!store.authEnabled()) {
                 return new AuthContext("admin", AdminUser.ROLE_ADMIN);
             }
-            String decoded = credentials(ex);
-            if (decoded == null) return null;
-            long now = System.currentTimeMillis();
-            CachedSession cached = sessionCache.get(decoded);
-            if (cached != null) {
-                if (cached.expiresAt() > now) {
-                    return new AuthContext(cached.username(), cached.role());
-                }
-                sessionCache.remove(decoded);
-            }
-            int i = decoded.indexOf(':');
-            if (i <= 0) return null;
-            String user = decoded.substring(0, i);
-            String pass = decoded.substring(i + 1);
-            String role = store.authenticate(user, pass);
-            if (role == null) return null;
-            sessionCache.put(decoded, new CachedSession(user, role, now + SESSION_CACHE_TTL_MS));
-            return new AuthContext(user, role);
+            return sessions.resolve(ex);
         } catch (Exception e) {
             return null;
         }
@@ -112,16 +93,16 @@ public final class AdminAuth {
         if (!store.authEnabled()) return false;
         String role = store.authenticate(username, password);
         if (role == null) return false;
-        setSessionCookie(ex, username, password);
-        sessionCache.put(username + ":" + password,
-                new CachedSession(username, role, System.currentTimeMillis() + SESSION_CACHE_TTL_MS));
+        sessions.login(ex, username, role);
         return true;
     }
 
     public void logout(HttpExchange ex) throws IOException {
-        String decoded = credentials(ex);
-        if (decoded != null) sessionCache.remove(decoded);
-        clearSessionCookie(ex);
+        try {
+            sessions.logout(ex);
+        } catch (SQLException e) {
+            AdminSessionCookies.clearAll(ex);
+        }
     }
 
     public List<Map<String, Object>> listUsers() throws Exception {
@@ -141,58 +122,6 @@ public final class AdminAuth {
             return store.authEnabled();
         } catch (Exception e) {
             return true;
-        }
-    }
-
-    private static String credentials(HttpExchange ex) {
-        String header = basicCredentials(ex);
-        if (header != null) return header;
-        return sessionCredentials(ex);
-    }
-
-    private static void setSessionCookie(HttpExchange ex, String user, String password) {
-        String val = Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
-        String proto = ex.getRequestHeaders().getFirst("X-Forwarded-Proto");
-        boolean secure = proto != null && proto.equalsIgnoreCase("https");
-        String cookie = SESSION_COOKIE + "=" + val
-                + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400"
-                + (secure ? "; Secure" : "");
-        ex.getResponseHeaders().add("Set-Cookie", cookie);
-    }
-
-    private static void clearSessionCookie(HttpExchange ex) {
-        String proto = ex.getRequestHeaders().getFirst("X-Forwarded-Proto");
-        boolean secure = proto != null && proto.equalsIgnoreCase("https");
-        String cookie = SESSION_COOKIE + "=; Path=/; HttpOnly; Max-Age=0"
-                + (secure ? "; Secure" : "");
-        ex.getResponseHeaders().add("Set-Cookie", cookie);
-    }
-
-    private static String sessionCredentials(HttpExchange ex) {
-        String cookies = ex.getRequestHeaders().getFirst("Cookie");
-        if (cookies == null || cookies.isBlank()) return null;
-        String prefix = SESSION_COOKIE + "=";
-        for (String part : cookies.split(";")) {
-            String trimmed = part.trim();
-            if (!trimmed.startsWith(prefix)) continue;
-            try {
-                return new String(Base64.getDecoder().decode(trimmed.substring(prefix.length())),
-                        StandardCharsets.UTF_8);
-            } catch (IllegalArgumentException e) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private static String basicCredentials(HttpExchange ex) {
-        String header = ex.getRequestHeaders().getFirst("Authorization");
-        if (header == null || !header.startsWith("Basic ")) return null;
-        try {
-            return new String(java.util.Base64.getDecoder().decode(header.substring(6)),
-                    java.nio.charset.StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException e) {
-            return null;
         }
     }
 }

@@ -1,7 +1,9 @@
-/* 注册表配置：参数池/页面池/元素池/业务事件 CRUD + 表头列拖拽排序 */
+/* 注册表配置：参数池/页面池/元素池/业务事件 CRUD + 批量操作 + CSV 导入 */
 import { $, $$, esc, toast } from '../util.js';
 import { api } from '../api.js';
-import { getMe, isAdmin, isSpaceAdmin, isEditor, canEditRegistry } from '../session.js';
+import {
+  isSpaceAdmin, isEditor, canEditRegistry, canApprove,
+} from '../session.js';
 
 let registry = { params: [], pages: [], elements: [], events: [] };
 let regMeta = {};
@@ -9,6 +11,7 @@ let registryLoaded = false;
 let registryLoading = null;
 let searchTimer = null;
 let curKind = 'params';
+const selected = new Set();
 
 const KIND_META = {
   params: { id: 'key', name: '参数',
@@ -31,7 +34,13 @@ const STATUS_LABEL = {
   live: '线上', deprecated: '已废弃',
 };
 
+const BULK_LABELS = {
+  submit: '提交审批', approve: '批准', reject: '驳回',
+  publish: '发布', deprecate: '废弃', delete: '删除',
+};
+
 function colKey() { return `reg-cols-${curKind}`; }
+function rowKey(it, meta) { return it[meta.id]; }
 
 function getCols(meta) {
   try {
@@ -45,6 +54,40 @@ function getCols(meta) {
 }
 
 function saveCols(cols) { localStorage.setItem(colKey(), JSON.stringify(cols)); }
+
+function filteredRows() {
+  const meta = KIND_META[curKind];
+  const kw = $('#reg-search').value.trim().toLowerCase();
+  return (registry[curKind] || []).filter((it) => !kw || JSON.stringify(it).toLowerCase().includes(kw));
+}
+
+function clearSelection() {
+  selected.clear();
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = $('#reg-bulk-bar');
+  if (!bar) return;
+  const n = selected.size;
+  const showBulk = canEditRegistry() || canApprove();
+  bar.hidden = !showBulk || n === 0;
+  $('#reg-bulk-count').textContent = `已选 ${n} 条`;
+  const rows = filteredRows();
+  const allOnPage = rows.length > 0 && rows.every((it) => selected.has(rowKey(it, KIND_META[curKind])));
+  const selAll = $('#reg-select-all');
+  if (selAll) {
+    selAll.checked = allOnPage;
+    selAll.indeterminate = n > 0 && !allOnPage;
+  }
+  const editor = isEditor() && !isSpaceAdmin();
+  $('#reg-bulk-submit')?.toggleAttribute('hidden', !canEditRegistry());
+  $('#reg-bulk-delete')?.toggleAttribute('hidden', !canEditRegistry());
+  $('#reg-bulk-approve')?.toggleAttribute('hidden', !canApprove());
+  $('#reg-bulk-reject')?.toggleAttribute('hidden', !canApprove());
+  $('#reg-bulk-publish')?.toggleAttribute('hidden', !canApprove() || editor);
+  $('#reg-bulk-deprecate')?.toggleAttribute('hidden', !canApprove() || editor);
+}
 
 function cell(it, c, meta) {
   const v = it[c];
@@ -137,22 +180,31 @@ function renderTable() {
   }
   const meta = KIND_META[curKind];
   const cols = getCols(meta);
-  const kw = $('#reg-search').value.trim().toLowerCase();
-  const rows = (registry[curKind] || []).filter((it) => !kw || JSON.stringify(it).toLowerCase().includes(kw));
+  const rows = filteredRows();
+  const showCheck = canEditRegistry() || canApprove();
   $('#reg-count').textContent = `${rows.length} 条`;
-  $('#reg-table').innerHTML = `<div class="col-hint">拖拽表头可调整列顺序 · <button type="button" class="link-btn" id="btn-reset-cols">恢复默认</button></div>
+  $('#reg-table').innerHTML = `<div class="col-hint">拖拽表头可调整列顺序 · 勾选多行可批量操作 · <button type="button" class="link-btn" id="btn-reset-cols">恢复默认</button></div>
     <table>
-    <thead><tr>${cols.map((c) =>
-      `<th data-col="${c}" title="拖拽调整列顺序"><span class="th-grip">⠿</span>${meta.labels[c]}</th>`).join('')}<th class="th-fixed">操作</th></tr></thead>
-    <tbody>${rows.map((it) => `<tr>
+    <thead><tr>
+      ${showCheck ? '<th class="reg-th-check"><input type="checkbox" id="reg-head-check" title="全选本页"></th>' : ''}
+      ${cols.map((c) =>
+      `<th data-col="${c}" title="拖拽调整列顺序"><span class="th-grip">⠿</span>${meta.labels[c]}</th>`).join('')}
+      <th class="th-fixed">操作</th></tr></thead>
+    <tbody>${rows.map((it) => {
+      const key = rowKey(it, meta);
+      const checked = selected.has(key);
+      return `<tr data-key="${esc(key)}" class="${checked ? 'row-selected' : ''}">
+      ${showCheck ? `<td class="reg-td-check"><input type="checkbox" class="reg-row-check" data-key="${esc(key)}" ${checked ? 'checked' : ''}></td>` : ''}
       ${cols.map((c) => `<td>${cell(it, c, meta)}</td>`).join('')}
       <td class="row-actions">
-        ${canModifyRow(it) ? `<button data-act="edit" data-key="${esc(it[meta.id])}">编辑</button>` : ''}
+        ${canModifyRow(it) ? `<button data-act="edit" data-key="${esc(key)}">编辑</button>` : ''}
         ${actionBtns(it, meta)}
-        <button data-act="audit" data-key="${esc(it[meta.id])}">审计</button>
-        ${canModifyRow(it) ? `<button data-act="del" data-key="${esc(it[meta.id])}" class="danger">删除</button>` : ''}
-      </td></tr>`).join('') || `<tr><td colspan="${cols.length + 1}" class="muted empty-cell">没有匹配的条目</td></tr>`}
+        <button data-act="audit" data-key="${esc(key)}">审计</button>
+        ${canModifyRow(it) ? `<button data-act="del" data-key="${esc(key)}" class="danger">删除</button>` : ''}
+      </td></tr>`;
+    }).join('') || `<tr><td colspan="${cols.length + (showCheck ? 2 : 1)}" class="muted empty-cell">没有匹配的条目</td></tr>`}
     </tbody></table>`;
+
   $('#reg-table').querySelectorAll('button[data-act]').forEach((b) => {
     const key = b.dataset.key;
     const act = b.dataset.act;
@@ -166,12 +218,34 @@ function renderTable() {
       else if (act === 'reject') doReject(key);
     };
   });
+
+  $('#reg-table').querySelectorAll('.reg-row-check').forEach((cb) => {
+    cb.onchange = () => {
+      const key = cb.dataset.key;
+      if (cb.checked) selected.add(key);
+      else selected.delete(key);
+      updateBulkBar();
+      cb.closest('tr')?.classList.toggle('row-selected', cb.checked);
+    };
+  });
+
+  const headCheck = $('#reg-head-check');
+  headCheck?.addEventListener('change', () => {
+    rows.forEach((it) => {
+      const key = rowKey(it, meta);
+      if (headCheck.checked) selected.add(key);
+      else selected.delete(key);
+    });
+    renderTable();
+  });
+
   $('#btn-reset-cols')?.addEventListener('click', () => {
     localStorage.removeItem(colKey());
     renderTable();
     toast('已恢复默认列顺序');
   });
   bindColDrag($('#reg-table').querySelector('table'), meta);
+  updateBulkBar();
 }
 
 export async function renderRegistry(force = false) {
@@ -185,9 +259,8 @@ export function invalidateRegistryCache() {
 
 function actionBtns(it, meta) {
   const s = it.status || 'live';
-  const me = getMe();
   let html = '';
-  if (isAdmin()) {
+  if (isSpaceAdmin()) {
     if (s === 'pending') {
       html += `<button data-act="approve" data-key="${esc(it[meta.id])}" class="primary">批准</button>`;
       html += `<button data-act="reject" data-key="${esc(it[meta.id])}">驳回</button>`;
@@ -201,6 +274,28 @@ function actionBtns(it, meta) {
   if (!canEditRegistry()) return html;
   if (isEditor() && s !== 'pending' && s !== 'draft' && s) return html;
   return html;
+}
+
+async function runBatch(action) {
+  const keys = [...selected];
+  if (!keys.length) return;
+  const label = BULK_LABELS[action] || action;
+  if (!confirm(`确认对 ${keys.length} 条执行「${label}」？`)) return;
+  const r = await api('/registry/batch', {
+    method: 'POST',
+    body: JSON.stringify({ kind: curKind, action, keys }),
+  });
+  if (r.failed > 0) {
+    const detail = (r.errors || []).slice(0, 5).map((e) => `${e.key}: ${e.error}`).join('\n');
+    toast(`${label}：成功 ${r.ok}，失败 ${r.failed}${detail ? '\n' + detail : ''}`, r.ok ? 'warn' : 'error');
+  } else {
+    toast(`${label}完成：${r.ok} 条`);
+  }
+  clearSelection();
+  renderRegistry(true);
+  if (action === 'submit' || action === 'approve') {
+    document.dispatchEvent(new CustomEvent('giso:pending-changed'));
+  }
 }
 
 async function doApprove(key) {
@@ -318,20 +413,103 @@ function openEditor(key) {
   };
 }
 
+async function downloadTemplate() {
+  const r = await fetch(`/admin/api/registry/import-template?kind=${encodeURIComponent(curKind)}`, {
+    credentials: 'same-origin',
+  });
+  if (!r.ok) { toast('下载模板失败', 'error'); return; }
+  const blob = await r.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${curKind}_import_template.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function countCsvRows(text) {
+  return text.split('\n').filter((l) => {
+    const t = l.trim();
+    return t && !t.startsWith('#') && !t.startsWith('key,') && !t.startsWith('pgid,')
+      && !t.startsWith('eid,') && !t.startsWith('code,');
+  }).length;
+}
+
+function openImportDialog() {
+  $('#reg-import-kind-label').textContent = KIND_META[curKind].name;
+  $('#reg-import-file').value = '';
+  $('#reg-import-text').value = '';
+  $('#reg-import-preview').textContent = '';
+  $('#reg-import-dialog').showModal();
+}
+
+async function runImport() {
+  let csv = $('#reg-import-text').value.trim();
+  const file = $('#reg-import-file').files?.[0];
+  if (file) csv = await file.text();
+  if (!csv) { toast('请上传或粘贴 CSV', 'error'); return; }
+  const n = countCsvRows(csv);
+  if (!n) { toast('未解析到数据行', 'error'); return; }
+  if (!confirm(`将导入约 ${n} 条到「${KIND_META[curKind].name}」，继续？`)) return;
+  const r = await api('/registry/import', {
+    method: 'POST',
+    body: JSON.stringify({ kind: curKind, csv }),
+  });
+  if (r.failed > 0) {
+    const detail = (r.errors || []).slice(0, 5).map((e) => `${e.key}: ${e.error}`).join('\n');
+    toast(`导入：成功 ${r.ok}，失败 ${r.failed}\n${detail}`, r.ok ? 'warn' : 'error');
+  } else {
+    toast(`导入完成：${r.ok} 条`);
+    $('#reg-import-dialog').close();
+  }
+  renderRegistry(true);
+  if (isEditor()) document.dispatchEvent(new CustomEvent('giso:pending-changed'));
+}
+
 export function initRegistry() {
   $$('.seg-btn').forEach((btn) => {
     btn.onclick = () => {
       curKind = btn.dataset.kind;
+      clearSelection();
       renderTable();
     };
   });
   $('#reg-search').addEventListener('input', () => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(renderTable, 120);
+    searchTimer = setTimeout(() => { clearSelection(); renderTable(); }, 120);
   });
   $('#btn-add').onclick = () => openEditor(null);
+  $('#btn-reg-template')?.addEventListener('click', downloadTemplate);
+  $('#btn-reg-import')?.addEventListener('click', openImportDialog);
+  $('#reg-import-dl-template')?.addEventListener('click', (e) => { e.preventDefault(); downloadTemplate(); });
+  $('#reg-import-run')?.addEventListener('click', runImport);
+  $('#reg-import-file')?.addEventListener('change', async () => {
+    const f = $('#reg-import-file').files?.[0];
+    if (f) $('#reg-import-preview').textContent = `已选文件：${f.name}（约 ${countCsvRows(await f.text())} 条）`;
+  });
+  $('#reg-import-text')?.addEventListener('input', () => {
+    const n = countCsvRows($('#reg-import-text').value);
+    $('#reg-import-preview').textContent = n ? `约 ${n} 条待导入` : '';
+  });
+  $('#reg-bulk-clear')?.addEventListener('click', () => { clearSelection(); renderTable(); });
+  $('#reg-select-all')?.addEventListener('change', () => {
+    const rows = filteredRows();
+    const meta = KIND_META[curKind];
+    if ($('#reg-select-all').checked) rows.forEach((it) => selected.add(rowKey(it, meta)));
+    else selected.clear();
+    renderTable();
+  });
+  $('#reg-bulk-submit')?.addEventListener('click', () => runBatch('submit'));
+  $('#reg-bulk-approve')?.addEventListener('click', () => runBatch('approve'));
+  $('#reg-bulk-reject')?.addEventListener('click', () => runBatch('reject'));
+  $('#reg-bulk-publish')?.addEventListener('click', () => runBatch('publish'));
+  $('#reg-bulk-deprecate')?.addEventListener('click', () => runBatch('deprecate'));
+  $('#reg-bulk-delete')?.addEventListener('click', () => runBatch('delete'));
   $('#btn-visual-picker')?.addEventListener('click', () => {
     document.dispatchEvent(new CustomEvent('giso:navigate', { detail: { view: 'visual' } }));
   });
-  if (!canEditRegistry()) $('#btn-add')?.setAttribute('hidden', '');
+  if (!canEditRegistry()) {
+    $('#btn-add')?.setAttribute('hidden', '');
+    $('#btn-reg-import')?.setAttribute('hidden', '');
+    $('#btn-reg-template')?.setAttribute('hidden', '');
+  }
 }

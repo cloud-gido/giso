@@ -1,6 +1,7 @@
 /* GISO 玑源 · 管理控制台入口 */
 import { $, $$ } from './util.js';
 import { api, logout, getSpace, setSpace } from './api.js';
+import { requireLoginRedirect } from './auth.js';
 import { setMe } from './session.js';
 import { initDebug, renderDebug } from './views/debug.js';
 import { initAssert } from './views/assert.js';
@@ -176,7 +177,7 @@ async function boot() {
     applyRole(me);
     show('debug');
   } catch {
-    location.href = '/admin/login.html';
+    requireLoginRedirect();
   }
 }
 

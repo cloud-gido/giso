@@ -86,6 +86,13 @@ public final class Registry {
 
     public synchronized String upsert(String spaceKey, String kind, Map<String, Object> item,
             String operator, String spaceRole) throws Exception {
+        String err = applyUpsert(spaceKey, kind, item, operator, spaceRole);
+        if (err == null) reload();
+        return err;
+    }
+
+    private synchronized String applyUpsert(String spaceKey, String kind, Map<String, Object> item,
+            String operator, String spaceRole) throws Exception {
         String idField = RegistryKinds.idField(kind);
         String key = String.valueOf(item.get(idField));
         Map<String, Object> existing = tablesFor(spaceKey).get(kind).get(key);
@@ -107,7 +114,6 @@ public final class Registry {
         if (err != null) return err;
         WriteResult wr = store.upsert(spaceKey, kind, item, operator);
         if (wr.error() != null) return wr.error();
-        reload();
         return null;
     }
 
@@ -116,6 +122,13 @@ public final class Registry {
     }
 
     public synchronized String delete(String spaceKey, String kind, String key, String operator, String spaceRole)
+            throws Exception {
+        String err = applyDelete(spaceKey, kind, key, operator, spaceRole);
+        if (err == null) reload();
+        return err;
+    }
+
+    private synchronized String applyDelete(String spaceKey, String kind, String key, String operator, String spaceRole)
             throws Exception {
         Map<String, Object> existing = tablesFor(spaceKey).get(kind).get(key);
         if (AdminUser.ROLE_EDITOR.equals(spaceRole) && existing != null) {
@@ -126,7 +139,6 @@ public final class Registry {
         }
         WriteResult wr = store.delete(spaceKey, kind, key, operator);
         if (wr.error() != null) return wr.error();
-        reload();
         return null;
     }
 
@@ -154,31 +166,133 @@ public final class Registry {
     }
 
     public synchronized String publish(String spaceKey, String kind, String key, String operator) throws Exception {
+        String err = applyPublish(spaceKey, kind, key, operator);
+        if (err == null) reload();
+        return err;
+    }
+
+    private synchronized String applyPublish(String spaceKey, String kind, String key, String operator)
+            throws Exception {
         WriteResult wr = store.publish(spaceKey, kind, key, operator);
         if (wr.error() != null) return wr.error();
-        reload();
         return null;
     }
 
     public synchronized String deprecate(String spaceKey, String kind, String key, String operator) throws Exception {
+        String err = applyDeprecate(spaceKey, kind, key, operator);
+        if (err == null) reload();
+        return err;
+    }
+
+    private synchronized String applyDeprecate(String spaceKey, String kind, String key, String operator)
+            throws Exception {
         WriteResult wr = store.deprecate(spaceKey, kind, key, operator);
         if (wr.error() != null) return wr.error();
-        reload();
         return null;
     }
 
     public synchronized String approve(String spaceKey, String kind, String key, String operator) throws Exception {
+        String err = applyApprove(spaceKey, kind, key, operator);
+        if (err == null) reload();
+        return err;
+    }
+
+    private synchronized String applyApprove(String spaceKey, String kind, String key, String operator)
+            throws Exception {
         WriteResult wr = store.approve(spaceKey, kind, key, operator);
         if (wr.error() != null) return wr.error();
-        reload();
         return null;
     }
 
     public synchronized String reject(String spaceKey, String kind, String key, String operator) throws Exception {
+        String err = applyReject(spaceKey, kind, key, operator);
+        if (err == null) reload();
+        return err;
+    }
+
+    private synchronized String applyReject(String spaceKey, String kind, String key, String operator)
+            throws Exception {
         WriteResult wr = store.reject(spaceKey, kind, key, operator);
         if (wr.error() != null) return wr.error();
-        reload();
         return null;
+    }
+
+    /**
+     * 批量操作：submit（提交审批）/ approve / reject / publish / deprecate / delete。
+     * 单次 reload，返回逐条成败。
+     */
+    public synchronized Map<String, Object> batch(String spaceKey, String kind, List<String> keys,
+            String action, String operator, String spaceRole) throws Exception {
+        List<Map<String, String>> errors = new ArrayList<>();
+        int ok = 0;
+        boolean changed = false;
+        for (String key : keys) {
+            if (key == null || key.isBlank()) continue;
+            String err = switch (action) {
+                case "submit" -> applySubmit(spaceKey, kind, key.trim(), operator, spaceRole);
+                case "approve" -> applyApprove(spaceKey, kind, key.trim(), operator);
+                case "reject" -> applyReject(spaceKey, kind, key.trim(), operator);
+                case "publish" -> applyPublish(spaceKey, kind, key.trim(), operator);
+                case "deprecate" -> applyDeprecate(spaceKey, kind, key.trim(), operator);
+                case "delete" -> applyDelete(spaceKey, kind, key.trim(), operator, spaceRole);
+                default -> "未知操作: " + action;
+            };
+            if (err == null) {
+                ok++;
+                changed = true;
+            } else {
+                errors.add(Map.of("key", key.trim(), "error", err));
+            }
+        }
+        if (changed) reload();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", ok);
+        out.put("failed", errors.size());
+        out.put("errors", errors);
+        return out;
+    }
+
+    /** 批量导入（CSV 解析后的条目列表），单次 reload。 */
+    public synchronized Map<String, Object> importItems(String spaceKey, String kind,
+            List<Map<String, Object>> items, String operator, String spaceRole) throws Exception {
+        List<Map<String, String>> errors = new ArrayList<>();
+        int ok = 0;
+        boolean changed = false;
+        for (Map<String, Object> item : items) {
+            String err = applyUpsert(spaceKey, kind, item, operator, spaceRole);
+            String idField = RegistryKinds.idField(kind);
+            String key = String.valueOf(item.getOrDefault(idField, "?"));
+            if (err == null) {
+                ok++;
+                changed = true;
+            } else {
+                errors.add(Map.of("key", key, "error", err));
+            }
+        }
+        if (changed) reload();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", ok);
+        out.put("failed", errors.size());
+        out.put("errors", errors);
+        return out;
+    }
+
+    private String applySubmit(String spaceKey, String kind, String key, String operator, String spaceRole)
+            throws Exception {
+        Map<String, Object> existing = tablesFor(spaceKey).get(kind).get(key);
+        if (existing == null) return "条目不存在: " + key;
+        String status = String.valueOf(existing.getOrDefault("status", "live"));
+        if (AdminUser.ROLE_EDITOR.equals(spaceRole)) {
+            if (!AdminPermissions.editorMayEditStatus(status)) {
+                return "只能提交「登记中/待审批」条目";
+            }
+        } else if (!"pending".equals(status)
+                && !java.util.Set.of("draft", "dev", "testing").contains(status)) {
+            return "只能提交非线上条目（当前: " + status + "）";
+        }
+        Map<String, Object> item = new LinkedHashMap<>(existing);
+        item.put("status", "pending");
+        return applyUpsert(spaceKey, kind, item, operator, spaceRole);
     }
 
     public synchronized Map<String, List<Map<String, Object>>> pending(String spaceKey) {

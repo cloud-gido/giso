@@ -26,7 +26,8 @@ public final class DbMigrator {
             new Migration(3, "approval", "/db/V3__approval.sql"),
             new Migration(4, "spaces", "/db/V4__spaces.sql"),
             new Migration(5, "registry_space", "/db/V5__registry_space.sql"),
-            new Migration(6, "system_settings", "/db/V6__system_settings.sql"));
+            new Migration(6, "system_settings", "/db/V6__system_settings.sql"),
+            new Migration(7, "admin_sessions", "/db/V7__admin_sessions.sql"));
 
     /** default → longvideo 注册表复制（幂等）；须在 V5 之后且 default 有数据时执行。 */
     public static final String SYNC_LONGVIDEO_SQL = "/db/sync_longvideo_registry.sql";
@@ -86,6 +87,7 @@ public final class DbMigrator {
         stampIf(4, tableExists("spaces"));
         stampIf(5, tableExists("registry_entries") && columnExists("registry_entries", "space_key"));
         stampIf(6, tableExists("system_settings"));
+        stampIf(7, tableExists("admin_sessions"));
 
         if (migrationCount() > 0) {
             System.out.println("[giso-db] backfilled schema_migrations for legacy database ("

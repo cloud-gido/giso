@@ -214,8 +214,22 @@ biz_event code=video_play_start</textarea>
         <span class="muted" id="reg-count"></span>
         <span class="muted" id="reg-meta"></span>
         <span class="spacer"></span>
+        <button type="button" id="btn-reg-template" class="ghost nav-admin-only">下载导入模板</button>
+        <button type="button" id="btn-reg-import" class="ghost nav-admin-only">批量导入</button>
         <button type="button" id="btn-visual-picker" class="ghost nav-admin-only" data-i18n="nav.visual">可视化圈选</button>
         <button id="btn-add" class="primary">＋ 新增</button>
+      </div>
+      <div class="reg-bulk-bar" id="reg-bulk-bar" hidden>
+        <label class="reg-bulk-check"><input type="checkbox" id="reg-select-all"> 全选本页</label>
+        <span class="reg-bulk-count" id="reg-bulk-count">已选 0 条</span>
+        <span class="spacer"></span>
+        <button type="button" class="ghost" id="reg-bulk-clear">取消选择</button>
+        <button type="button" class="primary" id="reg-bulk-submit" hidden>批量提交审批</button>
+        <button type="button" class="primary" id="reg-bulk-approve" hidden>批量批准</button>
+        <button type="button" id="reg-bulk-reject" hidden>批量驳回</button>
+        <button type="button" class="primary" id="reg-bulk-publish" hidden>批量发布</button>
+        <button type="button" id="reg-bulk-deprecate" hidden>批量废弃</button>
+        <button type="button" class="danger" id="reg-bulk-delete" hidden>批量删除</button>
       </div>
       <div id="reg-table" class="table-wrap"></div>
     </div>
@@ -378,6 +392,26 @@ biz_event code=video_play_start</textarea>
   <div class="dialog-actions">
     <button type="button" class="primary" onclick="document.getElementById('audit-dialog').close()">关闭</button>
   </div>
+</dialog>
+
+<dialog id="reg-import-dialog">
+  <form method="dialog" id="reg-import-form">
+    <h3>批量导入 · <span id="reg-import-kind-label">参数池</span></h3>
+    <p class="hint">先<a href="#" id="reg-import-dl-template">下载当前池的 CSV 模板</a>，按格式填写后上传。单次最多 500 条。</p>
+    <div class="field">
+      <label>CSV 文件</label>
+      <input type="file" id="reg-import-file" accept=".csv,text/csv,text/plain">
+    </div>
+    <div class="field">
+      <label>或直接粘贴 CSV</label>
+      <textarea id="reg-import-text" rows="8" placeholder="key,type,desc,..."></textarea>
+    </div>
+    <div id="reg-import-preview" class="muted"></div>
+    <div class="dialog-actions">
+      <button value="cancel" class="ghost">取消</button>
+      <button type="button" class="primary" id="reg-import-run">开始导入</button>
+    </div>
+  </form>
 </dialog>
 
 <div id="toasts"></div>

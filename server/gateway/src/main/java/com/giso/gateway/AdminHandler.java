@@ -8,6 +8,7 @@ import com.giso.gateway.auth.AdminAuth;
 import com.giso.gateway.auth.AdminPermissions;
 import com.giso.gateway.auth.AdminUser;
 import com.giso.gateway.registry.RegistryKinds;
+import com.giso.gateway.registry.RegistryImportTemplates;
 import com.giso.gateway.settings.SystemSettingsService;
 import com.giso.gateway.space.SpaceService;
 import com.sun.net.httpserver.HttpExchange;
@@ -147,6 +148,12 @@ public final class AdminHandler implements HttpHandler {
             return true;
         }
         if (path.equals("/registry/pending") && method.equals("GET")) return true;
+        if (path.equals("/registry/import-template") && method.equals("GET")) return true;
+        if (path.equals("/registry/batch") && method.equals("POST")) return true;
+        if (path.equals("/registry/import") && method.equals("POST")) {
+            return require(ex, globalRole, spaceRole,
+                    AdminPermissions.canEditRegistry(globalRole, spaceRole), "无权导入注册表");
+        }
         if (path.startsWith("/assistant/")) return true;
         if (path.startsWith("/settings")) {
             if (method.equals("GET")) return true;
@@ -257,6 +264,15 @@ public final class AdminHandler implements HttpHandler {
 
         } else if (path.equals("/registry/visual-draft") && method.equals("POST")) {
             routeVisualDraft(ex, spaceKey, spaceRole);
+
+        } else if (path.equals("/registry/import-template") && method.equals("GET")) {
+            routeImportTemplate(ex);
+
+        } else if (path.equals("/registry/import") && method.equals("POST")) {
+            routeImport(ex, spaceKey, spaceRole);
+
+        } else if (path.equals("/registry/batch") && method.equals("POST")) {
+            routeBatch(ex, spaceKey, globalRole, spaceRole);
 
         } else if (path.startsWith("/registry/")) {
             routeRegistry(ex, method, path, spaceKey, spaceRole);
@@ -507,6 +523,92 @@ public final class AdminHandler implements HttpHandler {
                 "ok", errors.isEmpty(),
                 "created_elements", created,
                 "errors", errors)));
+    }
+
+    private void routeImportTemplate(HttpExchange ex) throws IOException {
+        String kind = Http.query(ex).getOrDefault("kind", "");
+        if (!RegistryImportTemplates.supports(kind)) {
+            Http.json(ex, 400, "{\"error\":\"未知 kind\"}");
+            return;
+        }
+        String csv = RegistryImportTemplates.csvTemplate(kind);
+        String filename = RegistryKinds.yamlFile(kind).replace(".yaml", "_import_template.csv");
+        Http.csvAttachment(ex, filename, csv);
+    }
+
+    private void routeImport(HttpExchange ex, String spaceKey, String spaceRole) throws Exception {
+        Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+        String kind = str(body, "kind");
+        if (!RegistryKinds.isKnown(kind)) {
+            Http.json(ex, 400, "{\"error\":\"未知 kind\"}");
+            return;
+        }
+        List<Map<String, Object>> items;
+        if (body.get("items") instanceof List<?> list) {
+            items = new ArrayList<>();
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> row = (Map<String, Object>) m;
+                    items.add(row);
+                }
+            }
+        } else {
+            String csv = str(body, "csv");
+            if (csv.isBlank()) {
+                Http.json(ex, 400, "{\"error\":\"需要 items 或 csv 字段\"}");
+                return;
+            }
+            items = RegistryImportTemplates.parseCsv(kind, csv);
+        }
+        if (items.isEmpty()) {
+            Http.json(ex, 400, "{\"error\":\"没有可导入的条目\"}");
+            return;
+        }
+        if (items.size() > 500) {
+            Http.json(ex, 400, "{\"error\":\"单次最多导入 500 条\"}");
+            return;
+        }
+        String operator = auth.operator(ex);
+        Http.json(ex, 200, M.writeValueAsString(registry.importItems(spaceKey, kind, items, operator, spaceRole)));
+    }
+
+    private void routeBatch(HttpExchange ex, String spaceKey, String globalRole, String spaceRole)
+            throws Exception {
+        Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+        String kind = str(body, "kind");
+        String action = str(body, "action");
+        if (!RegistryKinds.isKnown(kind)) {
+            Http.json(ex, 400, "{\"error\":\"未知 kind\"}");
+            return;
+        }
+        boolean allowed = switch (action) {
+            case "submit", "delete" -> AdminPermissions.canEditRegistry(globalRole, spaceRole);
+            case "approve", "reject" -> AdminPermissions.canApproveRegistry(globalRole, spaceRole);
+            case "publish", "deprecate" -> AdminPermissions.canPublishRegistry(globalRole, spaceRole);
+            default -> false;
+        };
+        if (!allowed) {
+            Http.json(ex, 403, "{\"error\":\"当前角色无权执行: " + action + "\"}");
+            return;
+        }
+        List<String> keys = new ArrayList<>();
+        if (body.get("keys") instanceof List<?> list) {
+            for (Object o : list) {
+                if (o != null) keys.add(String.valueOf(o).trim());
+            }
+        }
+        if (keys.isEmpty()) {
+            Http.json(ex, 400, "{\"error\":\"keys 不能为空\"}");
+            return;
+        }
+        if (keys.size() > 200) {
+            Http.json(ex, 400, "{\"error\":\"单次最多操作 200 条\"}");
+            return;
+        }
+        String operator = auth.operator(ex);
+        Http.json(ex, 200, M.writeValueAsString(
+                registry.batch(spaceKey, kind, keys, action, operator, spaceRole)));
     }
 
     private void routeRegistry(HttpExchange ex, String method, String path,

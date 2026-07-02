@@ -1,4 +1,6 @@
 /* 管理 API 封装（Cookie 会话 + 空间头 X-GISO-Space） */
+import { logout as authLogout, requireLoginRedirect } from './auth.js';
+
 const SPACE_KEY = 'giso_space';
 let currentSpace = localStorage.getItem(SPACE_KEY) || 'default';
 
@@ -14,8 +16,7 @@ export async function api(p, opt = {}) {
   if (opt.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
   const r = await fetch('/admin/api' + p, { credentials: 'same-origin', ...opt, headers });
   if (r.status === 401) {
-    const next = encodeURIComponent(location.pathname + location.search);
-    location.href = '/admin/login.html?next=' + next;
+    requireLoginRedirect();
     throw new Error('unauthorized');
   }
   const data = await r.json();
@@ -47,6 +48,6 @@ export function connectSSE(onEvent, onState) {
 }
 
 export async function logout() {
-  await fetch('/admin/api/logout', { method: 'POST', credentials: 'same-origin' });
-  location.href = '/admin/login.html';
+  disconnectSSE();
+  await authLogout();
 }

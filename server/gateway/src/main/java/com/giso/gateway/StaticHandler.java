@@ -23,7 +23,9 @@ public final class StaticHandler implements HttpHandler {
     }
 
     private static boolean isPublic(String rel) {
-        return rel.equals("login.html") || rel.equals("js/login.js")
+        return rel.equals("login.html")
+                || rel.equals("js/login.js")
+                || rel.equals("js/auth.js")
                 || rel.startsWith("assets/");
     }
 

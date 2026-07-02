@@ -96,6 +96,20 @@ th[data-col].drag-over { background: var(--accent-soft); }
 #reg-search { width: 210px; }
 td .muted { color: var(--faint); }
 
+.reg-bulk-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; margin-bottom: 12px;
+  background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: var(--r-md);
+}
+.reg-bulk-bar[hidden] { display: none !important; }
+.reg-bulk-check { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.reg-bulk-count { font-size: 13px; font-weight: 600; color: var(--accent); }
+.reg-row-check { width: 16px; height: 16px; cursor: pointer; }
+tr.row-selected { background: var(--accent-soft); }
+th.reg-th-check, td.reg-td-check { width: 36px; text-align: center; }
+#reg-import-dialog { width: min(640px, 92vw); }
+#reg-import-preview { font-size: 12px; margin: 8px 0; max-height: 80px; overflow: auto; }
+
 /* ═ 质量统计 ═ */
 .stats-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; }
 .stats-grid .card { margin-bottom: 0; }
