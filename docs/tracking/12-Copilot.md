@@ -9,7 +9,8 @@
 | 产品功能 | GISO 与 GIDO 关系、Spaces、管理台能力 |
 | 埋点流程 | 接入六步、登记 → 常量 → 联调 → 发布 |
 | 上报协议 | `/v1/track`、env 分流、隔离区 |
-| 运维部署 | App Key、Doppler、Doris 链路 |
+| 架构与性能 | 单体 Gateway、HTTPS 对 App 影响、高流量容量与限流 |
+| 运维部署 | App Key、Doppler、Doris 链路、镜像回滚 `0.1` |
 
 回答会附带 **当前空间登记概况**（pages/elements 数量、待审批数）。
 
@@ -51,7 +52,7 @@ assistant:
 
 管理台 → **系统设置**（平台管理员）：配置 Copilot LLM、勾选出口管道，**保存后立即生效**。
 
-管理台 → **玑源 Copilot**（侧栏「帮助」）：对话界面。
+管理台 → **接入助手**（顶栏）：对话界面。
 
 ## 扩展新 Provider
 

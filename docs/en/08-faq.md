@@ -27,6 +27,18 @@ s3:
 
 Deploy Flink jobs from `server/paimon/*.sql`. See [server/paimon/README.md](../../server/paimon/README.md).
 
+## Will HTTPS batch reporting hurt app performance?
+
+**Not if you use the SDK.** Batching (20 events / 15s), gzip, background thread upload, local spill + retry, flush on background. Main thread only enqueues. Avoid `debug: true` in production and raw high-frequency POST from business threads.
+
+## Is the gateway a Spring Boot app?
+
+**No.** `giso-gateway` is a lightweight Java 21 JAR: JDK `HttpServer`, Jackson, no Spring. Scale with **stateless K8s replicas**, not heavier frameworks.
+
+## Can a monolithic gateway crash under high volume?
+
+The gateway is a thin ingest layer: decompress → validate → async Kafka → `204`. Kafka absorbs spikes; Doris stores data. Protections: 1MB body limit, per-IP rate limit (429), Kafka spill/replay. Run ≥2 replicas, enable `rate_limit_rps`, scale Kafka partitions. Rollback image tag: `0.1` or `main-<sha>`.
+
 ## English admin UI?
 
 Use the **English / 中文** toggle in the admin sidebar. More strings will migrate to i18n over time.

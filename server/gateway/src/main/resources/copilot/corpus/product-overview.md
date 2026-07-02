@@ -8,8 +8,8 @@
 
 - 9 个标准事件 + 注册表强校验
 - 四端 SDK（Web / Android / iOS / Server）
-- 管理台：联调 SSE、注册表 CRUD、审批、空间、Copilot 答疑
-- Kafka → Doris 实时 + 可选 S3/Paimon 湖仓
+- 管理台：联调 SSE、注册表 CRUD、审批、空间、**接入助手**答疑
+- **轻量 Gateway**（Java 单体 JAR，非 Spring）→ Kafka → Doris 实时 + 可选 S3/Paimon 湖仓
 
 ## 与 GIDO 关系
 
@@ -20,6 +20,6 @@
 
 同一 Doppler 项目、同一 deployment 两仓发布模式。
 
-## Copilot
+## 接入助手
 
-管理台 **玑源 Copilot** 解答产品与埋点流程问题。Provider 可插拔：`doc`（默认）/ `openai` / `gido_proxy`。
+管理台 **接入助手** 解答产品特性、埋点接入与架构容量问题。Provider 可插拔：`doc`（默认）/ `openai` / `gido_proxy`。语料含 `docs/tracking/08-FAQ` 与 `copilot/corpus/faq-architecture`、`faq-performance`。

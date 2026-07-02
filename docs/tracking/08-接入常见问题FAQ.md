@@ -81,6 +81,79 @@ registry:
 
 **说明**：`SLF4J: Failed to load class org.slf4j.impl.StaticLoggerBinder` 仅为日志实现缺失警告，不影响启动，可忽略。
 
+### Q5. Gateway 是 Spring Boot 吗？为什么用单体 JAR？
+
+**不是 Spring。** `giso-gateway` 是 **Java 21 单体可执行 JAR**，刻意保持轻量：
+
+| 组件 | 技术 |
+|------|------|
+| HTTP 服务 | JDK 内置 `HttpServer`（非 Tomcat / Spring MVC） |
+| JSON | Jackson |
+| 配置 | SnakeYAML + 环境变量 |
+| 管理台 | 静态 HTML + ES Module（同进程托管） |
+
+埋点接入是 **高并发、短路径、无状态**（解压 → 校验 → 写 Kafka → `204`），不需要 Spring 那套容器开销。生产通过 **K8s 多副本 + 负载均衡** 水平扩展，而不是拆成很多微服务。
+
+### Q6. HTTPS 接口上报会影响 App 性能吗？
+
+**正常使用 SDK 时影响很小**，因为上报在后台异步完成，不是「一点击就发一次请求」：
+
+| SDK 机制 | 作用 |
+|----------|------|
+| **攒批** | 默认满 **20 条** 或 **15 秒** 才发一批 |
+| **gzip** | 压缩 JSON，减少流量与耗时 |
+| **后台线程** | Android `EventQueue` 单线程调度，主线程只入队 |
+| **退后台 flush** | 进后台时补发，不阻塞 UI |
+| **失败落盘 + 退避重试** | 网络差时本地排队，不堵业务线程 |
+| **204 响应** | 无响应体，连接很快结束 |
+
+HTTPS 比 HTTP 多 TLS 握手，但现代系统有连接复用；相对视频播放、业务 API，埋点流量通常占比极低。
+
+**可能变重的误用**（需避免）：
+
+- 业务线程自己高频 `POST /v1/track`，绕过 SDK 攒批
+- 生产环境长期开 `debug: true`（联调用，会单条实时上报）
+- 单批超大（协议上限：≤50 条 / ≤256KB，解压后 ≤1MB）
+
+### Q7. 数据量很大，Gateway 单体会不会崩？
+
+Gateway 是 **薄接入层**，不做数仓计算，职责是：
+
+```
+解压 → 按注册表校验 → 异步写 Kafka → 立刻 204
+```
+
+**洪峰由 Kafka 扛，存储由 Doris/ClickHouse 扛**，不应在 Gateway 进程里堆数据。
+
+已有防护（`gateway.yaml` → `limits`）：
+
+| 机制 | 说明 |
+|------|------|
+| `max_body_bytes` | 单请求解压后 ≤ **1MB**，超出 `413` |
+| `rate_limit_rps` / `rate_limit_burst` | 按客户端 IP **令牌桶限流**，超出 `429`（生产示例 100 RPS） |
+| Kafka **异步 producer** | `linger.ms` + lz4 压缩 + `acks=all` |
+| **spill 兜底** | Broker 不可用时落本地文件，恢复后自动回放 |
+| **隔离区** | 校验失败进 `giso_events_quarantine`，不污染主 ODS |
+
+单机单实例有上限（极高 QPS、未开限流、注册表极大时 CPU 会吃紧）。应对方式：
+
+1. **Helm / K8s 多副本**（建议 ≥2）+ Ingress 负载均衡  
+2. 生产务必配置 **`rate_limit_rps`**  
+3. Kafka **加分区**，Gateway 只负责快进快出  
+4. 监控 QPS、429 率、`giso_kafka_spilled_total`（持续增长 = Kafka 故障）  
+5. 部署回滚：镜像标签 `ghcr.io/.../giso-gateway:0.1` 或 `main-<sha>`
+
+### Q8. 和「Spring 微服务」比，这套架构的取舍？
+
+| | GISO 单体 Gateway | Spring 微服务 |
+|--|-------------------|---------------|
+| 内存 / 启动 | 更轻 | 更重 |
+| 接入场景匹配度 | 高（校验 + 转发） | 功能过剩 |
+| 扩展方式 | 水平扩副本（无状态） | 拆服务 + 扩副本 |
+| 适用阶段 | 创业 ~ 中等流量 | 超大规模可演进专用 ingest 集群 |
+
+**结论**：不是「没用 Spring 就容易崩」，而是 **流量上来时扩 Gateway 副本 + 限流 + Kafka 扩容**。协议与 SDK 设计（9 事件收敛、攒批）从源头控制了数据量。
+
 ---
 
 ## 二、App Key 与鉴权
