@@ -35,10 +35,12 @@ FROM ${schema}.admin_users
 WHERE role IN ('editor', 'viewer') AND disabled_at IS NULL
 ON CONFLICT (username, space_key) DO NOTHING;
 
+-- 必须先删旧 CHECK（V3: admin/editor/viewer），再 UPDATE 为新角色
+ALTER TABLE ${schema}.admin_users DROP CONSTRAINT IF EXISTS admin_users_role_check;
+
 UPDATE ${schema}.admin_users SET role = 'system_admin' WHERE role = 'admin';
 UPDATE ${schema}.admin_users SET role = 'user' WHERE role IN ('editor', 'viewer');
 
-ALTER TABLE ${schema}.admin_users DROP CONSTRAINT IF EXISTS admin_users_role_check;
 ALTER TABLE ${schema}.admin_users ADD CONSTRAINT admin_users_role_check
     CHECK (role IN ('system_admin', 'user'));
 
