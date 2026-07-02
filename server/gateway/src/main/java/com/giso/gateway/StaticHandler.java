@@ -52,6 +52,9 @@ public final class StaticHandler implements HttpHandler {
             byte[] bytes = in.readAllBytes();
             String ext = rel.contains(".") ? rel.substring(rel.lastIndexOf('.') + 1) : "html";
             ex.getResponseHeaders().set("Content-Type", MIME.getOrDefault(ext, "application/octet-stream"));
+            if ("html".equals(ext) || "js".equals(ext)) {
+                ex.getResponseHeaders().set("Cache-Control", "no-store");
+            }
             ex.sendResponseHeaders(200, bytes.length);
             ex.getResponseBody().write(bytes);
             ex.close();

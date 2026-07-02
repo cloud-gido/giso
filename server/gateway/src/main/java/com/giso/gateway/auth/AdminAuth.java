@@ -152,12 +152,20 @@ public final class AdminAuth {
 
     private static void setSessionCookie(HttpExchange ex, String user, String password) {
         String val = Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
-        ex.getResponseHeaders().add("Set-Cookie",
-                SESSION_COOKIE + "=" + val + "; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=86400");
+        String proto = ex.getRequestHeaders().getFirst("X-Forwarded-Proto");
+        boolean secure = proto != null && proto.equalsIgnoreCase("https");
+        String cookie = SESSION_COOKIE + "=" + val
+                + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400"
+                + (secure ? "; Secure" : "");
+        ex.getResponseHeaders().add("Set-Cookie", cookie);
     }
 
     private static void clearSessionCookie(HttpExchange ex) {
-        ex.getResponseHeaders().add("Set-Cookie", SESSION_COOKIE + "=; Path=/admin; HttpOnly; Max-Age=0");
+        String proto = ex.getRequestHeaders().getFirst("X-Forwarded-Proto");
+        boolean secure = proto != null && proto.equalsIgnoreCase("https");
+        String cookie = SESSION_COOKIE + "=; Path=/; HttpOnly; Max-Age=0"
+                + (secure ? "; Secure" : "");
+        ex.getResponseHeaders().add("Set-Cookie", cookie);
     }
 
     private static String sessionCredentials(HttpExchange ex) {

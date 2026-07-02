@@ -34,7 +34,7 @@ form.addEventListener('submit', async (e) => {
 fetch('/admin/api/me', { credentials: 'same-origin' })
   .then((r) => (r.ok ? r.json() : null))
   .then((me) => {
-    if (me?.username) {
+    if (me?.username && me?.auth_enabled !== false && !me?.error) {
       location.replace(new URLSearchParams(location.search).get('next') || '/admin/');
     }
   })

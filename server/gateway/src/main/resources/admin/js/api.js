@@ -18,7 +18,14 @@ export async function api(p, opt = {}) {
     location.href = '/admin/login.html?next=' + next;
     throw new Error('unauthorized');
   }
-  return r.json();
+  const data = await r.json();
+  if (r.status === 403 && !opt._spaceRetried
+      && typeof data?.error === 'string' && data.error.includes('空间')
+      && currentSpace !== 'default') {
+    setSpace('default');
+    return api(p, { ...opt, _spaceRetried: true });
+  }
+  return data;
 }
 
 let sseConnection = null;

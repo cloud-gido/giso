@@ -154,26 +154,33 @@ $('#btn-locale')?.addEventListener('click', () => {
   const active = $$('[data-view].active')[0]?.dataset?.view;
   if (active) show(active);
 });
-show('debug');
 
-api('/me').then((me) => {
-  if (me.current_space && me.current_space !== getSpace()) {
-    setSpace(me.current_space);
+async function boot() {
+  try {
+    let me = await api('/me');
+    if (me?.error) throw new Error(me.error);
+    if (me.current_space && me.current_space !== getSpace()) {
+      setSpace(me.current_space);
+      me = await api('/me');
+    }
+    setMe(me);
+    function onSpaceChange(fresh) {
+      setMe(fresh);
+      applyRole(fresh);
+      invalidateRegistryCache();
+      refreshSpaceSwitcher(fresh, onSpaceChange);
+      const active = $$('[data-view].active')[0]?.dataset?.view;
+      if (active) VIEWS[active]?.onShow?.();
+    }
+    initSpaceSwitcher(onSpaceChange);
+    applyRole(me);
+    show('debug');
+  } catch {
+    location.href = '/admin/login.html';
   }
-  setMe(me);
-  function onSpaceChange(fresh) {
-    setMe(fresh);
-    applyRole(fresh);
-    invalidateRegistryCache();
-    refreshSpaceSwitcher(fresh, onSpaceChange);
-    const active = $$('[data-view].active')[0]?.dataset?.view;
-    if (active) VIEWS[active]?.onShow?.();
-  }
-  initSpaceSwitcher(onSpaceChange);
-  applyRole(me);
-}).catch(() => {
-  location.href = '/admin/login.html';
-});
+}
+
+boot();
 
 document.addEventListener('giso:pending-changed', () => {
   api('/me').then((me) => {
