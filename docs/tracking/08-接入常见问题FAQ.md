@@ -413,6 +413,7 @@ App **不需要**对 Gateway 建 WebSocket/SSE。
 | [02-上报协议规范](02-上报协议规范.md) | 信封结构、传输层 |
 | [03-命名与登记规范](03-命名与登记规范.md) | 命名规则、status 生命周期 |
 | [07-外部视频App接入问卷](07-外部视频App接入问卷.md) | 外部 App 登记清单 |
+| [13-SDK分发与版本](13-SDK分发与版本.md) | **外部 App 拿包、坐标、Key、endpoint** |
 | [09-账号与权限体系](09-账号与权限体系.md) | 管理台登录、角色、Doppler |
 | [10-空间与多租户](10-空间与多租户.md) | 空间路由、Kafka 单写、SSE 联调 |
 | [deploy/DEPLOYMENT.md](../../deploy/DEPLOYMENT.md) | 测试环境发布、Doppler、RDS |

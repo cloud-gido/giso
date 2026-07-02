@@ -1,16 +1,26 @@
-# @giso/tracker-web
+# @cloud-gido/giso-tracker-web
 
 GISO 玑源 Web SDK — 9 事件收敛、参数继承、注册表驱动。
+
+**外部团队**：完整对接清单见 [docs/tracking/13-SDK分发与版本.md](../../docs/tracking/13-SDK分发与版本.md)。
+
+## npm（GitHub Packages）
+
+```bash
+npm install @cloud-gido/giso-tracker-web@1.0.0
+```
+
+Registry：`https://npm.pkg.github.com`，scope `@cloud-gido`。需 `read:packages` PAT。
 
 ## 接入
 
 ```ts
-import { Tracker } from '@giso/tracker-web';
+import { Tracker } from '@cloud-gido/giso-tracker-web';
 
 const tracker = Tracker.init({
-  appId: 'giso',
+  appId: 'video-web-beta',
   appVersion: APP_VERSION,
-  endpoint: 'https://track.example.com/v1/track',
+  endpoint: 'https://gamelinelab-giso.envir.dev/v1/track',
   debug: process.env.NODE_ENV !== 'production',
 });
 ```

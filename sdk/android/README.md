@@ -2,11 +2,29 @@
 
 GISO 玑源 Android SDK — 零依赖，与 Web/iOS 同协议同口径。
 
+**外部团队**：完整对接清单见 [docs/tracking/13-SDK分发与版本.md](../../docs/tracking/13-SDK分发与版本.md)。
+
+## Maven 坐标（GitHub Packages）
+
+| 项 | 值 |
+|----|-----|
+| groupId | `com.giso` |
+| artifactId | `tracker` |
+| 仓库 | `https://maven.pkg.github.com/cloud-gido/giso` |
+
+```gradle
+implementation 'com.giso:tracker:1.0.0'
+```
+
+需 `read:packages` PAT，见分发文档 § 三。
+
 ## 接入
 
 ```java
-Tracker.init(this, TrackerConfig.builder("giso", BuildConfig.VERSION_NAME,
-        "https://track.example.com/v1/track")
+Tracker.init(this, TrackerConfig.builder(
+        "video-android-beta",  // App Key = X-App-Key
+        BuildConfig.VERSION_NAME,
+        "https://gamelinelab-giso.envir.dev/v1/track")
     .debug(BuildConfig.DEBUG)
     .build());
 ```

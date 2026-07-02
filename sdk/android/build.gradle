@@ -1,5 +1,6 @@
 plugins {
-    id 'com.android.library'
+    id 'com.android.library' version '8.5.2'
+    id 'maven-publish'
 }
 
 android {
@@ -19,8 +20,6 @@ android {
 
 // 零第三方依赖：仅用 android.jar 内置的 org.json / HttpURLConnection
 
-apply plugin: 'maven-publish'
-
 afterEvaluate {
     publishing {
         publications {
@@ -33,17 +32,26 @@ afterEvaluate {
         }
         repositories {
             maven {
+                def ghRepo = findProperty('gisoGithubRepo') ?: 'cloud-gido/giso'
                 def repoUrl = findProperty('gisoMavenRepo')
                 if (repoUrl) {
                     url = repoUrl
                     credentials {
-                        username = findProperty('gisoMavenUser') ?: ''
-                        password = findProperty('gisoMavenPassword') ?: ''
+                        username = findProperty('gisoMavenUser') ?: System.getenv('GITHUB_ACTOR') ?: ''
+                        password = findProperty('gisoMavenPassword') ?: System.getenv('GITHUB_TOKEN') ?: ''
                     }
                 } else {
-                    name = 'local'
-                    url = layout.buildDirectory.dir('repo')
+                    name = 'GitHubPackages'
+                    url = "https://maven.pkg.github.com/${ghRepo}"
+                    credentials {
+                        username = findProperty('gisoMavenUser') ?: System.getenv('GITHUB_ACTOR') ?: ''
+                        password = findProperty('gisoMavenPassword') ?: System.getenv('GITHUB_TOKEN') ?: ''
+                    }
                 }
+            }
+            maven {
+                name = 'local'
+                url = layout.buildDirectory.dir('repo')
             }
         }
     }

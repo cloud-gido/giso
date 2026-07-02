@@ -122,6 +122,15 @@ ArgoCD 自动滚动 `giso-gateway` Deployment。
 | 联调切空间 | 切 `X-GISO-Space` 时自动重连 SSE、重载当前空间事件列表 |
 | 联调 UI | 事件行展示 `space:`；工具栏显示当前联调空间 |
 
+## 外部 App SDK 分发
+
+不向业务方提供 Gateway 源码。发包与对接清单见源码仓 [docs/tracking/13-SDK分发与版本.md](../docs/tracking/13-SDK分发与版本.md)：
+
+- Android：`com.giso:tracker` → GitHub Packages Maven
+- Web：`@cloud-gido/giso-tracker-web` → GitHub Packages npm
+- iOS：SwiftPM tag `v*`
+- CI：`.github/workflows/sdk-publish.yml`（打 tag `v1.0.0` 触发）
+
 ## 验证
 
 ```bash
