@@ -16,6 +16,12 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+
+    publishing {
+        singleVariant('release') {
+            withSourcesJar()
+        }
+    }
 }
 
 // 零第三方依赖：仅用 android.jar 内置的 org.json / HttpURLConnection

@@ -51,7 +51,7 @@ function cssPath(el: Element): string {
     const parent: Element | null = cur.parentElement;
     if (parent) {
       const current = cur;
-      const siblings = [...parent.children].filter((c) => c.tagName === current.tagName);
+      const siblings = Array.from(parent.children).filter((c) => c.tagName === current.tagName);
       if (siblings.length > 1) sel += `:nth-of-type(${siblings.indexOf(current) + 1})`;
     }
     parts.unshift(sel);

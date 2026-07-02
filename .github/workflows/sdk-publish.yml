@@ -42,6 +42,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
@@ -58,6 +59,7 @@ jobs:
         working-directory: sdk/android
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
           gradle publishReleasePublicationToGitHubPackagesRepository \
             -PgisoVersion=${{ steps.ver.outputs.version }} \
@@ -88,6 +90,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          npm install
           npm version ${{ steps.ver.outputs.version }} --no-git-tag-version --allow-same-version
           npm run build
           npm publish --access restricted
