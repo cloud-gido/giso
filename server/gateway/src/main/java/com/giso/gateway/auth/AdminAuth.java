@@ -11,6 +11,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 管理台鉴权（对齐 GIDO：Ingress IP 白名单 + 应用层账号）。
@@ -19,9 +20,14 @@ import java.util.Map;
  */
 public final class AdminAuth {
     private static final String SESSION_COOKIE = "giso_admin_sess";
+    /** 登录后会话缓存，避免每个管理 API 都 BCrypt + 查库（只读浏览注册表时体感接近 yaml 模式）。 */
+    private static final long SESSION_CACHE_TTL_MS = 30 * 60 * 1000L;
 
     private final AdminUserStore store;
     private final SpaceService spaces;
+    private final ConcurrentHashMap<String, CachedSession> sessionCache = new ConcurrentHashMap<>();
+
+    private record CachedSession(String username, String role, long expiresAt) { }
 
     public AdminAuth(GatewayConfig config, PostgresRegistryStore registryStore, SpaceService spaces)
             throws Exception {
@@ -33,33 +39,47 @@ public final class AdminAuth {
         this.spaces = spaces;
     }
 
-    public String role(HttpExchange ex) {
+    public AuthContext resolve(HttpExchange ex) {
         try {
-            if (!store.authEnabled()) return AdminUser.ROLE_ADMIN;
+            if (!store.authEnabled()) {
+                return new AuthContext("admin", AdminUser.ROLE_ADMIN);
+            }
             String decoded = credentials(ex);
             if (decoded == null) return null;
+            long now = System.currentTimeMillis();
+            CachedSession cached = sessionCache.get(decoded);
+            if (cached != null) {
+                if (cached.expiresAt() > now) {
+                    return new AuthContext(cached.username(), cached.role());
+                }
+                sessionCache.remove(decoded);
+            }
             int i = decoded.indexOf(':');
             if (i <= 0) return null;
             String user = decoded.substring(0, i);
             String pass = decoded.substring(i + 1);
-            return store.authenticate(user, pass);
+            String role = store.authenticate(user, pass);
+            if (role == null) return null;
+            sessionCache.put(decoded, new CachedSession(user, role, now + SESSION_CACHE_TTL_MS));
+            return new AuthContext(user, role);
         } catch (Exception e) {
             return null;
         }
     }
 
+    public String role(HttpExchange ex) {
+        AuthContext ctx = resolve(ex);
+        return ctx == null ? null : ctx.role();
+    }
+
     public String operator(HttpExchange ex) {
-        String role = role(ex);
-        if (role == null) return null;
-        String decoded = credentials(ex);
-        if (decoded == null) return "admin";
-        int i = decoded.indexOf(':');
-        return i > 0 ? decoded.substring(0, i) : "admin";
+        AuthContext ctx = resolve(ex);
+        return ctx == null ? null : ctx.username();
     }
 
     public boolean unauthorized(HttpExchange ex) {
         try {
-            return role(ex) == null && store.authEnabled();
+            return resolve(ex) == null && store.authEnabled();
         } catch (Exception e) {
             return true;
         }
@@ -93,10 +113,14 @@ public final class AdminAuth {
         String role = store.authenticate(username, password);
         if (role == null) return false;
         setSessionCookie(ex, username, password);
+        sessionCache.put(username + ":" + password,
+                new CachedSession(username, role, System.currentTimeMillis() + SESSION_CACHE_TTL_MS));
         return true;
     }
 
     public void logout(HttpExchange ex) throws IOException {
+        String decoded = credentials(ex);
+        if (decoded != null) sessionCache.remove(decoded);
         clearSessionCookie(ex);
     }
 

@@ -23,6 +23,10 @@ public final class SpaceService {
     private final HikariDataSource ds;
     private final String dbSchema;
     private final Map<String, String> appKeyToSpace = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CachedSpaceRole> spaceRoleCache = new ConcurrentHashMap<>();
+    private static final long SPACE_ROLE_CACHE_TTL_MS = 60_000L;
+
+    private record CachedSpaceRole(String role, long expiresAt) { }
 
     private SpaceService(HikariDataSource ds, String dbSchema) {
         this.ds = ds;
@@ -164,6 +168,7 @@ public final class SpaceService {
             ps.setString(3, role);
             ps.executeUpdate();
         }
+        invalidateSpaceRoleCache();
         return null;
     }
 
@@ -174,6 +179,7 @@ public final class SpaceService {
             ps.setString(2, username);
             if (ps.executeUpdate() == 0) return "成员不存在";
         }
+        invalidateSpaceRoleCache();
         return null;
     }
 
@@ -245,6 +251,13 @@ public final class SpaceService {
 
     public String spaceRole(String username, String globalRole, String spaceKey) throws SQLException {
         if (AdminUser.ROLE_SYSTEM_ADMIN.equals(globalRole)) return AdminUser.ROLE_SPACE_ADMIN;
+        String cacheKey = username + "\0" + spaceKey;
+        long now = System.currentTimeMillis();
+        CachedSpaceRole cached = spaceRoleCache.get(cacheKey);
+        if (cached != null) {
+            if (cached.expiresAt() > now) return cached.role();
+            spaceRoleCache.remove(cacheKey);
+        }
         String sql = """
                 SELECT role FROM %s.space_members WHERE username = ? AND space_key = ?
                 """.formatted(dbSchema);
@@ -252,9 +265,17 @@ public final class SpaceService {
             ps.setString(1, username);
             ps.setString(2, spaceKey);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getString(1) : null;
+                String role = rs.next() ? rs.getString(1) : null;
+                if (role != null) {
+                    spaceRoleCache.put(cacheKey, new CachedSpaceRole(role, now + SPACE_ROLE_CACHE_TTL_MS));
+                }
+                return role;
             }
         }
+    }
+
+    public void invalidateSpaceRoleCache() {
+        spaceRoleCache.clear();
     }
 
     public boolean canAccessSpace(String username, String globalRole, String spaceKey) throws SQLException {

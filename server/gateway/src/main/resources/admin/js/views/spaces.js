@@ -1,6 +1,6 @@
 /* 空间管理 + 成员 + App Key 绑定 */
 import { $, esc, toast } from '../util.js';
-import { api, getSpace, setSpace } from '../api.js';
+import { api, getSpace, setSpace, disconnectSSE } from '../api.js';
 import { getMe, isSystemAdmin, isSpaceAdmin } from '../session.js';
 
 const SPACE_ROLE_LABEL = {
@@ -130,6 +130,7 @@ export function initSpaceSwitcher(onChange) {
     </option>`).join('');
   sel.onchange = async () => {
     setSpace(sel.value);
+    disconnectSSE();
     const fresh = await api('/me');
     onChange(fresh);
   };

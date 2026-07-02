@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.giso.gateway.auth.AdminPermissions;
 import com.giso.gateway.auth.AdminUser;
+import com.giso.gateway.registry.PostgresRegistryStore;
 import com.giso.gateway.registry.RegistryKinds;
 import com.giso.gateway.registry.RegistrySnapshot;
 import com.giso.gateway.registry.RegistryStore;
@@ -138,7 +139,14 @@ public final class Registry {
     }
 
     public Map<String, Object> meta() throws Exception {
-        return store.meta();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("backend", store.backendName());
+        out.put("revision", globalRevision);
+        out.put("entries", entryCount());
+        if (store instanceof PostgresRegistryStore pg) {
+            out.put("schema", pg.dbSchema());
+        }
+        return out;
     }
 
     public List<Map<String, Object>> audit(String spaceKey, String kind, String key, int limit) throws Exception {

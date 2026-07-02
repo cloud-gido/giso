@@ -2,7 +2,7 @@
 import { $, $$ } from './util.js';
 import { api, logout, getSpace, setSpace } from './api.js';
 import { setMe } from './session.js';
-import { initDebug } from './views/debug.js';
+import { initDebug, renderDebug } from './views/debug.js';
 import { initAssert } from './views/assert.js';
 import { initRegistry, renderRegistry, invalidateRegistryCache } from './views/registry.js';
 import { initStats, loadStats } from './views/stats.js';
@@ -20,7 +20,7 @@ const ROLE_LABEL = {
 };
 
 const VIEWS = {
-  debug: { titleKey: 'view.debug.title', descKey: 'view.debug.desc' },
+  debug: { titleKey: 'view.debug.title', descKey: 'view.debug.desc', onShow: renderDebug },
   assert: { titleKey: 'view.assert.title', descKey: 'view.assert.desc' },
   approval: { titleKey: 'view.approval.title', descKey: 'view.approval.desc', onShow: renderApproval },
   registry: { titleKey: 'view.registry.title', descKey: 'view.registry.desc', onShow: renderRegistry },

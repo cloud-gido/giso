@@ -21,8 +21,19 @@ export async function api(p, opt = {}) {
   return r.json();
 }
 
+let sseConnection = null;
+
+export function disconnectSSE() {
+  if (sseConnection) {
+    sseConnection.close();
+    sseConnection = null;
+  }
+}
+
 export function connectSSE(onEvent, onState) {
+  disconnectSSE();
   const es = new EventSource('/admin/api/stream?space=' + encodeURIComponent(currentSpace));
+  sseConnection = es;
   es.onopen = () => onState(true);
   es.onerror = () => onState(false);
   es.onmessage = (e) => onEvent(JSON.parse(e.data));

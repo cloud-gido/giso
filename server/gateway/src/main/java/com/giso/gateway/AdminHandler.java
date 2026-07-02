@@ -239,11 +239,11 @@ public final class AdminHandler implements HttpHandler {
             routeAssistantChat(ex, spaceKey);
             return;
         }
-        if (path.equals("/registry") && method.equals("GET")) {
-            Http.json(ex, 200, M.writeValueAsString(registry.all(spaceKey)));
-
-        } else if (path.equals("/registry/meta") && method.equals("GET")) {
+        if (path.equals("/registry/meta") && method.equals("GET")) {
             Http.json(ex, 200, M.writeValueAsString(registry.meta()));
+
+        } else if (path.equals("/registry") && method.equals("GET")) {
+            Http.json(ex, 200, M.writeValueAsString(registry.all(spaceKey)));
 
         } else if (path.equals("/registry/audit") && method.equals("GET")) {
             var q = Http.query(ex);

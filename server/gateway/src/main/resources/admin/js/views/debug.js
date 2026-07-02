@@ -1,6 +1,6 @@
 /* 实时联调：SSE 事件流 + 过滤 + 状态计数 */
 import { $, fmtTime, esc, toast } from '../util.js';
-import { api, connectSSE } from '../api.js';
+import { api, connectSSE, disconnectSSE, getSpace } from '../api.js';
 import { t } from '../i18n.js';
 
 const counts = { ok: 0, missing: 0, error: 0 };
@@ -43,6 +43,7 @@ function renderEvent(w, prepend = true) {
       <span class="ev-target">${esc(targetOf(d))}</span>
       <span class="ev-meta">
         <span class="meta-pill">${esc(d.common?.platform || '?')}</span>
+        <span class="meta-pill mono">space:${esc(d.common?.space || w.space || '?')}</span>
         <span class="meta-pill mono">did:${esc((d.common?.did || '').slice(0, 10))}</span>
         <span class="meta-pill mono">pg:${esc(d.page?.pgid || '-')}</span>
         <span class="meta-time">${fmtTime(w.stime)}</span>
@@ -73,36 +74,14 @@ function renderCounts() {
     ? ((counts.missing + counts.error) / total * 100).toFixed(1) + '%' : '—';
 }
 
-async function refilter() {
+function resetPanel() {
+  counts.ok = counts.missing = counts.error = 0;
   $('#event-list').innerHTML = '';
-  const q = new URLSearchParams({
-    limit: 200, did: $('#f-did').value.trim(),
-    event: $('#f-event').value, status: $('#f-status').value,
-  });
-  const list = await api('/events?' + q);
-  list.forEach((w) => renderEvent(w, false));
-  $('#debug-empty').hidden = $('#event-list').children.length > 0;
+  $('#debug-empty').hidden = false;
+  renderCounts();
 }
 
-export async function initDebug() {
-  ['#f-did', '#f-event', '#f-status'].forEach((sel) =>
-    $(sel).addEventListener('input', refilter));
-
-  $('#btn-clear').onclick = async () => {
-    const r = await api('/clear', { method: 'POST' });
-    if (r.error) { toast(r.error, 'error'); return; }
-    $('#event-list').innerHTML = '';
-    counts.ok = counts.missing = counts.error = 0;
-    renderCounts();
-    $('#debug-empty').hidden = false;
-    toast('已清空联调缓冲');
-  };
-
-  const recent = await api('/events?limit=100');
-  recent.reverse().forEach((w) => { bumpCounts(w.status); renderEvent(w); });
-  $('#debug-empty').hidden = $('#event-list').children.length > 0;
-  renderCounts();
-
+function bindSseState() {
   connectSSE(
     (w) => { bumpCounts(w.status); if (!$('#f-pause').checked) renderEvent(w); },
     (up) => {
@@ -111,4 +90,41 @@ export async function initDebug() {
       const label = conn.querySelector('.conn-label');
       if (label) label.textContent = up ? t('conn.live') : t('conn.off');
     });
+}
+
+async function refilter() {
+  resetPanel();
+  const q = new URLSearchParams({
+    limit: 200, did: $('#f-did').value.trim(),
+    event: $('#f-event').value, status: $('#f-status').value,
+  });
+  const list = await api('/events?' + q);
+  list.forEach((w) => { bumpCounts(w.status); renderEvent(w, false); });
+  $('#debug-empty').hidden = $('#event-list').children.length > 0;
+  renderCounts();
+}
+
+/** 切换空间或进入联调页：按当前 X-GISO-Space 重载缓冲并重建 SSE。 */
+export async function renderDebug() {
+  disconnectSSE();
+  resetPanel();
+  const recent = await api('/events?limit=100');
+  recent.reverse().forEach((w) => { bumpCounts(w.status); renderEvent(w); });
+  $('#debug-empty').hidden = $('#event-list').children.length > 0;
+  renderCounts();
+  bindSseState();
+  const hint = $('#debug-space-hint');
+  if (hint) hint.textContent = getSpace();
+}
+
+export function initDebug() {
+  ['#f-did', '#f-event', '#f-status'].forEach((sel) =>
+    $(sel).addEventListener('input', refilter));
+
+  $('#btn-clear').onclick = async () => {
+    const r = await api('/clear', { method: 'POST' });
+    if (r.error) { toast(r.error, 'error'); return; }
+    resetPanel();
+    toast('已清空本空间联调缓冲');
+  };
 }

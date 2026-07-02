@@ -63,6 +63,10 @@ public final class PostgresRegistryStore implements RegistryStore {
         return ds.getJdbcUrl();
     }
 
+    public String dbSchema() {
+        return dbSchema;
+    }
+
     public HikariDataSource dataSource() {
         return ds;
     }
