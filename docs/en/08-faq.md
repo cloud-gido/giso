@@ -12,6 +12,14 @@ Open Admin Live Debug → expand event → read `_issues`. Fix registry or clien
 
 Video keys route to `longvideo` space. Ensure registry is synced (`default` mirror or manual import).
 
+## Does Kafka get duplicate writes per space?
+
+**No.** Each `/v1/track` request resolves **one** space from `X-App-Key`, writes **one** Kafka record with `common.space`. Registry mirroring (`default` → `longvideo`) is **config only**, not event duplication.
+
+## Does play heartbeat use a long connection?
+
+**No.** `video_play_heartbeat` is a normal `biz_event` from an app-side timer (~30s). The SDK sends **short HTTP POSTs** (batched). Admin **SSE** (`/admin/api/stream`) is browser-only for live debug, not used by mobile SDKs.
+
 ## test vs prod data mixed?
 
 Set SDK `env: 'test'` for beta keys. Doris stores `env` column; filter in SQL. Physical isolation (separate DB) is not enabled by default.

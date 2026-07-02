@@ -105,6 +105,23 @@ git push origin main
 
 ArgoCD 自动滚动 `giso-gateway` Deployment。
 
+## 测试环境清单（deployment 仓库）
+
+| 项 | 当前测试配置 |
+|----|--------------|
+| 副本数 | `replicas: 1`（`apps/bigdata/giso/giso.yaml`） |
+| 注册表 | PostgreSQL `giso` 库，`registry.postgres.schema: public` |
+| Doppler 映射 | `apps/system/doppler/giso-secret.yaml` |
+| 空间路由 | `video-*` → `longvideo`；见 [10-空间与多租户](../docs/tracking/10-空间与多租户.md) |
+
+## Gateway 近期行为变更（需发新镜像）
+
+| 变更 | 说明 |
+|------|------|
+| 管理台读性能 | 会话缓存 + `registry/meta` 读内存，减轻 PG 模式下只读浏览卡顿 |
+| 联调切空间 | 切 `X-GISO-Space` 时自动重连 SSE、重载当前空间事件列表 |
+| 联调 UI | 事件行展示 `space:`；工具栏显示当前联调空间 |
+
 ## 验证
 
 ```bash

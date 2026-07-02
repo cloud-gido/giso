@@ -338,6 +338,61 @@ TrackerConfig.builder("video-android-beta", version, endpoint)
 
 复用登记：`video_feed`、`video_detail`、`video_series` 及 Demo 中已有元素/事件常量（见 `sdk/android/.../Pages.java` 等）。
 
+### Q21b. 多空间会往 Kafka 写两份吗？
+
+**不会。** 每条上报只解析 **一个** 空间（`X-App-Key` → `space_key`），Kafka **只写一条**；空间标识在 `common.space`。Topic 不按空间拆分，查数时用 `space_key` 过滤。
+
+### Q21c. 联调时为什么 default 和长视频空间都有数据？
+
+常见原因（**不是双写**）：
+
+| 现象 | 原因 |
+|------|------|
+| 两个空间**注册表**很像 | `default` → `longvideo` **注册表镜像**（配置同步） |
+| 两个空间**联调**都有事件 | 用了不同的 App Key（`video-*` vs 其他），或切换空间前旧 SSE 未刷新（新版本已修复：切空间重连 SSE） |
+| 一条事件有两个 space | **不应出现**；展开 JSON 查 `common.space`，若不对则查 App Key |
+
+长视频连调请统一使用 `video-android-beta` / `video-android-prod` 等 **`video-*` Key**。
+
+### Q21d. 管理台「实时联调」的 SSE 是什么？和 App 上报一样吗？
+
+**不一样。**
+
+| | App 上报 | 管理台 SSE |
+|--|----------|------------|
+| 协议 | `POST /v1/track` 短连接 HTTP | `GET /admin/api/stream` 长连接 |
+| 方向 | 客户端 → 服务端 | 服务端 → 浏览器 |
+| 用途 | 埋点入库 | 联调页实时看校验结果 |
+
+App **不需要**对 Gateway 建 WebSocket/SSE。
+
+### Q21e. 切换管理台空间后，联调事件要不要手动刷新？
+
+**不需要**（Gateway 新版本起）：切空间或再次进入「实时联调」会自动 **断开旧 SSE → 拉当前空间缓冲 → 重连 SSE**。工具栏显示当前联调空间名；每条事件展示 **space:** 标签。
+
+### Q21f. 播放心跳（`video_play_heartbeat`）要建立长连接吗？
+
+**不要。** 心跳是业务事件，由 **App 播放器层**实现：
+
+- 登记：`schema/biz_events.yaml` → `video_play_heartbeat`（约每 **30s** + 暂停/退出补报）
+- SDK：调 `bizEvent(BizEvents.VIDEO_PLAY_HEARTBEAT, params)`，**无内置播放器定时器**
+- 参考实现：`examples/android-video-demo/.../PlaybackTracker.java`（`Handler.postDelayed(30_000)`）
+- 上报：与其它事件相同，进 `EventQueue` **攒批**后 `POST /v1/track`（`debug: true` 时立即 POST）
+
+典型播放序列：`video_play_start` → 若干 `video_play_heartbeat` → `video_play_end`。
+
+### Q21g. 注册表改 PostgreSQL 后，管理台「只看参数」变慢？
+
+**只读不应等 `poll_interval_sec`（默认 10s）**——该间隔只影响 **保存后** Gateway 校验缓存刷新。
+
+若「打开注册表 / 切 Tab」明显变慢，常见原因是 PG 模式下 **每个管理 API 都做 BCrypt + 查库**（YAML 模式是内存比对）。Gateway 新版本已优化：
+
+- 登录会话缓存（30min 内免重复 BCrypt）
+- `/registry/meta` 改读内存快照（不再 `COUNT(*)` 查库）
+- 空间角色短缓存
+
+需发布新版 `giso-gateway` 镜像后生效。
+
 ---
 
 ## 七、资金与服务端事实
@@ -359,6 +414,7 @@ TrackerConfig.builder("video-android-beta", version, endpoint)
 | [03-命名与登记规范](03-命名与登记规范.md) | 命名规则、status 生命周期 |
 | [07-外部视频App接入问卷](07-外部视频App接入问卷.md) | 外部 App 登记清单 |
 | [09-账号与权限体系](09-账号与权限体系.md) | 管理台登录、角色、Doppler |
+| [10-空间与多租户](10-空间与多租户.md) | 空间路由、Kafka 单写、SSE 联调 |
 | [deploy/DEPLOYMENT.md](../../deploy/DEPLOYMENT.md) | 测试环境发布、Doppler、RDS |
 | [tools/registry/README.md](../../tools/registry/README.md) | 注册表 DB 运维脚本 |
 

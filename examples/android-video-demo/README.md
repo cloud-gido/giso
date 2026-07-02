@@ -67,6 +67,10 @@ app_launch → page_enter(video_feed) → element_exposure(video_card)
 → biz_event(video_play_start) → biz_event(video_play_heartbeat) ...
 ```
 
+**播放心跳说明**：心跳由 App 内 `Handler` 每 30s 触发 `bizEvent(VIDEO_PLAY_HEARTBEAT)`，**不是**与 Gateway 的 SSE/WebSocket 长连接。SDK 通过普通 HTTP 批量上报；管理台 SSE 仅用于浏览器「实时联调」看事件。
+
+联调时请确认顶栏空间为 **长视频**（或事件 JSON 里 `common.space` 为 `longvideo`），App Key 使用 `video-android-beta` 等 `video-*`。
+
 ### 断言 API（可选）
 
 ```bash
