@@ -49,7 +49,8 @@ public final class ViewTreeCapture {
                 out.add(o);
             } catch (Exception ignored) { }
         }
-        if (v instanceof ViewGroup vg) {
+        if (v instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) v;
             for (int i = 0; i < vg.getChildCount(); i++) {
                 walk(vg.getChildAt(i), vw, vh, out, max);
             }
@@ -58,7 +59,10 @@ public final class ViewTreeCapture {
 
     static String suggestEid(View v) {
         Object tag = v.getTag(TAG_EID);
-        if (tag instanceof String s && !s.isEmpty()) return s;
+        if (tag instanceof String) {
+            String s = (String) tag;
+            if (!s.isEmpty()) return s;
+        }
         if (v.getContentDescription() != null) {
             return simplify(String.valueOf(v.getContentDescription()));
         }
