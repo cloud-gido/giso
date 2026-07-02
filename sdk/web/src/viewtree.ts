@@ -48,10 +48,11 @@ function cssPath(el: Element): string {
       parts.unshift(`#${CSS.escape(cur.id)}`);
       break;
     }
-    const parent = cur.parentElement;
+    const parent: Element | null = cur.parentElement;
     if (parent) {
-      const siblings = [...parent.children].filter((c) => c.tagName === cur!.tagName);
-      if (siblings.length > 1) sel += `:nth-of-type(${siblings.indexOf(cur) + 1})`;
+      const current = cur;
+      const siblings = [...parent.children].filter((c) => c.tagName === current.tagName);
+      if (siblings.length > 1) sel += `:nth-of-type(${siblings.indexOf(current) + 1})`;
     }
     parts.unshift(sel);
     cur = parent;
