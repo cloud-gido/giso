@@ -4,6 +4,10 @@ import { api } from '../api.js';
 import { getMe, isAdmin, isSpaceAdmin, isEditor, canEditRegistry } from '../session.js';
 
 let registry = { params: [], pages: [], elements: [], events: [] };
+let regMeta = {};
+let registryLoaded = false;
+let registryLoading = null;
+let searchTimer = null;
 let curKind = 'params';
 
 const KIND_META = {
@@ -95,7 +99,7 @@ function bindColDrag(table, meta) {
       cols.splice(from, 1);
       cols.splice(to, 0, dragCol);
       saveCols(cols);
-      renderRegistry();
+      renderTable();
       toast('列顺序已保存');
     });
   });
@@ -108,17 +112,33 @@ function canModifyRow(it) {
   return s === 'pending' || s === 'draft' || !s;
 }
 
-export async function renderRegistry() {
+async function fetchRegistry(force = false) {
+  if (!force && registryLoaded) return;
+  if (registryLoading) return registryLoading;
+  registryLoading = Promise.all([
+    api('/registry/meta').catch(() => ({})),
+    api('/registry'),
+  ]).then(([meta, data]) => {
+    regMeta = meta || {};
+    registry = data || { params: [], pages: [], elements: [], events: [] };
+    registryLoaded = true;
+    registryLoading = null;
+  }).catch((e) => {
+    registryLoading = null;
+    throw e;
+  });
+  return registryLoading;
+}
+
+function renderTable() {
   $$('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.kind === curKind));
-  const regMeta = await api('/registry/meta').catch(() => ({}));
   if (regMeta.revision != null) {
     $('#reg-meta').textContent = `revision ${regMeta.revision} · ${regMeta.entries ?? '—'} 条 · ${regMeta.backend || '—'}`;
   }
-  registry = await api('/registry');
   const meta = KIND_META[curKind];
   const cols = getCols(meta);
   const kw = $('#reg-search').value.trim().toLowerCase();
-  const rows = registry[curKind].filter((it) => !kw || JSON.stringify(it).toLowerCase().includes(kw));
+  const rows = (registry[curKind] || []).filter((it) => !kw || JSON.stringify(it).toLowerCase().includes(kw));
   $('#reg-count').textContent = `${rows.length} 条`;
   $('#reg-table').innerHTML = `<div class="col-hint">拖拽表头可调整列顺序 · <button type="button" class="link-btn" id="btn-reset-cols">恢复默认</button></div>
     <table>
@@ -148,10 +168,19 @@ export async function renderRegistry() {
   });
   $('#btn-reset-cols')?.addEventListener('click', () => {
     localStorage.removeItem(colKey());
-    renderRegistry();
+    renderTable();
     toast('已恢复默认列顺序');
   });
   bindColDrag($('#reg-table').querySelector('table'), meta);
+}
+
+export async function renderRegistry(force = false) {
+  await fetchRegistry(force);
+  renderTable();
+}
+
+export function invalidateRegistryCache() {
+  registryLoaded = false;
 }
 
 function actionBtns(it, meta) {
@@ -178,28 +207,28 @@ async function doApprove(key) {
   if (!confirm(`批准 ${key} 上线？`)) return;
   const r = await api(`/registry/${curKind}/approve?key=${encodeURIComponent(key)}`, { method: 'POST' });
   if (r.error) toast(r.error, 'error');
-  else { toast(`已批准 ${key}`); renderRegistry(); document.dispatchEvent(new CustomEvent('giso:pending-changed')); }
+  else { toast(`已批准 ${key}`); renderRegistry(true); document.dispatchEvent(new CustomEvent('giso:pending-changed')); }
 }
 
 async function doReject(key) {
   if (!confirm(`驳回 ${key}？`)) return;
   const r = await api(`/registry/${curKind}/reject?key=${encodeURIComponent(key)}`, { method: 'POST' });
   if (r.error) toast(r.error, 'error');
-  else { toast(`已驳回 ${key}`); renderRegistry(); }
+  else { toast(`已驳回 ${key}`); renderRegistry(true); }
 }
 
 async function doPublish(key) {
   if (!confirm(`发布 ${key} 为 live？发布后将参与线上校验。`)) return;
   const r = await api(`/registry/${curKind}/publish?key=${encodeURIComponent(key)}`, { method: 'POST' });
   if (r.error) toast(r.error, 'error');
-  else { toast(`已发布 ${key}`); renderRegistry(); }
+  else { toast(`已发布 ${key}`); renderRegistry(true); }
 }
 
 async function doDeprecate(key) {
   if (!confirm(`废弃 ${key}？`)) return;
   const r = await api(`/registry/${curKind}/deprecate?key=${encodeURIComponent(key)}`, { method: 'POST' });
   if (r.error) toast(r.error, 'error');
-  else { toast(`已废弃 ${key}`); renderRegistry(); }
+  else { toast(`已废弃 ${key}`); renderRegistry(true); }
 }
 
 async function openAudit(key) {
@@ -216,7 +245,7 @@ async function doDelete(key) {
   if (!confirm(`确认删除 ${key}？已上报数据中的历史引用不受影响，但校验将把它判为未登记。`)) return;
   const r = await api(`/registry/${curKind}?key=${encodeURIComponent(key)}`, { method: 'DELETE' });
   if (r.error) toast(r.error, 'error');
-  else { toast(`已删除 ${key}`); renderRegistry(); }
+  else { toast(`已删除 ${key}`); renderRegistry(true); }
 }
 
 const field = (label, inner) => `<div class="field"><label>${label}</label>${inner}</div>`;
@@ -283,7 +312,7 @@ function openEditor(key) {
     if (r.error) { toast(r.error, 'error'); e.preventDefault(); }
     else {
       toast(isEditor() ? '已提交待审批' : '已保存');
-      renderRegistry();
+      renderRegistry(true);
       if (isEditor()) document.dispatchEvent(new CustomEvent('giso:pending-changed'));
     }
   };
@@ -292,13 +321,14 @@ function openEditor(key) {
 export function initRegistry() {
   $$('.seg-btn').forEach((btn) => {
     btn.onclick = () => {
-      $$('.seg-btn').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
       curKind = btn.dataset.kind;
-      renderRegistry();
+      renderTable();
     };
   });
-  $('#reg-search').addEventListener('input', renderRegistry);
+  $('#reg-search').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(renderTable, 120);
+  });
   $('#btn-add').onclick = () => openEditor(null);
   $('#btn-visual-picker')?.addEventListener('click', () => {
     document.dispatchEvent(new CustomEvent('giso:navigate', { detail: { view: 'visual' } }));

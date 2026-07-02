@@ -4,7 +4,7 @@ import { api, logout, getSpace, setSpace } from './api.js';
 import { setMe } from './session.js';
 import { initDebug } from './views/debug.js';
 import { initAssert } from './views/assert.js';
-import { initRegistry, renderRegistry } from './views/registry.js';
+import { initRegistry, renderRegistry, invalidateRegistryCache } from './views/registry.js';
 import { initStats, loadStats } from './views/stats.js';
 import { initApproval, renderApproval } from './views/approval.js';
 import { initUsers, renderUsers } from './views/users.js';
@@ -134,6 +134,7 @@ api('/me').then((me) => {
   initSpaceSwitcher((fresh) => {
     setMe(fresh);
     applyRole(fresh);
+    invalidateRegistryCache();
     const active = $$('[data-view].active')[0]?.dataset?.view;
     if (active) VIEWS[active]?.onShow?.();
   });
