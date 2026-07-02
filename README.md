@@ -1,10 +1,19 @@
 # GISO · 玑源
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](CHANGELOG.md)
+[![Maven SDK](https://img.shields.io/badge/Maven-com.giso%3Atracker-1.0.0-blue)](docs/tracking/13-SDK分发与版本.md)
 
 **GIDO 的数据源头** — Schema 驱动的移动端 + Web 行为分析平台。
 
 事件收敛、参数继承、注册表强校验、Kafka → Doris 可插拔管道。方法论参考腾讯大同；可自托管、可 fork，适合强规范多业务线 App。
+
+| | |
+|---|---|
+| **版本** | [1.0.0](CHANGELOG.md#100---2026-07-02)（SDK 首发） |
+| **协议** | [Apache License 2.0](LICENSE) · [NOTICE](NOTICE) |
+| **维护者** | Felix Zhu \<[troyzhujingbin@163.com](mailto:troyzhujingbin@163.com)\> |
+| **源码** | [github.com/cloud-gido/giso](https://github.com/cloud-gido/giso) |
 
 ## 特性
 
@@ -104,6 +113,16 @@ deploy/              Docker Compose（含 Postgres）
 k8s/                 Gateway K8s 清单
 ```
 
-## 许可证
+## 许可证与版本
 
-[Apache License 2.0](LICENSE)
+| 文档 | 说明 |
+|------|------|
+| [CHANGELOG.md](CHANGELOG.md) | **版本说明与发布记录** |
+| [LICENSE](LICENSE) | Apache License 2.0 |
+| [NOTICE](NOTICE) | 版权与第三方组件声明 |
+| [AUTHORS.md](AUTHORS.md) | 维护者与联系方式 |
+
+核心服务端（`server/gateway`）与三端 SDK（`sdk/`）源码均遵循 **Apache-2.0**。  
+外部 App 集成 SDK 二进制包时，请保留 [NOTICE](NOTICE) 并在产品说明中注明 GISO SDK 许可。
+
+集成 SDK 见 [13-SDK分发与版本](docs/tracking/13-SDK分发与版本.md)。

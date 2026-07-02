@@ -32,3 +32,10 @@
 ## 问题反馈
 
 Bug / 功能建议请开 Issue，附上：复现步骤、期望行为、`schema` 相关条目（如有）。
+
+也可邮件联系维护者：[troyzhujingbin@163.com](mailto:troyzhujingbin@163.com)。
+
+## 许可证
+
+提交 PR 即表示你同意你的贡献在 [Apache License 2.0](LICENSE) 下授权。  
+请参阅 [NOTICE](NOTICE) 了解版权与第三方依赖声明；版本历史见 [CHANGELOG.md](CHANGELOG.md)。

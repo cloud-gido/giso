@@ -2,6 +2,8 @@
   "name": "@cloud-gido/giso-tracker-web",
   "version": "1.0.0",
   "description": "GISO 玑源 Web SDK: 9-event convergence, param inheritance, registry-driven",
+  "license": "Apache-2.0",
+  "author": "Felix Zhu <troyzhujingbin@163.com>",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [

@@ -270,7 +270,11 @@ git push origin v1.0.0
 
 ### Q5. 能自己 fork 改 SDK 吗？
 
-许可 Apache-2.0 允许修改，但**口径分裂**会导致与数仓不一致；生产建议只用平台发布的版本号。
+许可 [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) 允许修改与商用；生产环境建议只用官方发布版本，并保留 [NOTICE](../../NOTICE)。维护者：Felix Zhu \<troyzhujingbin@163.com\>。
+
+### Q6. 版本记录在哪？
+
+[CHANGELOG.md](../../CHANGELOG.md) · 当前 SDK **1.0.0**（tag `v1.0.0`）。
 
 ### Q6. 没有 GitHub 账号怎么办？
 

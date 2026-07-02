@@ -11,6 +11,33 @@
 
   <name>GISO · 玑源</name>
   <description>GIDO 的数据源头 — Schema 驱动埋点平台</description>
+  <url>https://github.com/cloud-gido/giso</url>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>felixzhu</id>
+      <name>Felix Zhu</name>
+      <email>troyzhujingbin@163.com</email>
+      <roles>
+        <role>maintainer</role>
+      </roles>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:git@github.com:cloud-gido/giso.git</connection>
+    <developerConnection>scm:git:git@github.com:cloud-gido/giso.git</developerConnection>
+    <url>https://github.com/cloud-gido/giso</url>
+    <tag>v1.0.0</tag>
+  </scm>
 
   <properties>
     <maven.compiler.source>21</maven.compiler.source>

@@ -33,3 +33,7 @@ const tracker = Tracker.init({
 - 远程配置（`GET /v1/config`）
 
 常量从 `schema/` 生成，见 `src/generated.ts`。
+
+## 许可证
+
+Apache License 2.0 · [NOTICE](../../NOTICE) · Maintainer: [troyzhujingbin@163.com](mailto:troyzhujingbin@163.com)

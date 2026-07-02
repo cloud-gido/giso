@@ -37,3 +37,7 @@ Tracker.init(this, TrackerConfig.builder(
 - 远程配置下发
 
 常量类 `Pages` / `Elements` / `Params` / `BizEvents` 由 `tools/codegen/generate.py` 生成。
+
+## 许可证
+
+Apache License 2.0 · [NOTICE](../../NOTICE) · Maintainer: [troyzhujingbin@163.com](mailto:troyzhujingbin@163.com)

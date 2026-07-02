@@ -34,6 +34,28 @@ afterEvaluate {
                 groupId = 'com.giso'
                 artifactId = 'tracker'
                 version = findProperty('gisoVersion') ?: '1.0.0-SNAPSHOT'
+                pom {
+                    name = 'GISO Tracker SDK'
+                    description = 'GISO Android SDK — Apache-2.0, registry-driven tracking'
+                    url = 'https://github.com/cloud-gido/giso'
+                    licenses {
+                        license {
+                            name = 'Apache License 2.0'
+                            url = 'https://www.apache.org/licenses/LICENSE-2.0'
+                        }
+                    }
+                    developers {
+                        developer {
+                            name = 'Felix Zhu'
+                            email = 'troyzhujingbin@163.com'
+                        }
+                    }
+                    scm {
+                        connection = 'scm:git:git@github.com:cloud-gido/giso.git'
+                        developerConnection = 'scm:git:git@github.com:cloud-gido/giso.git'
+                        url = 'https://github.com/cloud-gido/giso'
+                    }
+                }
             }
         }
         repositories {

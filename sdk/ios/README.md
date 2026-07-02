@@ -29,3 +29,7 @@ Tracker.initialize(config: config)
 与 Android/Web 对齐：9 标准事件、曝光、继承、攒批、远程配置。
 
 常量见 `Generated.swift`（CI 从 `schema/` 生成）。
+
+## 许可证
+
+Apache License 2.0 · [NOTICE](../../NOTICE) · Maintainer: [troyzhujingbin@163.com](mailto:troyzhujingbin@163.com)
