@@ -61,8 +61,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: |
+          VERSION='${{ steps.ver.outputs.version }}'
+          GROUP_PATH='com/giso/tracker'
+          META_URL="https://maven.pkg.github.com/${{ github.repository }}/$GROUP_PATH/maven-metadata.xml"
+          if curl -fsSL -u "${GITHUB_ACTOR}:${GITHUB_TOKEN}" "$META_URL" \
+            | grep -q "<version>${VERSION}</version>"; then
+            echo "Maven com.giso:tracker:${VERSION} already published, skipping."
+            exit 0
+          fi
           gradle publishReleasePublicationToGitHubPackagesRepository \
-            -PgisoVersion=${{ steps.ver.outputs.version }} \
+            -PgisoVersion="${VERSION}" \
             -PgisoGithubRepo=${{ github.repository }}
 
   publish-web:
@@ -90,7 +98,12 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          VERSION='${{ steps.ver.outputs.version }}'
           npm install
-          npm version ${{ steps.ver.outputs.version }} --no-git-tag-version --allow-same-version
+          npm version "${VERSION}" --no-git-tag-version --allow-same-version
           npm run build
+          if npm view "@cloud-gido/giso-tracker-web@${VERSION}" version 2>/dev/null; then
+            echo "npm @cloud-gido/giso-tracker-web@${VERSION} already published, skipping."
+            exit 0
+          fi
           npm publish --access restricted
