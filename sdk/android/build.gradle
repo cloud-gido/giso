@@ -18,3 +18,33 @@ android {
 }
 
 // 零第三方依赖：仅用 android.jar 内置的 org.json / HttpURLConnection
+
+apply plugin: 'maven-publish'
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                groupId = 'com.giso'
+                artifactId = 'tracker'
+                version = findProperty('gisoVersion') ?: '1.0.0-SNAPSHOT'
+            }
+        }
+        repositories {
+            maven {
+                def repoUrl = findProperty('gisoMavenRepo')
+                if (repoUrl) {
+                    url = repoUrl
+                    credentials {
+                        username = findProperty('gisoMavenUser') ?: ''
+                        password = findProperty('gisoMavenPassword') ?: ''
+                    }
+                } else {
+                    name = 'local'
+                    url = layout.buildDirectory.dir('repo')
+                }
+            }
+        }
+    }
+}

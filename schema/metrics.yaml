@@ -1,0 +1,63 @@
+# GISO 指标字典（口径中心）
+# 与 server/doris/04_analysis_views.sql ADS 查询一一对应；BI 看板引用 code 而非散落 SQL 别名。
+version: "1.0"
+
+metrics:
+  - code: dau
+    name: 日活跃设备数
+    grain: day
+    space_scoped: true
+    sql_ref: dwd_daily_active
+    definition: COUNT(DISTINCT did) WHERE event_date = T
+    owner: data-team
+
+  - code: new_devices
+    name: 日新增设备
+    grain: day
+    space_scoped: true
+    sql_ref: ods_events.app_install
+    definition: DISTINCT did with app_install on event_date
+
+  - code: element_ctr
+    name: 元素点击率
+    grain: day
+    space_scoped: true
+    sql_ref: dwd_element_events
+    definition: clicks / exposures per eid, quality=ok
+
+  - code: page_pv
+    name: 页面浏览量
+    grain: day
+    space_scoped: true
+    sql_ref: dwd_page_views
+    definition: COUNT page_enter, quality in (ok,missing)
+
+  - code: biz_funnel
+    name: 业务事件漏斗
+    grain: session
+    space_scoped: true
+    sql_ref: dwd_biz_events
+    definition: 按 biz_code 序列统计转化
+
+  - code: event_error_rate
+    name: 网关校验错误率
+    grain: 5m
+    space_scoped: false
+    prometheus: |
+      sum(rate(giso_events_total{status="error"}[5m]))
+        / sum(rate(giso_events_total[5m]))
+    owner: platform
+
+  - code: coverage_pages_missing
+    name: 登记未上报页面数
+    grain: snapshot
+    space_scoped: true
+    api: GET /admin/api/coverage
+    definition: live pages − seen pgids (进程内 + ClickHouse)
+
+dimensions:
+  - space_key
+  - env
+  - platform
+  - app_vrsn
+  - event_date

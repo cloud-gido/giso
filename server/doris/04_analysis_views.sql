@@ -16,7 +16,7 @@ USE tracking;
 
 -- 曝光/点击明细（CTR 分析基础）
 CREATE VIEW IF NOT EXISTS dwd_element_events AS
-SELECT event_date, stime, event, platform, app_vrsn, channel,
+SELECT event_date, stime, event, platform, app_vrsn, channel, space_key,
        did, uid, session_id, pgid, eid, mod, pos,
        exp_dur, exp_ratio, el_params, pt
 FROM ods_events
@@ -24,14 +24,14 @@ WHERE event IN ('element_exposure', 'element_click') AND quality = 'ok';
 
 -- 页面浏览明细（带停留时长与来源链路）
 CREATE VIEW IF NOT EXISTS dwd_page_views AS
-SELECT event_date, stime, event, platform, app_vrsn, channel,
+SELECT event_date, stime, event, platform, app_vrsn, channel, space_key,
        did, uid, session_id, pgid, ref_pgid, ref_eid, pg_stay, pg_params
 FROM ods_events
 WHERE event IN ('page_enter', 'page_exit') AND quality IN ('ok', 'missing');
 
 -- 业务事件明细（行为流 client + 事实流 server 同表，source 字段区分）
 CREATE VIEW IF NOT EXISTS dwd_biz_events AS
-SELECT event_date, stime, platform, app_vrsn, channel,
+SELECT event_date, stime, platform, app_vrsn, channel, space_key,
        did, uid, session_id, pgid, biz_code, biz_params, pt,
        IF(platform = 'server', 'server', 'client') AS source
 FROM ods_events

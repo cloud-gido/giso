@@ -33,6 +33,24 @@ git push origin main
 | `INFRA_GISO_DB_SERVICE_URL` | `postgresql://...:5432/giso` | → `GISO_DB_URL` |
 | `INFRA_GISO_DB_SERVICE_USER` | `giso-user` | → `GISO_DB_USER` |
 | `INFRA_GISO_DB_SERVICE_PASSWORD` | `***` | → `GISO_DB_PASSWORD` |
+| `INFRA_GISO_S3_BUCKET` | `gamelinelab-giso-raw` | → `GISO_S3_BUCKET`（湖仓 Bronze，可选） |
+| `INFRA_GISO_S3_PREFIX` | `giso/` | → `GISO_S3_PREFIX` |
+| `INFRA_GISO_S3_REGION` | `ap-southeast-1` | → `GISO_S3_REGION` |
+| `INFRA_AWS_ACCESS_KEY_ID` / `SECRET` | — | → `GISO_AWS_*`（或集群 IRSA） |
+
+Gateway 生产双写：`sinks: [kafka, s3]`，Flink/Paimon 作业见 `server/paimon/`（对齐 GIDO 湖仓）。
+
+**Copilot（阿里云 MaaS LLM）**：
+
+| Key | → Pod |
+|-----|-------|
+| `INFRA_GISO_LLM_API_KEY` | `GISO_LLM_API_KEY`（MaaS 控制台 API Key） |
+| `INFRA_GISO_LLM_BASE_URL` | `GISO_LLM_BASE_URL`（可选，默认北京兼容端点） |
+| `INFRA_GISO_LLM_MODEL` | `GISO_LLM_MODEL`（如 `qwen-plus`） |
+| `INFRA_GISO_ASSISTANT_PROVIDER` | `GISO_ASSISTANT_PROVIDER`（生产建议 `openai`） |
+| `INFRA_GISO_GIDO_COPILOT_URL` | `GISO_GIDO_COPILOT_URL` |
+
+默认 LLM 端点：`https://ws-df7ipa997hhtkd8h.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`。未配 Key 时可保持 `provider=doc`。详见 `docs/tracking/12-Copilot.md`。
 
 **RDS 一次性**：`CREATE DATABASE giso`（控制台或 SQL，与 GIDO/DataEase 相同，deployment 不自动建库）。Gateway 启动自动迁表 + 空库种子导入。详见 `tools/registry/README.md`。
 

@@ -56,7 +56,7 @@ def load_registry() -> dict[str, list[dict]]:
     return reg
 
 
-def import_registry(operator: str = "import_yaml") -> int:
+def import_registry(operator: str = "import_yaml", space_key: str = "default") -> int:
     reg = load_registry()
     total = sum(len(v) for v in reg.values())
     print(f"loaded {total} entries from {SCHEMA}")
@@ -77,9 +77,9 @@ def import_registry(operator: str = "import_yaml") -> int:
                     cur.execute(
                         """
                         INSERT INTO giso.registry_entries
-                            (kind, entry_key, body, status, revision, created_by, updated_by)
-                        VALUES (%s, %s, %s::jsonb, %s, 1, %s, %s)
-                        ON CONFLICT (kind, entry_key) DO UPDATE SET
+                            (space_key, kind, entry_key, body, status, revision, created_by, updated_by)
+                        VALUES (%s, %s, %s, %s::jsonb, %s, 1, %s, %s)
+                        ON CONFLICT (space_key, kind, entry_key) DO UPDATE SET
                             body = EXCLUDED.body,
                             status = EXCLUDED.status,
                             revision = giso.registry_entries.revision + 1,
@@ -87,7 +87,7 @@ def import_registry(operator: str = "import_yaml") -> int:
                             updated_by = EXCLUDED.updated_by,
                             deleted_at = NULL
                         """,
-                        (kind, key, body, status, operator, operator),
+                        (space_key, kind, key, body, status, operator, operator),
                     )
             cur.execute(
                 """
@@ -112,6 +112,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Import schema YAML into PostgreSQL registry")
     parser.add_argument("--dsn", help="postgresql://user:pass@host:5432/giso")
     parser.add_argument("--operator", default="import_yaml")
+    parser.add_argument("--space", default="default", help="target space_key")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -132,7 +133,7 @@ def main() -> int:
             print(f"  {kind}: {len(items)}")
         return 0
 
-    return import_registry(args.operator)
+    return import_registry(args.operator, args.space)
 
 
 if __name__ == "__main__":

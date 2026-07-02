@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.giso.gateway.sink.EventSink;
+import com.giso.gateway.sink.SinkRegistry;
+import com.giso.gateway.space.SpaceService;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -15,15 +17,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 事件处理中枢：
- *   持久化 → 委托给插拔式 EventSink 管道（file / kafka / ...，可多路双写）
- *   内存环形缓冲（含校验结果）→ 供管理页面实时联调
- *   质量统计 → 事件维度 + 参数维度（上报量/缺失量/错误量，对应大同校验明细）
+ * 事件处理中枢（按空间隔离统计与覆盖率累计）。
  */
 public final class EventStore {
     private static final ObjectMapper M = new ObjectMapper();
 
-    private final List<EventSink> sinks;
+    private final SinkRegistry sinkRegistry;
     private final int recentMax;
     private final Deque<ObjectNode> recent = new ArrayDeque<>();
 
@@ -33,25 +32,29 @@ public final class EventStore {
 
     private final Map<String, Counter> eventStats = new LinkedHashMap<>();
     private final Map<String, Counter> paramStats = new LinkedHashMap<>();
-    /** 按 App 版本的质量分布（新版本灰度埋点回归监控的依据） */
     private final Map<String, Counter> versionStats = new LinkedHashMap<>();
-    /** 按 UTC 小时的接收量（epoch hour → count），供下游对账，保留最近 48 小时 */
-    private final Map<Long, Long> hourlyCounts = new LinkedHashMap<>();
+    /** space|epochHour → count */
+    private final Map<String, Long> hourlyCounts = new LinkedHashMap<>();
 
     private final Set<String> seenPgids = ConcurrentHashMap.newKeySet();
     private final Set<String> seenEids = ConcurrentHashMap.newKeySet();
     private final Set<String> seenBizCodes = ConcurrentHashMap.newKeySet();
 
-    public EventStore(List<EventSink> sinks, int recentMax) {
-        this.sinks = sinks;
+    public EventStore(SinkRegistry sinkRegistry, int recentMax) {
+        this.sinkRegistry = sinkRegistry;
         this.recentMax = recentMax;
     }
 
-    /** 返回包装后的记录（原事件 + 校验结果 + 接收时间），供 SSE 推送 */
-    public synchronized ObjectNode accept(JsonNode ev, Registry.Result result) {
+    private static String sk(String spaceKey) {
+        return spaceKey == null || spaceKey.isBlank() ? SpaceService.DEFAULT_SPACE : spaceKey;
+    }
+
+    public synchronized ObjectNode accept(JsonNode ev, Registry.Result result, String spaceKey) {
+        String space = sk(spaceKey);
         ObjectNode wrapped = M.createObjectNode();
         wrapped.put("stime", System.currentTimeMillis());
         wrapped.put("status", result.status());
+        wrapped.put("space", space);
         var issues = wrapped.putArray("issues");
         for (Registry.Issue i : result.issues()) {
             ObjectNode io = issues.addObject();
@@ -66,14 +69,14 @@ public final class EventStore {
         out.put("stime", wrapped.get("stime").asLong());
         if (result.status().equals("missing")) out.put("_quality", "missing");
         if (quarantine) out.set("_issues", issues.deepCopy());
-        for (EventSink sink : sinks) {
+        for (EventSink sink : sinkRegistry.current()) {
             sink.accept(out, quarantine);
         }
 
         recent.addFirst(wrapped);
         if (recent.size() > recentMax) recent.removeLast();
-        recordSeen(ev);
-        updateStats(ev, result);
+        recordSeen(ev, space);
+        updateStats(ev, result, space);
         Metrics.inc("giso_events_total{status=\"" + result.status() + "\"}");
         String vrsn = ev.path("common").path("app_vrsn").asText("");
         if (!vrsn.isEmpty()) {
@@ -83,28 +86,48 @@ public final class EventStore {
         return wrapped;
     }
 
-    private void recordSeen(JsonNode ev) {
+    private void recordSeen(JsonNode ev, String space) {
         String pgid = ev.path("page").path("pgid").asText("");
-        if (!pgid.isEmpty()) seenPgids.add(pgid);
+        if (!pgid.isEmpty()) seenPgids.add(space + "|" + pgid);
         String eid = ev.path("element").path("eid").asText("");
-        if (!eid.isEmpty()) seenEids.add(eid);
+        if (!eid.isEmpty()) seenEids.add(space + "|" + eid);
         if ("biz_event".equals(ev.path("event").asText(""))) {
             String code = ev.path("biz").path("code").asText("");
-            if (!code.isEmpty()) seenBizCodes.add(code);
+            if (!code.isEmpty()) seenBizCodes.add(space + "|" + code);
         }
     }
 
-    public Set<String> seenPgids() { return Set.copyOf(seenPgids); }
-    public Set<String> seenEids() { return Set.copyOf(seenEids); }
-    public Set<String> seenBizCodes() { return Set.copyOf(seenBizCodes); }
+    public Set<String> seenPgids(String spaceKey) { return seenFor(spaceKey, seenPgids); }
+    public Set<String> seenEids(String spaceKey) { return seenFor(spaceKey, seenEids); }
+    public Set<String> seenBizCodes(String spaceKey) { return seenFor(spaceKey, seenBizCodes); }
 
-    private void updateStats(JsonNode ev, Registry.Result result) {
-        String key = ev.path("event").asText("unknown");
-        String detail = switch (key) {
-            case "element_exposure", "element_click" -> key + " · " + ev.path("element").path("eid").asText("?");
-            case "biz_event" -> "biz_event · " + ev.path("biz").path("code").asText("?");
-            case "page_enter", "page_exit" -> key + " · " + ev.path("page").path("pgid").asText("?");
-            default -> key;
+    /** @deprecated 使用 {@link #seenPgids(String)} */
+    @Deprecated
+    public Set<String> seenPgids() { return seenPgids(null); }
+
+    @Deprecated
+    public Set<String> seenEids() { return seenEids(null); }
+
+    @Deprecated
+    public Set<String> seenBizCodes() { return seenBizCodes(null); }
+
+    private static Set<String> seenFor(String spaceKey, Set<String> raw) {
+        String prefix = sk(spaceKey) + "|";
+        return raw.stream()
+                .filter(k -> k.startsWith(prefix))
+                .map(k -> k.substring(prefix.length()))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    private void updateStats(JsonNode ev, Registry.Result result, String space) {
+        String evName = ev.path("event").asText("unknown");
+        String detail = switch (evName) {
+            case "element_exposure", "element_click" ->
+                    space + "|" + evName + " · " + ev.path("element").path("eid").asText("?");
+            case "biz_event" -> space + "|biz_event · " + ev.path("biz").path("code").asText("?");
+            case "page_enter", "page_exit" ->
+                    space + "|" + evName + " · " + ev.path("page").path("pgid").asText("?");
+            default -> space + "|" + evName;
         };
         Counter c = eventStats.computeIfAbsent(detail, k -> new Counter());
         c.total++;
@@ -114,27 +137,40 @@ public final class EventStore {
         String version = ev.path("common").path("app_vrsn").asText("");
         String platform = ev.path("common").path("platform").asText("?");
         Counter vc = versionStats.computeIfAbsent(
-                platform + " · " + (version.isEmpty() ? "unknown" : version), k -> new Counter());
+                space + "|" + platform + " · " + (version.isEmpty() ? "unknown" : version),
+                k -> new Counter());
         vc.total++;
         if (result.status().equals("missing")) vc.missing++;
         if (result.status().equals("error")) vc.error++;
 
         long hour = System.currentTimeMillis() / 3_600_000L;
-        hourlyCounts.merge(hour, 1L, Long::sum);
-        hourlyCounts.keySet().removeIf(h -> h < hour - 48);
+        String hourKey = space + "|" + hour;
+        hourlyCounts.merge(hourKey, 1L, Long::sum);
+        long cutoff = hour - 48;
+        hourlyCounts.keySet().removeIf(k -> {
+            int i = k.lastIndexOf('|');
+            if (i < 0) return false;
+            try {
+                return Long.parseLong(k.substring(i + 1)) < cutoff;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        });
 
         for (Registry.Issue i : result.issues()) {
             String param = i.field().substring(i.field().lastIndexOf('.') + 1);
-            Counter pc = paramStats.computeIfAbsent(param, k -> new Counter());
+            Counter pc = paramStats.computeIfAbsent(space + "|" + param, k -> new Counter());
             if (i.level().equals("missing")) pc.missing++;
             else pc.error++;
         }
     }
 
-    public synchronized List<ObjectNode> recent(int limit, String did, String event, String status) {
+    public synchronized List<ObjectNode> recent(int limit, String spaceKey, String did, String event, String status) {
         List<ObjectNode> out = new ArrayList<>();
+        String space = spaceKey == null || spaceKey.isBlank() ? null : spaceKey;
         for (ObjectNode n : recent) {
             if (out.size() >= limit) break;
+            if (space != null && !space.equals(n.path("space").asText(""))) continue;
             JsonNode data = n.get("data");
             if (!did.isEmpty() && !data.path("common").path("did").asText().contains(did)) continue;
             if (!event.isEmpty() && !data.path("event").asText().equals(event)) continue;
@@ -144,27 +180,31 @@ public final class EventStore {
         return out;
     }
 
-    public synchronized ObjectNode stats() {
+    public synchronized ObjectNode stats(String spaceKey) {
+        String space = spaceKey == null || spaceKey.isBlank() ? null : sk(spaceKey);
         ObjectNode o = M.createObjectNode();
         var evArr = o.putArray("events");
         eventStats.forEach((k, c) -> {
+            if (space != null && !k.startsWith(space + "|")) return;
             ObjectNode e = evArr.addObject();
-            e.put("key", k);
+            e.put("key", space != null ? k.substring(space.length() + 1) : k);
             e.put("total", c.total);
             e.put("missing", c.missing);
             e.put("error", c.error);
         });
         var pArr = o.putArray("params");
         paramStats.forEach((k, c) -> {
+            if (space != null && !k.startsWith(space + "|")) return;
             ObjectNode e = pArr.addObject();
-            e.put("key", k);
+            e.put("key", space != null ? k.substring(space.length() + 1) : k);
             e.put("missing", c.missing);
             e.put("error", c.error);
         });
         var vArr = o.putArray("versions");
         versionStats.forEach((k, c) -> {
+            if (space != null && !k.startsWith(space + "|")) return;
             ObjectNode e = vArr.addObject();
-            e.put("key", k);
+            e.put("key", space != null ? k.substring(space.length() + 1) : k);
             e.put("total", c.total);
             e.put("missing", c.missing);
             e.put("error", c.error);
@@ -172,21 +212,24 @@ public final class EventStore {
         return o;
     }
 
-    /** 指定设备的近期事件（旧→新），供联调用例断言按序比对 */
     public synchronized List<ObjectNode> recentByDid(String did) {
         List<ObjectNode> out = new ArrayList<>();
         for (ObjectNode n : recent) {
             if (n.path("data").path("common").path("did").asText().equals(did)) out.add(n);
         }
-        java.util.Collections.reverse(out); // recent 是新→旧，断言按时间正序比
+        java.util.Collections.reverse(out);
         return out;
     }
 
-    /** UTC 小时级接收量（最近 48h），供对账脚本比对 Doris 落地行数 */
-    public synchronized ObjectNode hourly() {
+    public synchronized ObjectNode hourly(String spaceKey) {
+        String space = sk(spaceKey);
         ObjectNode o = M.createObjectNode();
+        o.put("space", space);
         var arr = o.putArray("hours");
-        hourlyCounts.forEach((h, c) -> {
+        String prefix = space + "|";
+        hourlyCounts.forEach((k, c) -> {
+            if (!k.startsWith(prefix)) return;
+            long h = Long.parseLong(k.substring(prefix.length()));
             ObjectNode e = arr.addObject();
             e.put("epoch_hour", h);
             e.put("utc", java.time.Instant.ofEpochMilli(h * 3_600_000L).toString());
@@ -195,15 +238,29 @@ public final class EventStore {
         return o;
     }
 
-    public synchronized void clearRecent() {
-        recent.clear();
-        eventStats.clear();
-        paramStats.clear();
-        versionStats.clear();
-        seenPgids.clear();
-        seenEids.clear();
-        seenBizCodes.clear();
+    public synchronized void clearRecent(String spaceKey) {
+        if (spaceKey == null || spaceKey.isBlank()) {
+            recent.clear();
+            eventStats.clear();
+            paramStats.clear();
+            versionStats.clear();
+            hourlyCounts.clear();
+            seenPgids.clear();
+            seenEids.clear();
+            seenBizCodes.clear();
+            return;
+        }
+        String space = sk(spaceKey);
+        String prefix = space + "|";
+        recent.removeIf(n -> space.equals(n.path("space").asText("")));
+        eventStats.keySet().removeIf(k -> k.startsWith(prefix));
+        paramStats.keySet().removeIf(k -> k.startsWith(prefix));
+        versionStats.keySet().removeIf(k -> k.startsWith(prefix));
+        hourlyCounts.keySet().removeIf(k -> k.startsWith(prefix));
+        seenPgids.removeIf(k -> k.startsWith(prefix));
+        seenEids.removeIf(k -> k.startsWith(prefix));
+        seenBizCodes.removeIf(k -> k.startsWith(prefix));
     }
 
-    public List<EventSink> sinks() { return sinks; }
+    public List<EventSink> sinks() { return sinkRegistry.current(); }
 }

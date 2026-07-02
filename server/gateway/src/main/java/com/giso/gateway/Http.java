@@ -143,7 +143,7 @@ final class Http {
         var h = ex.getResponseHeaders();
         h.set("Access-Control-Allow-Origin", "*");
         h.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        h.set("Access-Control-Allow-Headers", "Content-Type, X-App-Key, Authorization");
+        h.set("Access-Control-Allow-Headers", "Content-Type, X-App-Key, Authorization, X-GISO-Space");
     }
 
     static boolean handlePreflight(HttpExchange ex) throws IOException {
@@ -183,5 +183,13 @@ final class Http {
             }
         }
         return q;
+    }
+
+    static String spaceKey(HttpExchange ex) {
+        String h = ex.getRequestHeaders().getFirst(com.giso.gateway.space.SpaceService.HEADER_SPACE);
+        if (h != null && !h.isBlank()) return h.trim();
+        String q = query(ex).get("space");
+        if (q != null && !q.isBlank()) return q.trim();
+        return com.giso.gateway.space.SpaceService.DEFAULT_SPACE;
     }
 }

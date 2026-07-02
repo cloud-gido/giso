@@ -7,9 +7,9 @@ import java.util.Map;
 public interface RegistryStore extends RegistryMeta {
     RegistrySnapshot load() throws Exception;
 
-    WriteResult upsert(String kind, Map<String, Object> item, String operator) throws Exception;
+    WriteResult upsert(String spaceKey, String kind, Map<String, Object> item, String operator) throws Exception;
 
-    WriteResult delete(String kind, String key, String operator) throws Exception;
+    WriteResult delete(String spaceKey, String kind, String key, String operator) throws Exception;
 
     String backendName();
 
@@ -29,27 +29,27 @@ public interface RegistryStore extends RegistryMeta {
     }
 
     @Override
-    default List<Map<String, Object>> audit(String kind, String key, int limit) throws Exception {
+    default List<Map<String, Object>> audit(String spaceKey, String kind, String key, int limit) throws Exception {
         return List.of();
     }
 
     @Override
-    default WriteResult publish(String kind, String key, String operator) throws Exception {
+    default WriteResult publish(String spaceKey, String kind, String key, String operator) throws Exception {
         return WriteResult.fail("当前后端不支持 publish（仅 postgres）");
     }
 
     @Override
-    default WriteResult deprecate(String kind, String key, String operator) throws Exception {
+    default WriteResult deprecate(String spaceKey, String kind, String key, String operator) throws Exception {
         return WriteResult.fail("当前后端不支持 deprecate（仅 postgres）");
     }
 
     @Override
-    default WriteResult approve(String kind, String key, String operator) throws Exception {
+    default WriteResult approve(String spaceKey, String kind, String key, String operator) throws Exception {
         return WriteResult.fail("当前后端不支持 approve（仅 postgres）");
     }
 
     @Override
-    default WriteResult reject(String kind, String key, String operator) throws Exception {
+    default WriteResult reject(String spaceKey, String kind, String key, String operator) throws Exception {
         return WriteResult.fail("当前后端不支持 reject（仅 postgres）");
     }
 }

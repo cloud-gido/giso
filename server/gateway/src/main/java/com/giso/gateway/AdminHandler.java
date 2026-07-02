@@ -2,18 +2,27 @@ package com.giso.gateway;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.giso.gateway.assistant.AssistantService;
+import com.giso.gateway.assistant.ChatMessage;
 import com.giso.gateway.auth.AdminAuth;
 import com.giso.gateway.auth.AdminPermissions;
+import com.giso.gateway.auth.AdminUser;
 import com.giso.gateway.registry.RegistryKinds;
+import com.giso.gateway.settings.SystemSettingsService;
+import com.giso.gateway.space.SpaceService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * 管理 REST API（角色：admin / editor / viewer）。
+ * 管理 REST API（平台 system_admin + 空间角色）。
  *   GET    /admin/api/me
+ *   GET/POST /admin/api/spaces[...]
  *   GET/POST/PUT/DELETE /admin/api/users[/{username}]
  *   GET    /admin/api/registry/pending
  *   POST   /admin/api/registry/{kind}/approve|reject|publish|deprecate
@@ -26,14 +35,21 @@ public final class AdminHandler implements HttpHandler {
     private final SseHub sse;
     private final AdminAuth auth;
     private final ClickHouseCoverage clickhouse;
+    private final SpaceService spaces;
+    private final AssistantService assistant;
+    private final SystemSettingsService systemSettings;
 
     public AdminHandler(Registry registry, EventStore store, SseHub sse, AdminAuth auth,
-                        GatewayConfig config) {
+                        GatewayConfig config, SpaceService spaces,
+                        SystemSettingsService systemSettings) throws Exception {
         this.registry = registry;
         this.store = store;
         this.sse = sse;
         this.auth = auth;
+        this.spaces = spaces;
         this.clickhouse = new ClickHouseCoverage(config.clickhouseUrl);
+        this.systemSettings = systemSettings;
+        this.assistant = new AssistantService(systemSettings, registry);
     }
 
     @Override
@@ -55,12 +71,27 @@ public final class AdminHandler implements HttpHandler {
                 Http.unauthorizedJson(ex);
                 return;
             }
-            String role = auth.role(ex);
-            if (!authorize(ex, role, method, path)) return;
-            route(ex, method, path, role);
+            String globalRole = auth.role(ex);
+            String spaceKey = Http.spaceKey(ex);
+            String spaceRole = resolveSpaceRole(ex, globalRole, spaceKey);
+            if (spaceRole == null && auth.authEnabled() && spaces != null
+                    && !AdminUser.isSystemAdmin(globalRole)) {
+                Http.json(ex, 403, "{\"error\":\"无权访问该空间\"}");
+                return;
+            }
+            if (!authorize(ex, globalRole, spaceRole, method, path)) return;
+            route(ex, method, path, globalRole, spaceRole, spaceKey);
         } catch (Exception e) {
             Http.json(ex, 500, M.writeValueAsString(Map.of("error", String.valueOf(e.getMessage()))));
         }
+    }
+
+    private String resolveSpaceRole(HttpExchange ex, String globalRole, String spaceKey) throws Exception {
+        if (spaces == null) {
+            return globalRole == null ? AdminUser.ROLE_ADMIN : globalRole;
+        }
+        String username = auth.operator(ex);
+        return spaces.spaceRole(username, globalRole, spaceKey);
     }
 
     private void routeLogin(HttpExchange ex) throws Exception {
@@ -79,65 +110,103 @@ public final class AdminHandler implements HttpHandler {
             Http.json(ex, 401, "{\"error\":\"用户名或密码错误\"}");
             return;
         }
-        var me = auth.me(ex);
-        me.put("pending_count", registry.pendingCount());
+        String spaceKey = Http.spaceKey(ex);
+        var me = auth.me(ex, spaceKey);
+        me.put("pending_count", registry.pendingCount(spaceKey));
         Http.json(ex, 200, M.writeValueAsString(me));
     }
 
-    private boolean authorize(HttpExchange ex, String role, String method, String path) throws IOException {
+    private boolean authorize(HttpExchange ex, String globalRole, String spaceRole,
+            String method, String path) throws IOException {
         if (path.equals("/me") && method.equals("GET")) return true;
+        if (path.equals("/spaces") && method.equals("GET")) return true;
+        if (path.startsWith("/spaces")) {
+            if (path.equals("/spaces") && method.equals("POST")) {
+                return require(ex, globalRole, spaceRole,
+                        AdminPermissions.canManageSpaces(globalRole), "仅平台管理员可创建空间");
+            }
+            if (path.endsWith("/members")) {
+                return require(ex, globalRole, spaceRole,
+                        AdminPermissions.canManageSpaceMembers(globalRole, spaceRole), "无权管理空间成员");
+            }
+            if (path.endsWith("/app-keys")) {
+                return require(ex, globalRole, spaceRole,
+                        AdminPermissions.canManageSpaceMembers(globalRole, spaceRole), "无权管理 App Key");
+            }
+            return true;
+        }
         if (path.startsWith("/users")) {
             if (method.equals("GET") && path.equals("/users")) {
-                return require(ex, role, AdminPermissions.canManageUsers(role));
+                return require(ex, globalRole, spaceRole,
+                        AdminPermissions.canManageUsers(globalRole), "仅平台管理员可管理账号");
             }
-            if (!AdminPermissions.canManageUsers(role)) {
-                Http.json(ex, 403, "{\"error\":\"仅管理员可管理账号\"}");
+            if (!AdminPermissions.canManageUsers(globalRole)) {
+                Http.json(ex, 403, "{\"error\":\"仅平台管理员可管理账号\"}");
                 return false;
             }
             return true;
         }
         if (path.equals("/registry/pending") && method.equals("GET")) return true;
+        if (path.startsWith("/assistant/")) return true;
+        if (path.startsWith("/settings")) {
+            if (method.equals("GET")) return true;
+            return require(ex, globalRole, spaceRole,
+                    AdminPermissions.canManageSystemSettings(globalRole), "仅平台管理员可修改系统设置");
+        }
         if (path.equals("/clear") && method.equals("POST")) {
-            return require(ex, role, AdminPermissions.canClearBuffer(role));
+            return require(ex, globalRole, spaceRole,
+                    AdminPermissions.canClearBuffer(globalRole, spaceRole), "无权清空缓冲");
         }
         if (path.startsWith("/registry/")) {
             String rest = path.substring("/registry/".length());
             String action = rest.contains("/") ? rest.substring(rest.indexOf('/') + 1) : null;
             if ("approve".equals(action) || "reject".equals(action)) {
-                return require(ex, role, AdminPermissions.canApproveRegistry(role));
+                return require(ex, globalRole, spaceRole,
+                        AdminPermissions.canApproveRegistry(globalRole, spaceRole), "无权审批");
             }
             if ("publish".equals(action) || "deprecate".equals(action)) {
-                return require(ex, role, AdminPermissions.canPublishRegistry(role));
+                return require(ex, globalRole, spaceRole,
+                        AdminPermissions.canPublishRegistry(globalRole, spaceRole), "无权发布");
             }
             if (path.equals("/registry/reload") && method.equals("POST")) {
-                return require(ex, role, AdminPermissions.canPublishRegistry(role));
+                return require(ex, globalRole, spaceRole,
+                        AdminPermissions.canPublishRegistry(globalRole, spaceRole), "无权重载");
             }
             if (method.equals("POST") && action == null) {
-                return require(ex, role, AdminPermissions.canEditRegistry(role));
+                return require(ex, globalRole, spaceRole,
+                        AdminPermissions.canEditRegistry(globalRole, spaceRole), "无权编辑注册表");
             }
             if (method.equals("DELETE")) {
-                return require(ex, role, AdminPermissions.canEditRegistry(role));
+                return require(ex, globalRole, spaceRole,
+                        AdminPermissions.canEditRegistry(globalRole, spaceRole), "无权删除");
             }
             return true;
         }
         return true;
     }
 
-    private static boolean require(HttpExchange ex, String role, boolean ok) throws IOException {
+    private static boolean require(HttpExchange ex, String globalRole, String spaceRole,
+            boolean ok, String msg) throws IOException {
         if (ok) return true;
-        Http.json(ex, 403, "{\"error\":\"当前角色（" + role + "）无权执行此操作\"}");
+        String label = spaceRole != null ? spaceRole : globalRole;
+        Http.json(ex, 403, "{\"error\":\"" + msg + "（当前角色 " + label + "）\"}");
         return false;
     }
 
-    private void route(HttpExchange ex, String method, String path, String role) throws Exception {
+    private void route(HttpExchange ex, String method, String path, String globalRole,
+            String spaceRole, String spaceKey) throws Exception {
         if (path.equals("/me") && method.equals("GET")) {
-            var me = auth.me(ex);
+            var me = auth.me(ex, spaceKey);
             if (me == null) {
                 Http.unauthorizedJson(ex);
                 return;
             }
-            me.put("pending_count", registry.pendingCount());
+            me.put("pending_count", registry.pendingCount(spaceKey));
             Http.json(ex, 200, M.writeValueAsString(me));
+            return;
+        }
+        if (path.startsWith("/spaces")) {
+            routeSpaces(ex, method, path, spaceKey);
             return;
         }
         if (path.startsWith("/users")) {
@@ -145,11 +214,33 @@ public final class AdminHandler implements HttpHandler {
             return;
         }
         if (path.equals("/registry/pending") && method.equals("GET")) {
-            Http.json(ex, 200, M.writeValueAsString(registry.pending()));
+            Http.json(ex, 200, M.writeValueAsString(registry.pending(spaceKey)));
+            return;
+        }
+        if (path.equals("/assistant/status") && method.equals("GET")) {
+            var st = new java.util.LinkedHashMap<String, Object>();
+            st.put("enabled", systemSettings.assistantProvider().ready()
+                    || !systemSettings.assistantProvider().name().equals("disabled"));
+            st.put("provider", systemSettings.assistantProvider().name());
+            st.put("ready", systemSettings.assistantProvider().ready());
+            st.put("topics", List.of("product", "tracking_flow", "registry", "deploy", "quarantine"));
+            Http.json(ex, 200, M.writeValueAsString(st));
+            return;
+        }
+        if (path.equals("/settings") && method.equals("GET")) {
+            Http.json(ex, 200, M.writeValueAsString(systemSettings.getPublicSettings()));
+            return;
+        }
+        if (path.equals("/settings") && method.equals("PUT")) {
+            routeSettingsUpdate(ex);
+            return;
+        }
+        if (path.equals("/assistant/chat") && method.equals("POST")) {
+            routeAssistantChat(ex, spaceKey);
             return;
         }
         if (path.equals("/registry") && method.equals("GET")) {
-            Http.json(ex, 200, M.writeValueAsString(registry.all()));
+            Http.json(ex, 200, M.writeValueAsString(registry.all(spaceKey)));
 
         } else if (path.equals("/registry/meta") && method.equals("GET")) {
             Http.json(ex, 200, M.writeValueAsString(registry.meta()));
@@ -158,48 +249,111 @@ public final class AdminHandler implements HttpHandler {
             var q = Http.query(ex);
             int limit = Integer.parseInt(q.getOrDefault("limit", "50"));
             Http.json(ex, 200, M.writeValueAsString(registry.audit(
-                    q.getOrDefault("kind", ""), q.getOrDefault("key", ""), limit)));
+                    spaceKey, q.getOrDefault("kind", ""), q.getOrDefault("key", ""), limit)));
 
         } else if (path.equals("/registry/reload") && method.equals("POST")) {
             registry.reload();
             Http.json(ex, 200, "{\"ok\":true}");
 
+        } else if (path.equals("/registry/visual-draft") && method.equals("POST")) {
+            routeVisualDraft(ex, spaceKey, spaceRole);
+
         } else if (path.startsWith("/registry/")) {
-            routeRegistry(ex, method, path, role);
+            routeRegistry(ex, method, path, spaceKey, spaceRole);
 
         } else if (path.equals("/events") && method.equals("GET")) {
             var q = Http.query(ex);
             int limit = Integer.parseInt(q.getOrDefault("limit", "200"));
             Http.json(ex, 200, M.writeValueAsString(store.recent(
-                    limit, q.getOrDefault("did", ""), q.getOrDefault("event", ""),
+                    limit, spaceKey, q.getOrDefault("did", ""), q.getOrDefault("event", ""),
                     q.getOrDefault("status", ""))));
 
         } else if (path.equals("/stats") && method.equals("GET")) {
-            Http.json(ex, 200, store.stats().toString());
+            Http.json(ex, 200, store.stats(spaceKey).toString());
 
         } else if (path.equals("/coverage") && method.equals("GET")) {
             String env = Http.query(ex).getOrDefault("env", "prod");
-            var pgids = merge(store.seenPgids(), clickhouse.seenPgids(env));
-            var eids = merge(store.seenEids(), clickhouse.seenEids(env));
-            var codes = merge(store.seenBizCodes(), clickhouse.seenBizCodes(env));
-            Http.json(ex, 200, registry.coverage(pgids, eids, codes).toString());
+            var pgids = merge(store.seenPgids(spaceKey), clickhouse.seenPgids(env, spaceKey));
+            var eids = merge(store.seenEids(spaceKey), clickhouse.seenEids(env, spaceKey));
+            var codes = merge(store.seenBizCodes(spaceKey), clickhouse.seenBizCodes(env, spaceKey));
+            Http.json(ex, 200, registry.coverage(spaceKey, pgids, eids, codes).toString());
 
         } else if (path.equals("/hourly") && method.equals("GET")) {
-            Http.json(ex, 200, store.hourly().toString());
+            Http.json(ex, 200, store.hourly(spaceKey).toString());
 
         } else if (path.equals("/assert") && method.equals("POST")) {
             assertCase(ex);
 
         } else if (path.equals("/stream") && method.equals("GET")) {
-            sse.subscribe(ex);
+            sse.subscribe(ex, spaceKey);
 
         } else if (path.equals("/clear") && method.equals("POST")) {
-            store.clearRecent();
+            store.clearRecent(spaceKey);
             Http.json(ex, 200, "{\"ok\":true}");
 
         } else {
             Http.empty(ex, 404);
         }
+    }
+
+    private void routeSpaces(HttpExchange ex, String method, String path, String spaceKey) throws Exception {
+        if (spaces == null) {
+            Http.json(ex, 400, "{\"error\":\"当前环境未启用空间（需 PostgreSQL）\"}");
+            return;
+        }
+        if (path.equals("/spaces") && method.equals("GET")) {
+            Http.json(ex, 200, M.writeValueAsString(spaces.listSpaces()));
+            return;
+        }
+        if (path.equals("/spaces") && method.equals("POST")) {
+            Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+            String err = spaces.createSpace(str(body, "space_key"), str(body, "display_name"));
+            if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+            else Http.json(ex, 200, "{\"ok\":true}");
+            return;
+        }
+        if (path.startsWith("/spaces/")) {
+            String rest = path.substring("/spaces/".length());
+            if (rest.endsWith("/members")) {
+                String sk = rest.substring(0, rest.length() - "/members".length());
+                if (method.equals("GET")) {
+                    Http.json(ex, 200, M.writeValueAsString(spaces.listMembers(sk)));
+                    return;
+                }
+                if (method.equals("POST")) {
+                    Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+                    String err = spaces.saveMember(sk, str(body, "username"), str(body, "role"));
+                    if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+                    else Http.json(ex, 200, "{\"ok\":true}");
+                    return;
+                }
+                if (method.equals("DELETE")) {
+                    String username = Http.query(ex).getOrDefault("username", "");
+                    String err = spaces.removeMember(sk, username);
+                    if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+                    else Http.json(ex, 200, "{\"ok\":true}");
+                    return;
+                }
+            }
+            if (rest.endsWith("/app-keys")) {
+                String sk = rest.substring(0, rest.length() - "/app-keys".length());
+                if (method.equals("GET")) {
+                    Http.json(ex, 200, M.writeValueAsString(spaces.listAppKeys(sk)));
+                    return;
+                }
+                if (method.equals("POST")) {
+                    Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+                    String err = spaces.bindAppKey(sk, str(body, "app_key"));
+                    if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+                    else {
+                        spaces.reloadAppKeys();
+                        Http.json(ex, 200, "{\"ok\":true}");
+                    }
+                    return;
+                }
+            }
+        }
+        Http.empty(ex, 404);
     }
 
     private void routeUsers(HttpExchange ex, String method, String path) throws Exception {
@@ -243,7 +397,120 @@ public final class AdminHandler implements HttpHandler {
         Http.empty(ex, 405);
     }
 
-    private void routeRegistry(HttpExchange ex, String method, String path, String role) throws Exception {
+    private void routeAssistantChat(HttpExchange ex, String spaceKey) throws Exception {
+        var body = M.readValue(Http.readBody(ex), new TypeReference<Map<String, Object>>() { });
+        String message = str(body, "message");
+        if (message.isEmpty()) {
+            Http.json(ex, 400, "{\"error\":\"message required\"}");
+            return;
+        }
+        String topic = str(body, "topic");
+        List<ChatMessage> history = List.of();
+        if (body.get("history") instanceof List<?> raw) {
+            List<ChatMessage> parsed = new ArrayList<>();
+            for (Object o : raw) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                String role = String.valueOf(m.get("role"));
+                String content = String.valueOf(m.get("content"));
+                parsed.add(new ChatMessage(role, content));
+            }
+            history = parsed;
+        }
+        try {
+            var resp = assistant.chat(message, history, topic, spaceKey);
+            Http.json(ex, 200, M.writeValueAsString(Map.of(
+                    "answer", resp.answer(),
+                    "provider", resp.provider(),
+                    "sources", resp.sources(),
+                    "suggested_followups", resp.suggestedFollowups())));
+        } catch (Exception e) {
+            Http.json(ex, 502, M.writeValueAsString(Map.of(
+                    "error", e.getMessage(),
+                    "provider", systemSettings.assistantProvider().name())));
+        }
+    }
+
+    private void routeSettingsUpdate(HttpExchange ex) throws Exception {
+        Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+        try {
+            var result = systemSettings.update(body, auth.operator(ex));
+            Http.json(ex, 200, M.writeValueAsString(result));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            Http.json(ex, 400, M.writeValueAsString(Map.of("error", e.getMessage())));
+        }
+    }
+
+    private void routeVisualDraft(HttpExchange ex, String spaceKey, String spaceRole) throws Exception {
+        Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+        String pgid = str(body, "pgid");
+        if (pgid.isEmpty()) {
+            Http.json(ex, 400, "{\"error\":\"需要 pgid\"}");
+            return;
+        }
+        String operator = auth.operator(ex);
+        List<String> created = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+
+        Object els = body.get("elements");
+        if (els instanceof List<?> list) {
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> raw)) continue;
+                Map<String, Object> el = new HashMap<>();
+                raw.forEach((k, v) -> el.put(String.valueOf(k), v));
+                el.putIfAbsent("status", "draft");
+                el.putIfAbsent("domain", str(body, "domain").isEmpty() ? "common" : str(body, "domain"));
+                el.putIfAbsent("owner", operator != null ? operator : "visual-picker");
+                el.putIfAbsent("params", List.of());
+                String eid = str(el, "eid");
+                if (eid.isEmpty()) {
+                    errors.add("缺少 eid");
+                    continue;
+                }
+                String err = registry.upsert(spaceKey, "elements", el, operator, spaceRole);
+                if (err != null) errors.add(eid + ": " + err);
+                else created.add(eid);
+            }
+        }
+
+        Map<String, Object> pageUpdate = null;
+        for (Map<String, Object> p : registry.all(spaceKey).getOrDefault("pages", List.of())) {
+            if (pgid.equals(str(p, "pgid"))) {
+                pageUpdate = new HashMap<>(p);
+                break;
+            }
+        }
+        if (pageUpdate == null) {
+            pageUpdate = new HashMap<>();
+            pageUpdate.put("pgid", pgid);
+            pageUpdate.put("desc", str(body, "desc").isEmpty() ? pgid : str(body, "desc"));
+            pageUpdate.put("domain", str(body, "domain").isEmpty() ? "common" : str(body, "domain"));
+            pageUpdate.put("status", "draft");
+            pageUpdate.put("params", List.of());
+            pageUpdate.put("elements", new ArrayList<String>());
+        }
+        String screenshot = str(body, "screenshot");
+        if (!screenshot.isEmpty()) pageUpdate.put("screenshot", screenshot);
+
+        @SuppressWarnings("unchecked")
+        List<String> bound = pageUpdate.get("elements") instanceof List<?> bl
+                ? new ArrayList<>((List<String>) bl.stream().map(String::valueOf).toList())
+                : new ArrayList<>();
+        for (String e : created) {
+            if (!bound.contains(e)) bound.add(e);
+        }
+        pageUpdate.put("elements", bound);
+
+        String perr = registry.upsert(spaceKey, "pages", pageUpdate, operator, spaceRole);
+        if (perr != null) errors.add("page: " + perr);
+
+        Http.json(ex, 200, M.writeValueAsString(Map.of(
+                "ok", errors.isEmpty(),
+                "created_elements", created,
+                "errors", errors)));
+    }
+
+    private void routeRegistry(HttpExchange ex, String method, String path,
+            String spaceKey, String spaceRole) throws Exception {
         String rest = path.substring("/registry/".length());
         String[] slash = rest.split("/", 2);
         String kind = slash[0];
@@ -255,25 +522,25 @@ public final class AdminHandler implements HttpHandler {
         String operator = auth.operator(ex);
         String key = Http.query(ex).getOrDefault("key", "");
         if ("approve".equals(action) && method.equals("POST")) {
-            String err = registry.approve(kind, key, operator);
+            String err = registry.approve(spaceKey, kind, key, operator);
             if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
             else Http.json(ex, 200, "{\"ok\":true}");
             return;
         }
         if ("reject".equals(action) && method.equals("POST")) {
-            String err = registry.reject(kind, key, operator);
+            String err = registry.reject(spaceKey, kind, key, operator);
             if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
             else Http.json(ex, 200, "{\"ok\":true}");
             return;
         }
         if ("publish".equals(action) && method.equals("POST")) {
-            String err = registry.publish(kind, key, operator);
+            String err = registry.publish(spaceKey, kind, key, operator);
             if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
             else Http.json(ex, 200, "{\"ok\":true}");
             return;
         }
         if ("deprecate".equals(action) && method.equals("POST")) {
-            String err = registry.deprecate(kind, key, operator);
+            String err = registry.deprecate(spaceKey, kind, key, operator);
             if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
             else Http.json(ex, 200, "{\"ok\":true}");
             return;
@@ -284,11 +551,11 @@ public final class AdminHandler implements HttpHandler {
         }
         if (method.equals("POST")) {
             Map<String, Object> item = M.readValue(Http.readBody(ex), new TypeReference<>() { });
-            String err = registry.upsert(kind, item, operator, role);
+            String err = registry.upsert(spaceKey, kind, item, operator, spaceRole);
             if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
             else Http.json(ex, 200, "{\"ok\":true}");
         } else if (method.equals("DELETE")) {
-            String err = registry.delete(kind, key, operator, role);
+            String err = registry.delete(spaceKey, kind, key, operator, spaceRole);
             if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
             else Http.json(ex, 200, "{\"ok\":true}");
         } else {

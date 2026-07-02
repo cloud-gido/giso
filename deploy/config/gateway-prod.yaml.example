@@ -3,8 +3,9 @@
 port: 8123
 schema_dir: /app/schema
 
-# 生产仅 Kafka 出口（勿启用 file sink）
+# 生产仅 Kafka 出口（湖仓归档可加 s3 双写）
 sinks: [kafka]
+# sinks: [kafka, s3]
 
 kafka:
   bootstrap_servers: kafka-broker1:9092,kafka-broker2:9092,kafka-broker3:9092
@@ -19,6 +20,14 @@ kafka:
     linger.ms: 20
     compression.type: lz4
     enable.idempotence: true
+
+# 可选：S3 Bronze（对齐 GIDO deployment S3 warehouse → Flink/Paimon）
+# s3:
+#   bucket: gamelinelab-giso-raw
+#   prefix: giso/
+#   region: ap-southeast-1
+#   buffer_dir: /data/s3-buffer
+#   flush_bytes: 5242880
 
 admin:
   recent_buffer: 5000
@@ -44,3 +53,12 @@ sdk_config:
   exposure_max_per_page: 3
   batch_size: 20
   flush_interval_ms: 15000
+
+# Copilot LLM（阿里云 MaaS OpenAI 兼容）
+assistant:
+  enabled: true
+  provider: openai
+  openai:
+    base_url: https://ws-df7ipa997hhtkd8h.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+    model: qwen-plus
+  # API Key 走 GISO_LLM_API_KEY（Doppler INFRA_GISO_LLM_API_KEY），勿写入 ConfigMap

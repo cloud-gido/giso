@@ -1,6 +1,6 @@
 /* GISO 玑源 · 管理控制台入口 */
 import { $, $$ } from './util.js';
-import { api, logout } from './api.js';
+import { api, logout, getSpace, setSpace } from './api.js';
 import { setMe } from './session.js';
 import { initDebug } from './views/debug.js';
 import { initAssert } from './views/assert.js';
@@ -8,27 +8,60 @@ import { initRegistry, renderRegistry } from './views/registry.js';
 import { initStats, loadStats } from './views/stats.js';
 import { initApproval, renderApproval } from './views/approval.js';
 import { initUsers, renderUsers } from './views/users.js';
+import { initSpaceSwitcher, renderSpaces } from './views/spaces.js';
+import { initVisualPicker, renderVisualPicker } from './views/visual-picker.js';
+import { initCopilot, renderCopilot } from './views/copilot.js';
+import { initSettings, renderSettings } from './views/settings.js';
+import { t, setLocale, getLocale, applyI18n } from './i18n.js';
 
-const ROLE_LABEL = { admin: '管理员', editor: '编辑员', viewer: '只读' };
-
-const VIEWS = {
-  debug: { title: '实时联调', desc: '设备开 debug 模式后实时核对上报，红错误 / 黄缺失 / 绿正常' },
-  assert: { title: '用例断言', desc: '声明链路期望事件序列，与设备实报做有序比对，一键回归' },
-  approval: { title: '待审批', desc: '编辑员提交的登记变更；管理员批准后参与线上校验', onShow: renderApproval },
-  registry: { title: '注册表配置', desc: '生产写 PostgreSQL；编辑员提交待审批，管理员批准后生效', onShow: renderRegistry },
-  stats: { title: '质量统计', desc: '事件 / 参数 / 版本三个维度的上报质量，配合 /metrics 告警使用', onShow: loadStats },
-  users: { title: '账号管理', desc: '管理台 admin / editor / viewer 账号（PostgreSQL 持久化）', onShow: renderUsers },
+const ROLE_LABEL = {
+  system_admin: '平台管理员', admin: '管理员', user: '平台用户',
+  space_admin: '空间管理员', editor: '编辑员', viewer: '只读',
 };
 
-function show(view) {
-  $$('.nav-item[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+const VIEWS = {
+  debug: { titleKey: 'view.debug.title', descKey: 'view.debug.desc' },
+  assert: { titleKey: 'view.assert.title', descKey: 'view.assert.desc' },
+  approval: { titleKey: 'view.approval.title', descKey: 'view.approval.desc', onShow: renderApproval },
+  registry: { titleKey: 'view.registry.title', descKey: 'view.registry.desc', onShow: renderRegistry },
+  visual: { titleKey: 'view.visual.title', descKey: 'view.visual.desc', onShow: renderVisualPicker },
+  copilot: { titleKey: 'view.copilot.title', descKey: 'view.copilot.desc', onShow: renderCopilot },
+  settings: { titleKey: 'view.settings.title', descKey: 'view.settings.desc', onShow: renderSettings },
+  stats: { titleKey: 'view.stats.title', descKey: 'view.stats.desc', onShow: loadStats },
+  spaces: { titleKey: 'view.spaces.title', descKey: 'view.spaces.desc', onShow: renderSpaces },
+  users: { titleKey: 'view.users.title', descKey: 'view.users.desc', onShow: renderUsers },
+};
+
+export function show(view) {
+  if (!VIEWS[view]) return;
+  $$('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   $$('.view').forEach((p) => p.classList.toggle('active', p.id === 'view-' + view));
-  $('#page-title').textContent = VIEWS[view].title;
-  $('#page-desc').textContent = VIEWS[view].desc;
+  $('#page-title').textContent = t(VIEWS[view].titleKey);
+  $('#page-desc').textContent = t(VIEWS[view].descKey);
+  $$('.top-menu.open').forEach((m) => m.classList.remove('open'));
   VIEWS[view].onShow?.();
 }
 
-$$('.nav-item[data-view]').forEach((btn) => { btn.onclick = () => show(btn.dataset.view); });
+function initNavigation() {
+  $$('[data-view]').forEach((btn) => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      show(btn.dataset.view);
+    };
+  });
+}
+
+function initTopMenus() {
+  $$('.top-menu').forEach((menu) => {
+    menu.querySelector('.top-menu-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasOpen = menu.classList.contains('open');
+      $$('.top-menu.open').forEach((m) => m.classList.remove('open'));
+      if (!wasOpen) menu.classList.add('open');
+    });
+  });
+  document.addEventListener('click', () => $$('.top-menu.open').forEach((m) => m.classList.remove('open')));
+}
 
 function updatePendingBadge(count) {
   const badge = $('#nav-pending-badge');
@@ -48,35 +81,62 @@ function applyRole(me) {
   if (me?.auth_enabled) {
     pill.hidden = false;
     logoutBtn.hidden = false;
-    const roleLabel = ROLE_LABEL[me.role] || me.role;
-    pill.textContent = `${me.username} · ${roleLabel}`;
-    pill.title = roleLabel;
+    const global = ROLE_LABEL[me.role] || me.role;
+    const space = ROLE_LABEL[me.space_role] || me.space_role || '';
+    pill.textContent = `${me.username} · ${space || global}`;
+    pill.title = `全局: ${global} · 本空间: ${space}`;
   } else {
     pill.hidden = false;
     pill.textContent = '本地开发 · 免登录';
     logoutBtn.hidden = true;
   }
 
-  if (me.role === 'viewer') {
+  if (me.space_role === 'viewer') {
     $('#btn-clear')?.setAttribute('hidden', '');
     $('#btn-add')?.setAttribute('hidden', '');
   }
-  if (me.role !== 'admin') {
+  if (!['system_admin', 'admin', 'space_admin'].includes(me.space_role)
+      && !['system_admin', 'admin'].includes(me.role)) {
     $$('.nav-admin-only').forEach((el) => el.setAttribute('hidden', ''));
+  }
+  if (!['system_admin', 'admin'].includes(me.role)) {
+    $$('.nav-platform-only').forEach((el) => el.setAttribute('hidden', ''));
   }
   updatePendingBadge(me.pending_count || 0);
 }
 
+initNavigation();
+initTopMenus();
 initDebug();
 initAssert();
 initApproval();
 initRegistry();
 initStats();
 initUsers();
+initVisualPicker();
+initCopilot();
+initSettings();
+applyI18n();
+document.documentElement.lang = getLocale() === 'en' ? 'en' : 'zh-CN';
+$('#btn-locale')?.addEventListener('click', () => {
+  setLocale(getLocale() === 'en' ? 'zh' : 'en');
+  applyI18n();
+  const active = $$('[data-view].active')[0]?.dataset?.view;
+  if (active) show(active);
+});
 show('debug');
 
 api('/me').then((me) => {
+  if (me.current_space && me.current_space !== getSpace()) {
+    setSpace(me.current_space);
+  }
   setMe(me);
+  initSpaceSwitcher((fresh) => {
+    setMe(fresh);
+    applyRole(fresh);
+    const active = $$('[data-view].active')[0]?.dataset?.view;
+    if (active) VIEWS[active]?.onShow?.();
+  });
   applyRole(me);
 }).catch(() => {
   location.href = '/admin/login.html';
@@ -90,3 +150,5 @@ document.addEventListener('giso:pending-changed', () => {
     updatePendingBadge(me.pending_count || 0);
   });
 });
+
+document.addEventListener('giso:navigate', (e) => show(e.detail?.view));

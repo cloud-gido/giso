@@ -61,5 +61,5 @@ CI 在 push 到 `main` 时自动构建推送，见 `.github/workflows/docker-pub
 | | GIDO | GISO |
 |---|---|---|
 | 核心应用 | backend + frontend | **gateway**（无状态） |
-| 数据平台 | Flink + Paimon | **Kafka + Doris** |
+| 数据平台 | Flink + Paimon (+ S3) | **Kafka + Doris** (+ optional **S3 + Paimon**, see `server/paimon/`) |
 | 重镜像 | flink-runtime | 无（Doris 用官方镜像） |

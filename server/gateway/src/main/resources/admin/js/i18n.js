@@ -1,0 +1,196 @@
+/** Admin console i18n (zh-CN / en). */
+const STR = {
+  zh: {
+    'nav.debug': '实时联调',
+    'nav.assert': '用例断言',
+    'nav.approval': '待审批',
+    'nav.registry': '注册表配置',
+    'nav.visual': '可视化圈选',
+    'nav.stats': '质量统计',
+    'nav.spaces': '空间管理',
+    'nav.users': '账号管理',
+    'nav.group.debug': '联调验证',
+    'nav.group.registry': '注册表',
+    'nav.group.governance': '治理',
+    'nav.group.platform': '平台',
+    'nav.group.assistant': '智能助手',
+    'nav.group.ref': '参考',
+    'nav.product': '产品导航',
+    'nav.gap': '大同对比评审',
+    'vp.pgidPh': '页面 pgid（如 video_feed）',
+    'vp.screenshotPh': '页面截图 URL',
+    'vp.load': '加载截图',
+    'vp.reset': '清空框选',
+    'vp.save': '保存草稿',
+    'vp.hint': '在截图上拖拽框选元素，或粘贴 Web SDK <code>exportViewTreeJson()</code> / Android <code>ViewTreeCapture</code> 导出的 ViewTree JSON。',
+    'vp.importVt': '导入 ViewTree',
+    'vp.vtPh': '[{"suggested_eid":"play_btn","bounds":{"x":0.1,"y":0.2,"w":0.3,"h":0.05}}]',
+    'vp.eidPh': '元素 eid（snake_case）',
+    'view.debug.title': '实时联调',
+    'view.debug.desc': '设备开 debug 模式后实时核对上报，红错误 / 黄缺失 / 绿正常',
+    'view.assert.title': '用例断言',
+    'view.assert.desc': '声明链路期望事件序列，与设备实报做有序比对，一键回归',
+    'view.approval.title': '待审批',
+    'view.approval.desc': '编辑员提交的登记变更；管理员批准后参与线上校验',
+    'view.registry.title': '注册表配置',
+    'view.registry.desc': '按当前空间隔离；编辑员提交待审批，管理员批准后生效',
+    'view.visual.title': '可视化圈选',
+    'view.visual.desc': '在页面截图上框选按钮/卡片位置，自动生成元素登记草稿（无需手写坐标）；也可导入 SDK 导出的 ViewTree',
+    'view.stats.title': '质量统计',
+    'view.stats.desc': '当前空间的事件 / 参数 / 版本质量',
+    'view.spaces.title': '空间管理',
+    'view.spaces.desc': '成员、App Key 绑定；平台管理员可创建新空间',
+    'view.users.title': '账号管理',
+    'view.users.desc': '平台 system_admin / user 全局账号（PostgreSQL）',
+    'vp.empty': '在截图上拖拽框选元素',
+    'vp.desc': '说明',
+    'vp.needPgid': '请填写 pgid',
+    'vp.needScreenshot': '请填写截图 URL',
+    'vp.needRect': '至少框选一个元素并填写 eid',
+    'vp.saved': '已保存 {n} 个元素 draft',
+    'vp.imported': '已导入 {n} 个节点',
+    'vp.importFail': 'ViewTree JSON 解析失败',
+    'locale': 'English',
+    'nav.copilot': '接入助手',
+    'view.copilot.title': '接入助手',
+    'view.copilot.desc': '产品介绍与埋点接入答疑；基于 FAQ 文档，可切换 LLM / GIDO 代理',
+    'copilot.welcome': '问我：上报流程、App Key、隔离区、空间隔离、注册表…',
+    'copilot.you': '你',
+    'copilot.bot': '助手',
+    'copilot.sources': '参考文档',
+    'copilot.provider': '知识源',
+    'copilot.clear': '清空对话',
+    'copilot.send': '发送',
+    'copilot.inputPh': '问产品特性、接入流程、登记规范…',
+    'top.platform': '平台',
+    'top.more': '更多',
+    'top.space': '空间',
+    'top.logout': '退出',
+    'conn.connecting': '连接中…',
+    'conn.live': '实时',
+    'conn.off': '断开',
+    'settings.assistantTitle': '接入助手（LLM）',
+    'settings.assistantEnable': '启用接入助手',
+    'nav.settings': '系统设置',
+    'view.settings.title': '系统设置',
+    'view.settings.desc': '接入助手 LLM 与数据出口管道；保存后立即生效，无需重启',
+    'settings.sinkHint': '<b>为何多选？</b> Kafka = 实时 BI 主路径；S3 = 湖仓冷备/重算；file = 本地调试。可只选 Kafka，不必双写。',
+    'settings.apiKeyPh': '留空表示不修改',
+    'settings.readonly': 'yaml 模式请改 gateway.yaml',
+    'settings.sinkRequired': '至少选择一个出口',
+    'settings.saved': '已保存，当前出口: {sinks}',
+  },
+  en: {
+    'nav.debug': 'Live Debug',
+    'nav.assert': 'Assertions',
+    'nav.approval': 'Pending',
+    'nav.registry': 'Registry',
+    'nav.visual': 'Visual Picker',
+    'nav.stats': 'Quality',
+    'nav.spaces': 'Spaces',
+    'nav.users': 'Accounts',
+    'nav.group.debug': 'Debug',
+    'nav.group.registry': 'Registry',
+    'nav.group.governance': 'Governance',
+    'nav.group.platform': 'Platform',
+    'nav.group.assistant': 'Assistant',
+    'nav.group.ref': 'Reference',
+    'nav.product': 'Product Hub',
+    'nav.gap': 'Datong Gap Review',
+    'vp.pgidPh': 'Page pgid (e.g. video_feed)',
+    'vp.screenshotPh': 'Screenshot URL',
+    'vp.load': 'Load',
+    'vp.reset': 'Reset',
+    'vp.save': 'Save draft',
+    'vp.hint': 'Drag on the screenshot to mark elements, or paste ViewTree JSON from Web SDK <code>exportViewTreeJson()</code> / Android <code>ViewTreeCapture</code>.',
+    'vp.importVt': 'Import ViewTree',
+    'vp.vtPh': '[{"suggested_eid":"play_btn","bounds":{"x":0.1,"y":0.2,"w":0.3,"h":0.05}}]',
+    'vp.eidPh': 'Element eid (snake_case)',
+    'view.debug.title': 'Live Debug',
+    'view.debug.desc': 'Stream device events with ok / missing / error classification',
+    'view.assert.title': 'Assertions',
+    'view.assert.desc': 'Declare expected event sequences and compare with device traffic',
+    'view.approval.title': 'Pending Approval',
+    'view.approval.desc': 'Registry changes submitted by editors; admins approve for validation',
+    'view.registry.title': 'Registry',
+    'view.registry.desc': 'Space-scoped params / pages / elements / biz events',
+    'view.visual.title': 'Visual Picker',
+    'view.visual.desc': 'Draw boxes on a screenshot or paste ViewTree JSON to create registry drafts',
+    'view.stats.title': 'Quality Stats',
+    'view.stats.desc': 'Event, param, and version quality for the current space',
+    'view.spaces.title': 'Spaces',
+    'view.spaces.desc': 'Members and App Key bindings',
+    'view.users.title': 'Accounts',
+    'view.users.desc': 'Platform system_admin / user accounts',
+    'vp.empty': 'Drag on the screenshot to mark elements',
+    'vp.desc': 'Description',
+    'vp.needPgid': 'pgid is required',
+    'vp.needScreenshot': 'Screenshot URL is required',
+    'vp.needRect': 'Draw at least one box and set eid',
+    'vp.saved': 'Saved {n} element draft(s)',
+    'vp.imported': 'Imported {n} node(s)',
+    'vp.importFail': 'Invalid ViewTree JSON',
+    'locale': '中文',
+    'nav.copilot': 'Guide',
+    'view.copilot.title': 'Integration Guide',
+    'view.copilot.desc': 'Product intro & tracking onboarding Q&A; doc RAG by default, pluggable LLM / GIDO proxy',
+    'copilot.welcome': 'Ask about tracking flow, App Keys, quarantine, spaces, registry…',
+    'copilot.you': 'You',
+    'copilot.bot': 'Guide',
+    'copilot.sources': 'Sources',
+    'copilot.provider': 'Provider',
+    'copilot.clear': 'Clear',
+    'copilot.send': 'Send',
+    'copilot.inputPh': 'Ask about product features, onboarding, registry…',
+    'top.platform': 'Platform',
+    'top.more': 'More',
+    'top.space': 'Space',
+    'top.logout': 'Logout',
+    'conn.connecting': 'Connecting…',
+    'conn.live': 'Live',
+    'conn.off': 'Offline',
+    'settings.assistantTitle': 'Integration Guide (LLM)',
+    'settings.assistantEnable': 'Enable guide',
+    'nav.settings': 'Settings',
+    'view.settings.title': 'System Settings',
+    'view.settings.desc': 'Guide LLM & data sinks; applies immediately without restart',
+    'settings.sinkHint': '<b>Why multiple?</b> Kafka = realtime BI; S3 = lake archive/replay; file = local debug. You can pick Kafka only.',
+    'settings.apiKeyPh': 'Leave blank to keep current',
+    'settings.readonly': 'Edit gateway.yaml in yaml mode',
+    'settings.sinkRequired': 'Select at least one sink',
+    'settings.saved': 'Saved. Active sinks: {sinks}',
+  },
+};
+
+let locale = localStorage.getItem('giso-locale') || 'zh';
+
+export function getLocale() { return locale; }
+
+export function setLocale(next) {
+  locale = next === 'en' ? 'en' : 'zh';
+  localStorage.setItem('giso-locale', locale);
+  document.documentElement.lang = locale === 'en' ? 'en' : 'zh-CN';
+}
+
+export function t(key, vars = {}) {
+  let s = STR[locale]?.[key] ?? STR.zh[key] ?? key;
+  Object.entries(vars).forEach(([k, v]) => { s = s.replace(`{${k}}`, v); });
+  return s;
+}
+
+export function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    const k = el.dataset.i18n;
+    if (k) el.textContent = t(k);
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach((el) => {
+    const k = el.dataset.i18nHtml;
+    if (k) el.innerHTML = t(k);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    const k = el.dataset.i18nPlaceholder;
+    if (k) el.placeholder = t(k);
+  });
+}
+
+export function applyNavI18n() { applyI18n(); }

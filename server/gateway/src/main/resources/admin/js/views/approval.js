@@ -1,14 +1,14 @@
 /* 待审批收件箱（管理员批准 / 驳回） */
 import { $, esc, toast } from '../util.js';
 import { api } from '../api.js';
-import { isAdmin, getMe } from '../session.js';
+import { canApprove, getMe } from '../session.js';
 
 const KIND_LABEL = { params: '参数', pages: '页面', elements: '元素', events: '业务事件' };
 const ID_FIELD = { params: 'key', pages: 'pgid', elements: 'eid', events: 'code' };
 
 export async function renderApproval() {
   const box = $('#approval-list');
-  if (!isAdmin()) {
+  if (!canApprove()) {
     box.innerHTML = '<p class="muted">仅管理员可审批。编辑员提交的条目会出现在此。</p>';
     return;
   }

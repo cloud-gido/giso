@@ -88,9 +88,15 @@ public final class PostgresAdminUserStore implements AdminUserStore {
             if (!exists) return "新账号必须指定 role";
             role = fetchRole(username);
         }
-        if (!java.util.Set.of(AdminUser.ROLE_ADMIN, AdminUser.ROLE_EDITOR, AdminUser.ROLE_VIEWER)
+        if (!java.util.Set.of(
+                AdminUser.ROLE_SYSTEM_ADMIN, AdminUser.ROLE_USER,
+                AdminUser.ROLE_ADMIN, AdminUser.ROLE_EDITOR, AdminUser.ROLE_VIEWER)
                 .contains(role)) {
-            return "role 非法（admin/editor/viewer）";
+            return "role 非法（system_admin/user）";
+        }
+        if (AdminUser.ROLE_ADMIN.equals(role)) role = AdminUser.ROLE_SYSTEM_ADMIN;
+        if (AdminUser.ROLE_EDITOR.equals(role) || AdminUser.ROLE_VIEWER.equals(role)) {
+            role = AdminUser.ROLE_USER;
         }
         String disp = displayName == null || displayName.isBlank() ? username : displayName;
         if (!exists && (password == null || password.length() < 6)) {
@@ -159,7 +165,7 @@ public final class PostgresAdminUserStore implements AdminUserStore {
             seeds = List.of(new AdminUser(
                     AdminUser.DEFAULT_ADMIN_USER,
                     AdminUser.DEFAULT_ADMIN_PASSWORD,
-                    AdminUser.ROLE_ADMIN));
+                    AdminUser.ROLE_SYSTEM_ADMIN));
             System.out.println("[giso] admin_users empty: bootstrapped default "
                     + AdminUser.DEFAULT_ADMIN_USER + " (change password in 账号管理 after login)");
         }
@@ -174,9 +180,14 @@ public final class PostgresAdminUserStore implements AdminUserStore {
                 """.formatted(dbSchema);
         try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(upsert)) {
             for (AdminUser u : seeds) {
+                String role = u.role();
+                if (AdminUser.ROLE_ADMIN.equals(role)) role = AdminUser.ROLE_SYSTEM_ADMIN;
+                if (AdminUser.ROLE_EDITOR.equals(role) || AdminUser.ROLE_VIEWER.equals(role)) {
+                    role = AdminUser.ROLE_USER;
+                }
                 ps.setString(1, u.username());
                 ps.setString(2, BCrypt.hashpw(u.password(), BCrypt.gensalt(12)));
-                ps.setString(3, u.role());
+                ps.setString(3, role);
                 ps.setString(4, u.username());
                 ps.executeUpdate();
             }

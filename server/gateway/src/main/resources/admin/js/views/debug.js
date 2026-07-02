@@ -1,6 +1,7 @@
 /* 实时联调：SSE 事件流 + 过滤 + 状态计数 */
 import { $, fmtTime, esc, toast } from '../util.js';
 import { api, connectSSE } from '../api.js';
+import { t } from '../i18n.js';
 
 const counts = { ok: 0, missing: 0, error: 0 };
 const MAX_ROWS = 300;
@@ -107,6 +108,7 @@ export async function initDebug() {
     (up) => {
       const conn = $('#conn');
       conn.classList.toggle('off', !up);
-      conn.innerHTML = `<span class="conn-dot"></span>${up ? '实时连接' : '已断开 · 重连中'}`;
+      const label = conn.querySelector('.conn-label');
+      if (label) label.textContent = up ? t('conn.live') : t('conn.off');
     });
 }

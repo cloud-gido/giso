@@ -42,7 +42,7 @@
 | **分流** | `env=test` → 测试 Topic；`env=prod` → 生产 Topic |
 | **入口** | 公网仅 `/v1/track`、`/v1/config`；管理台内网 |
 
-外部 App 对接常见问题见 [**08-接入常见问题FAQ**](docs/tracking/08-接入常见问题FAQ.md)。
+外部 App 对接常见问题见 [**08-接入常见问题FAQ**](docs/tracking/08-接入常见问题FAQ.md)。English: [**docs/en/**](docs/en/README.md).
 
 ## 快速开始
 

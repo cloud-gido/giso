@@ -17,8 +17,9 @@ public final class SinkFactory {
             switch (type) {
                 case "file" -> sinks.add(new FileSink(Path.of(config.fileDir)));
                 case "kafka" -> sinks.add(new KafkaSink(config));
+                case "s3" -> sinks.add(new S3Sink(config));
                 default -> throw new IllegalArgumentException("未知 sink 类型: " + type
-                        + "（支持 file / kafka；新出口实现 EventSink 后在此注册）");
+                        + "（支持 file / kafka / s3；新出口实现 EventSink 后在此注册）");
             }
         }
         if (sinks.isEmpty()) throw new IllegalArgumentException("至少配置一个 sink");

@@ -1,5 +1,6 @@
 package com.giso.gateway.registry;
 
+import com.giso.gateway.space.SpaceService;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
@@ -31,25 +32,32 @@ public final class YamlRegistryStore implements RegistryStore {
             List<Map<String, Object>> items = (List<Map<String, Object>>) doc.get(e.getValue()[1]);
             RegistryKinds.putItems(kind, items, tables);
         }
-        return new RegistrySnapshot(tables, 0);
+        return RegistrySnapshot.singleSpace(tables, 0);
     }
 
     @Override
-    public WriteResult upsert(String kind, Map<String, Object> item, String operator) throws IOException {
+    public WriteResult upsert(String spaceKey, String kind, Map<String, Object> item, String operator)
+            throws IOException {
+        if (!SpaceService.DEFAULT_SPACE.equals(spaceKey)) {
+            return WriteResult.fail("yaml 模式仅支持 default 空间");
+        }
         RegistrySnapshot snap = load();
         String key = String.valueOf(item.get(RegistryKinds.idField(kind)));
-        snap.tables().get(kind).put(key, item);
-        persist(kind, snap.tables().get(kind));
+        snap.tablesFor(spaceKey).get(kind).put(key, item);
+        persist(kind, snap.tablesFor(spaceKey).get(kind));
         return WriteResult.ok(0);
     }
 
     @Override
-    public WriteResult delete(String kind, String key, String operator) throws IOException {
+    public WriteResult delete(String spaceKey, String kind, String key, String operator) throws IOException {
+        if (!SpaceService.DEFAULT_SPACE.equals(spaceKey)) {
+            return WriteResult.fail("yaml 模式仅支持 default 空间");
+        }
         RegistrySnapshot snap = load();
-        if (snap.tables().get(kind).remove(key) == null) {
+        if (snap.tablesFor(spaceKey).get(kind).remove(key) == null) {
             return WriteResult.fail("不存在: " + key);
         }
-        persist(kind, snap.tables().get(kind));
+        persist(kind, snap.tablesFor(spaceKey).get(kind));
         return WriteResult.ok(0);
     }
 

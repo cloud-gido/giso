@@ -4,27 +4,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.giso.gateway.auth.AdminAuth;
 import com.giso.gateway.registry.PostgresRegistryStore;
 import com.giso.gateway.registry.RegistryWatcher;
+import com.giso.gateway.settings.PostgresSystemSettingsStore;
+import com.giso.gateway.settings.SystemSettingsService;
+import com.giso.gateway.settings.SystemSettingsStore;
 import com.giso.gateway.sink.EventSink;
-import com.giso.gateway.sink.SinkFactory;
+import com.giso.gateway.sink.SinkRegistry;
+import com.giso.gateway.space.SpaceService;
 import com.sun.net.httpserver.HttpServer;
 
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
 /**
  * 埋点接入网关 + 管理控制台。
- *
- * 端点：
- *   POST /v1/track            事件上报（批量 JSON，支持 gzip）
- *   GET  /v1/config           SDK 远程配置下发（曝光口径、攒批参数）
- *   GET  /admin/              管理页面（注册表配置 / 实时联调 / 质量统计）
- *   GET  /admin/api/...       管理 REST API
- *
- * 启动：java -jar giso-gateway.jar [--config gateway.yaml] [--port 8080] [--schema ../../schema]
- * 出口管道由 gateway.yaml 的 sinks 配置（file / kafka，可多路双写），见 sink/ 包。
  */
 public final class Main {
     public static void main(String[] args) throws Exception {
@@ -45,19 +39,25 @@ public final class Main {
 
         Registry registry = Registry.create(config);
         PostgresRegistryStore pgStore = registry.store() instanceof PostgresRegistryStore pg ? pg : null;
-        AdminAuth adminAuth = new AdminAuth(config, pgStore);
+        SpaceService spaces = pgStore != null ? SpaceService.create(pgStore.dataSource(), config) : null;
+        AdminAuth adminAuth = new AdminAuth(config, pgStore, spaces);
         RegistryWatcher registryWatcher = new RegistryWatcher(
                 registry, registry.store(), config.registryPollIntervalSec);
         registryWatcher.start();
-        List<EventSink> sinks = SinkFactory.create(config);
-        EventStore store = new EventStore(sinks, config.adminRecentBuffer);
+
+        SinkRegistry sinkRegistry = new SinkRegistry();
+        SystemSettingsStore settingsStore = pgStore != null
+                ? new PostgresSystemSettingsStore(pgStore.dataSource(), config.dbSchema) : null;
+        SystemSettingsService systemSettings = SystemSettingsService.create(config, settingsStore, sinkRegistry);
+
+        EventStore store = new EventStore(sinkRegistry, config.adminRecentBuffer);
         SseHub sse = new SseHub();
 
         String sdkConfigJson = new ObjectMapper().writeValueAsString(config.sdkConfig);
 
         HttpServer server = HttpServer.create(new InetSocketAddress(config.port), 0);
         server.setExecutor(Executors.newFixedThreadPool(8));
-        server.createContext("/v1/track", new TrackHandler(registry, store, sse, config));
+        server.createContext("/v1/track", new TrackHandler(registry, store, sse, config, spaces));
         server.createContext("/v1/config", ex -> {
             if (!Http.handlePreflight(ex)) Http.json(ex, 200, sdkConfigJson);
         });
@@ -66,16 +66,26 @@ public final class Main {
                 Http.empty(ex, 405);
                 return;
             }
-            String body = new ObjectMapper().writeValueAsString(Map.of(
-                    "status", "ok",
-                    "registry", Map.of(
-                            "backend", registry.backendName(),
-                            "revision", registry.globalRevision(),
-                            "entries", registry.entryCount()),
-                    "auth", Map.of(
-                            "enabled", adminAuth.authEnabled(),
-                            "backend", pgStore != null ? "postgres" : "config")));
-            Http.json(ex, 200, body);
+            var health = new java.util.LinkedHashMap<String, Object>();
+            health.put("status", "ok");
+            health.put("registry", Map.of(
+                    "backend", registry.backendName(),
+                    "revision", registry.globalRevision(),
+                    "entries", registry.entryCount()));
+            health.put("auth", Map.of(
+                    "enabled", adminAuth.authEnabled(),
+                    "backend", pgStore != null ? "postgres" : "config"));
+            health.put("sinks", sinkRegistry.activeNames());
+            if (pgStore != null) {
+                try {
+                    health.put("db_migrations", new DbMigrator(
+                            pgStore.dataSource(), config.dbSchema, PostgresRegistryStore.class)
+                            .appliedVersions());
+                } catch (Exception e) {
+                    health.put("db_migrations_error", e.getMessage());
+                }
+            }
+            Http.json(ex, 200, new ObjectMapper().writeValueAsString(health));
         });
         server.createContext("/ready", ex -> {
             if (!ex.getRequestMethod().equals("GET")) {
@@ -99,17 +109,17 @@ public final class Main {
             ex.getResponseBody().write(body);
             ex.close();
         });
-        server.createContext("/admin/api", new AdminHandler(registry, store, sse, adminAuth, config));
+        server.createContext("/admin/api",
+                new AdminHandler(registry, store, sse, adminAuth, config, spaces, systemSettings));
         server.createContext("/admin", new StaticHandler(adminAuth));
         server.createContext("/", new HubHandler());
         server.start();
 
-        // 优雅停机：停收新请求 → 最多等 3s 在途请求处理完 → flush 并关闭 sink
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("shutting down: draining in-flight requests...");
             registryWatcher.close();
             server.stop(3);
-            sinks.forEach(EventSink::close);
+            sinkRegistry.close();
             System.out.println("shutdown complete");
         }, "graceful-shutdown"));
 
@@ -119,7 +129,7 @@ public final class Main {
         System.out.println("  registry      : " + registry.backendName()
                 + " (revision=" + registry.globalRevision()
                 + ", entries=" + registry.entryCount() + ")");
-        for (EventSink sink : sinks) {
+        for (EventSink sink : sinkRegistry.current()) {
             System.out.println("  sink          : " + sink.name());
         }
     }

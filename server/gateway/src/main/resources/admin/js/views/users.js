@@ -3,7 +3,7 @@ import { $, esc, toast } from '../util.js';
 import { api } from '../api.js';
 import { isAdmin } from '../session.js';
 
-const ROLE_LABEL = { admin: '管理员', editor: '编辑员', viewer: '只读' };
+const ROLE_LABEL = { system_admin: '平台管理员', user: '平台用户', admin: '管理员' };
 
 export async function renderUsers() {
   const wrap = $('#users-table');

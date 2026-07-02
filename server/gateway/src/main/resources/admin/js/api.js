@@ -1,6 +1,16 @@
-/* 管理 API 封装（Cookie 会话，登录页 POST /admin/api/login） */
+/* 管理 API 封装（Cookie 会话 + 空间头 X-GISO-Space） */
+const SPACE_KEY = 'giso_space';
+let currentSpace = localStorage.getItem(SPACE_KEY) || 'default';
+
+export function getSpace() { return currentSpace; }
+
+export function setSpace(spaceKey) {
+  currentSpace = spaceKey || 'default';
+  localStorage.setItem(SPACE_KEY, currentSpace);
+}
+
 export async function api(p, opt = {}) {
-  const headers = { ...(opt.headers || {}) };
+  const headers = { 'X-GISO-Space': currentSpace, ...(opt.headers || {}) };
   if (opt.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
   const r = await fetch('/admin/api' + p, { credentials: 'same-origin', ...opt, headers });
   if (r.status === 401) {
@@ -12,7 +22,7 @@ export async function api(p, opt = {}) {
 }
 
 export function connectSSE(onEvent, onState) {
-  const es = new EventSource('/admin/api/stream');
+  const es = new EventSource('/admin/api/stream?space=' + encodeURIComponent(currentSpace));
   es.onopen = () => onState(true);
   es.onerror = () => onState(false);
   es.onmessage = (e) => onEvent(JSON.parse(e.data));

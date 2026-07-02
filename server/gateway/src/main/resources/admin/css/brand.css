@@ -21,15 +21,15 @@
 }
 .sidebar { position: sticky; }
 
-.brand { position: relative; padding-bottom: 18px; margin-bottom: 4px; }
-.brand::after {
+.brand-compact { position: relative; }
+.brand-compact::after {
   content: "";
   position: absolute; left: 8px; right: 8px; bottom: 0; height: 1px;
   background: linear-gradient(90deg, transparent, var(--border), transparent);
 }
 
-.brand-mark {
-  width: 38px; height: 38px; border-radius: 12px;
+.brand-compact .brand-mark {
+  width: 34px; height: 34px; border-radius: 10px;
   background: var(--gradient-brand);
   box-shadow: var(--glow-brand);
 }

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS ods_events (
     session_id   VARCHAR(64),
     channel      VARCHAR(64),
     env          VARCHAR(16)  DEFAULT 'prod' COMMENT 'prod/test，与 ClickHouse 一致',
+    space_key    VARCHAR(32)  DEFAULT 'default' COMMENT '业务空间（common.space）',
 
     -- 页面上下文
     pgid         VARCHAR(64),
@@ -69,6 +70,7 @@ CREATE TABLE IF NOT EXISTS ods_events_quarantine (
     app_id       VARCHAR(32),
     platform     VARCHAR(16),
     did          VARCHAR(64),
+    space_key    VARCHAR(32)  DEFAULT 'default',
     issues       JSON         COMMENT '校验失败明细',
     raw          JSON         COMMENT '完整原始信封'
 )

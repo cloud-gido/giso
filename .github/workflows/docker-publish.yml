@@ -6,7 +6,13 @@ name: docker-publish
 on:
   push:
     branches: [main, master]
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      image_version:
+        description: 'Extra immutable tag for giso-gateway (e.g. 0.1); retags latest after build'
+        required: false
+        type: string
 
 concurrency:
   group: docker-publish-${{ github.ref }}
@@ -38,7 +44,7 @@ jobs:
   docker-images:
     name: Build and push images to GHCR
     needs: schema-ci
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -57,6 +63,19 @@ jobs:
           username: ${{ env.REGISTRY_USER }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Pin rollback baseline image (0.1)
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway"
+          if docker buildx imagetools inspect "$IMAGE:0.1" >/dev/null 2>&1; then
+            echo "Baseline $IMAGE:0.1 already exists — skip"
+          elif docker buildx imagetools inspect "$IMAGE:latest" >/dev/null 2>&1; then
+            docker buildx imagetools create -t "$IMAGE:0.1" "$IMAGE:latest"
+            echo "Tagged $IMAGE:0.1 from latest (deployment rollback baseline)"
+          else
+            echo "No latest image yet — skip baseline tag"
+          fi
+
       - name: Extract metadata (gateway)
         id: meta_gateway
         uses: docker/metadata-action@v5
@@ -64,7 +83,9 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository }}/giso-gateway
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-            type=sha,prefix=main-
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=sha,prefix=main-,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+            type=raw,value=${{ inputs.image_version }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.image_version != '' }}
 
       - name: Build and push giso-gateway
         uses: docker/build-push-action@v5

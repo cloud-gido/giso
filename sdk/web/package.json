@@ -7,6 +7,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://npm.example.com/"
+  },
   "devDependencies": {
     "typescript": "^5.6.0"
   }

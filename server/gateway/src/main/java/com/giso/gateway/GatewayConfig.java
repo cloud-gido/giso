@@ -49,6 +49,16 @@ public final class GatewayConfig {
     /** kafka 不可用时本地兜底目录（spill 文件，恢复后可回放） */
     public String kafkaSpillDir = "./data/spill";
 
+    // s3 sink（湖仓 Bronze 归档，对齐 GIDO deployment S3 warehouse）
+    public String s3Bucket = "";
+    public String s3Prefix = "giso/";
+    public String s3Region = "ap-southeast-1";
+    public String s3Endpoint = "";
+    public String s3BufferDir = "./data/s3-buffer";
+    public long s3FlushBytes = 5 * 1024 * 1024;
+    public String s3AccessKey = "";
+    public String s3SecretKey = "";
+
     /** 管理页环形缓冲条数 */
     public int adminRecentBuffer = 2000;
 
@@ -76,15 +86,45 @@ public final class GatewayConfig {
     public int rateLimitBurst = 0;
 
     /** SDK 远程配置（GET /v1/config 下发，客户端覆盖本地默认口径） */
-    public Map<String, Object> sdkConfig = Map.of(
-            "exposure_ratio", 0.5,
-            "exposure_duration_ms", 500,
-            "exposure_max_per_page", 3,
-            "batch_size", 20,
-            "flush_interval_ms", 15000);
+    public Map<String, Object> sdkConfig = defaultSdkConfig();
+
+    static Map<String, Object> defaultSdkConfig() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("exposure_ratio", 0.5);
+        m.put("exposure_duration_ms", 500);
+        m.put("exposure_max_per_page", 3);
+        m.put("batch_size", 20);
+        m.put("flush_interval_ms", 15000);
+        m.put("event_sample_rates", new LinkedHashMap<String, Object>());
+        m.put("events_disabled", List.<String>of());
+        return m;
+    }
 
     /** ClickHouse HTTP 地址（管理台覆盖率反算）；空 = 仅用进程内累计 */
     public String clickhouseUrl = "";
+
+    // ── Copilot（产品 / 埋点流程答疑，插拔式 provider）──
+    public boolean assistantEnabled = true;
+    /** doc（本地 FAQ 检索，默认）| openai | gido_proxy */
+    public String assistantProvider = "doc";
+    public List<String> assistantDocsDirs = List.of("../../docs/tracking", "../../docs/en");
+    /** classpath 兜底语料目录（相对 resources） */
+    public String assistantCorpusClasspath = "copilot/corpus";
+    public int assistantMaxChunks = 5;
+    public String assistantSystemPrompt = defaultAssistantPrompt();
+    public String openAiBaseUrl = "https://ws-df7ipa997hhtkd8h.cn-beijing.maas.aliyuncs.com/compatible-mode/v1";
+    public String openAiApiKey = "";
+    public String openAiModel = "qwen-plus";
+    /** GIDO 平台 Copilot 代理 URL（deployment 侧服务） */
+    public String gidoProxyUrl = "";
+
+    static String defaultAssistantPrompt() {
+        return """
+                你是 GISO 玑源 Copilot，GIDO 数据产品族中的埋点治理助手。
+                职责：解答产品功能、埋点登记、上报协议、App Key、空间隔离、隔离区、Doris 链路等。
+                回答须基于提供的文档片段与登记概况；不确定时明确说明并指向 docs/tracking/08-接入常见问题FAQ.md。
+                使用简洁中文，步骤用有序列表。""";
+    }
 
     @SuppressWarnings("unchecked")
     public static GatewayConfig load(Path file) throws IOException {
@@ -111,6 +151,14 @@ public final class GatewayConfig {
         if (kafka.get("properties") instanceof Map<?, ?> p) {
             c.kafkaProperties = new HashMap<>((Map<String, Object>) p);
         }
+
+        Map<String, Object> s3 = (Map<String, Object>) doc.getOrDefault("s3", Map.of());
+        c.s3Bucket = (String) s3.getOrDefault("bucket", c.s3Bucket);
+        c.s3Prefix = (String) s3.getOrDefault("prefix", c.s3Prefix);
+        c.s3Region = (String) s3.getOrDefault("region", c.s3Region);
+        c.s3Endpoint = (String) s3.getOrDefault("endpoint", c.s3Endpoint);
+        c.s3BufferDir = (String) s3.getOrDefault("buffer_dir", c.s3BufferDir);
+        if (s3.get("flush_bytes") instanceof Number n) c.s3FlushBytes = n.longValue();
 
         Map<String, Object> admin = (Map<String, Object>) doc.getOrDefault("admin", Map.of());
         c.adminRecentBuffer = (int) admin.getOrDefault("recent_buffer", c.adminRecentBuffer);
@@ -143,10 +191,26 @@ public final class GatewayConfig {
         c.rateLimitBurst = (int) limits.getOrDefault("rate_limit_burst",
                 c.rateLimitRps > 0 ? c.rateLimitRps * 2 : 0);
 
-        if (doc.get("sdk_config") instanceof Map<?, ?> s) c.sdkConfig = (Map<String, Object>) s;
+        if (doc.get("sdk_config") instanceof Map<?, ?> s) {
+            Map<String, Object> merged = new LinkedHashMap<>(defaultSdkConfig());
+            merged.putAll((Map<String, Object>) s);
+            c.sdkConfig = merged;
+        }
 
         Map<String, Object> ch = (Map<String, Object>) doc.getOrDefault("clickhouse", Map.of());
         c.clickhouseUrl = (String) ch.getOrDefault("url", c.clickhouseUrl);
+
+        Map<String, Object> asst = (Map<String, Object>) doc.getOrDefault("assistant", Map.of());
+        if (asst.get("enabled") instanceof Boolean b) c.assistantEnabled = b;
+        c.assistantProvider = (String) asst.getOrDefault("provider", c.assistantProvider);
+        if (asst.get("docs_dirs") instanceof List<?> dirs) c.assistantDocsDirs = (List<String>) dirs;
+        c.assistantCorpusClasspath = (String) asst.getOrDefault("corpus_classpath", c.assistantCorpusClasspath);
+        if (asst.get("max_chunks") instanceof Number n) c.assistantMaxChunks = n.intValue();
+        c.assistantSystemPrompt = (String) asst.getOrDefault("system_prompt", c.assistantSystemPrompt);
+        Map<String, Object> oai = (Map<String, Object>) asst.getOrDefault("openai", Map.of());
+        c.openAiBaseUrl = (String) oai.getOrDefault("base_url", c.openAiBaseUrl);
+        c.openAiModel = (String) oai.getOrDefault("model", c.openAiModel);
+        c.gidoProxyUrl = (String) asst.getOrDefault("gido_proxy_url", c.gidoProxyUrl);
 
         Map<String, Object> reg = (Map<String, Object>) doc.getOrDefault("registry", Map.of());
         c.registryBackend = (String) reg.getOrDefault("backend", c.registryBackend);
@@ -202,6 +266,21 @@ public final class GatewayConfig {
         envLong("GISO_MAX_BODY_BYTES").ifPresent(v -> c.maxBodyBytes = v);
         env("GISO_CLICKHOUSE_URL").ifPresent(v -> c.clickhouseUrl = v);
         envCsv("GISO_SINKS").ifPresent(v -> c.sinks = v);
+        envBool("GISO_ASSISTANT_ENABLED").ifPresent(v -> c.assistantEnabled = v);
+        env("GISO_ASSISTANT_PROVIDER").ifPresent(v -> c.assistantProvider = v);
+        envCsv("GISO_ASSISTANT_DOCS_DIRS").ifPresent(v -> c.assistantDocsDirs = v);
+        env("GISO_LLM_API_KEY").ifPresent(v -> c.openAiApiKey = v);
+        env("GISO_LLM_BASE_URL").ifPresent(v -> c.openAiBaseUrl = v);
+        env("GISO_LLM_MODEL").ifPresent(v -> c.openAiModel = v);
+        env("GISO_GIDO_COPILOT_URL").ifPresent(v -> c.gidoProxyUrl = v);
+        env("GISO_S3_BUCKET").ifPresent(v -> c.s3Bucket = v);
+        env("GISO_S3_PREFIX").ifPresent(v -> c.s3Prefix = v);
+        env("GISO_S3_REGION").ifPresent(v -> c.s3Region = v);
+        env("GISO_S3_ENDPOINT").ifPresent(v -> c.s3Endpoint = v);
+        env("GISO_S3_BUFFER_DIR").ifPresent(v -> c.s3BufferDir = v);
+        envLong("GISO_S3_FLUSH_BYTES").ifPresent(v -> c.s3FlushBytes = v);
+        env("GISO_AWS_ACCESS_KEY_ID").ifPresent(v -> c.s3AccessKey = v);
+        env("GISO_AWS_SECRET_ACCESS_KEY").ifPresent(v -> c.s3SecretKey = v);
         env("GISO_REGISTRY_BACKEND").ifPresent(v -> c.registryBackend = v);
         env("GISO_DB_URL").ifPresent(v -> c.dbUrl = v);
         env("GISO_DB_HOST").ifPresent(v -> c.dbHost = v);
@@ -250,6 +329,10 @@ public final class GatewayConfig {
 
     private static java.util.Optional<Long> envLong(String key) {
         return env(key).map(Long::parseLong);
+    }
+
+    private static java.util.Optional<Boolean> envBool(String key) {
+        return env(key).map(v -> v.equals("1") || v.equalsIgnoreCase("true") || v.equalsIgnoreCase("yes"));
     }
 
     private static java.util.Optional<List<String>> envCsv(String key) {

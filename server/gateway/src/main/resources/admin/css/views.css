@@ -101,3 +101,35 @@ td .muted { color: var(--faint); }
 .stats-grid .card { margin-bottom: 0; }
 .stats-grid .span-2 { grid-column: 1 / -1; }
 @media (max-width: 900px) { .stats-grid { grid-template-columns: 1fr; } }
+
+/* ═ 可视化圈选 v2 ═ */
+.vp-toolbar { flex-wrap: wrap; gap: 8px; }
+.vp-stage { position: relative; max-width: 100%; margin: 12px 0; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: #111; min-height: 120px; }
+#vp-canvas { display: block; max-width: 100%; cursor: crosshair; }
+.vp-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.vp-row { display: flex; gap: 8px; align-items: center; }
+.vp-row input { flex: 1; min-width: 0; }
+#vp-viewtree { width: 100%; margin-top: 8px; font-family: var(--mono); font-size: 12px; }
+
+/* ═ Copilot ═ */
+.copilot-card { display: flex; flex-direction: column; min-height: 480px; }
+.copilot-messages { flex: 1; overflow-y: auto; max-height: 420px; padding: 12px 0; display: flex; flex-direction: column; gap: 12px; }
+.copilot-msg { padding: 10px 14px; border-radius: var(--r-md); max-width: 92%; }
+.copilot-msg.user { align-self: flex-end; background: var(--accent-soft); border: 1px solid var(--accent-border); }
+.copilot-msg.assistant { align-self: flex-start; background: var(--panel2); border: 1px solid var(--border); }
+.copilot-role { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.copilot-body { font-size: 13px; line-height: 1.55; white-space: normal; }
+.copilot-form { display: flex; gap: 8px; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.copilot-form input { flex: 1; }
+.copilot-prompts, .copilot-followups { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.copilot-chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); cursor: pointer; }
+.copilot-chip:hover { border-color: var(--accent); color: var(--accent); }
+.copilot-sources { margin-top: 8px; font-size: 12px; }
+.copilot-welcome { padding: 24px; text-align: center; }
+
+/* ═ 系统设置 ═ */
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.settings-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.settings-sink-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.settings-sink-row:last-child { border-bottom: none; }
+.settings-sink-row p { margin: 4px 0 0; font-size: 12px; }

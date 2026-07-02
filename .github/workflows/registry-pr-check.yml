@@ -1,0 +1,22 @@
+name: registry-pr-check
+
+on:
+  pull_request:
+    paths:
+      - 'db/**'
+      - 'schema/**'
+      - 'tools/registry/**'
+
+jobs:
+  export-diff:
+    if: ${{ vars.GISO_DB_URL != '' || vars.GISO_DB_HOST != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r tools/registry/requirements.txt
+      - run: ./tools/registry/pr_check.sh
+        env:
+          GISO_DB_URL: ${{ secrets.GISO_DB_URL }}

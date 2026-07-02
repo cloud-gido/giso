@@ -1,24 +1,24 @@
 /* 注册表配置：参数池/页面池/元素池/业务事件 CRUD + 表头列拖拽排序 */
 import { $, $$, esc, toast } from '../util.js';
 import { api } from '../api.js';
-import { getMe, isAdmin, isEditor, canEditRegistry } from '../session.js';
+import { getMe, isAdmin, isSpaceAdmin, isEditor, canEditRegistry } from '../session.js';
 
 let registry = { params: [], pages: [], elements: [], events: [] };
 let curKind = 'params';
 
 const KIND_META = {
   params: { id: 'key', name: '参数',
-    cols: ['key', 'type', 'desc', 'rule', 'owner', 'since', 'status'],
-    labels: { key: '参数 key', type: '类型', desc: '说明', rule: '取值规则', owner: '负责人', since: '起始版本', status: '状态' } },
+    cols: ['key', 'type', 'desc', 'rule', 'owner', 'since', 'issue_link', 'status'],
+    labels: { key: '参数 key', type: '类型', desc: '说明', rule: '取值规则', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
   pages: { id: 'pgid', name: '页面',
-    cols: ['pgid', 'screenshot', 'desc', 'domain', 'params', 'elements', 'owner', 'status'],
-    labels: { pgid: '页面 pgid', screenshot: '页面截图', desc: '页面说明', domain: '业务域', params: '页面参数', elements: '绑定元素（结构体）', owner: '负责人', status: '状态' } },
+    cols: ['pgid', 'screenshot', 'desc', 'domain', 'params', 'elements', 'owner', 'since', 'issue_link', 'status'],
+    labels: { pgid: '页面 pgid', screenshot: '页面截图', desc: '页面说明', domain: '业务域', params: '页面参数', elements: '绑定元素（结构体）', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
   elements: { id: 'eid', name: '元素',
-    cols: ['eid', 'desc', 'domain', 'params', 'children', 'owner', 'status'],
-    labels: { eid: '元素 eid', desc: '说明', domain: '业务域', params: '必携参数', children: '子元素', owner: '负责人', status: '状态' } },
+    cols: ['eid', 'desc', 'domain', 'params', 'children', 'owner', 'since', 'issue_link', 'status'],
+    labels: { eid: '元素 eid', desc: '说明', domain: '业务域', params: '必携参数', children: '子元素', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
   events: { id: 'code', name: '业务事件',
-    cols: ['code', 'desc', 'domain', 'source', 'params', 'owner', 'status'],
-    labels: { code: '事件 code', desc: '说明', domain: '业务域', source: '事实源', params: '事件参数', owner: '负责人', status: '状态' } },
+    cols: ['code', 'desc', 'domain', 'source', 'params', 'owner', 'since', 'issue_link', 'status'],
+    labels: { code: '事件 code', desc: '说明', domain: '业务域', source: '事实源', params: '事件参数', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
 };
 const LIST_COLS = ['params', 'children', 'elements'];
 const TEXTAREA_COLS = ['desc'];
@@ -103,12 +103,13 @@ function bindColDrag(table, meta) {
 
 function canModifyRow(it) {
   if (!canEditRegistry()) return false;
-  if (isAdmin()) return true;
+  if (isSpaceAdmin()) return true;
   const s = it.status || 'live';
   return s === 'pending' || s === 'draft' || !s;
 }
 
 export async function renderRegistry() {
+  $$('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.kind === curKind));
   const regMeta = await api('/registry/meta').catch(() => ({}));
   if (regMeta.revision != null) {
     $('#reg-meta').textContent = `revision ${regMeta.revision} · ${regMeta.entries ?? '—'} 条 · ${regMeta.backend || '—'}`;
@@ -299,5 +300,8 @@ export function initRegistry() {
   });
   $('#reg-search').addEventListener('input', renderRegistry);
   $('#btn-add').onclick = () => openEditor(null);
+  $('#btn-visual-picker')?.addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent('giso:navigate', { detail: { view: 'visual' } }));
+  });
   if (!canEditRegistry()) $('#btn-add')?.setAttribute('hidden', '');
 }

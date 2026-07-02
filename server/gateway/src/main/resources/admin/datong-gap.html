@@ -24,7 +24,8 @@
         <span class="product-tag">GISO · 埋点治理</span>
       </div>
       <h1>GISO 玑源 vs 腾讯大同 · 功能对齐度评审</h1>
-      <p class="sub">GISO = Gi Is the Source Of data · GIDO 的数据源头 · 2026-06-11</p>
+      <p class="sub">GISO = Gi Is the Source Of data · GIDO 的数据源头 · 2026-06-13 更新</p>
+      <p class="sub muted">2026-06 后已落地：Spaces 多租户、env test/prod 分流、审批流、版本化校验(since)、覆盖率 API。详见 <a href="/admin/">管理台</a> 与 docs/tracking/11-建设路线图.md</p>
     </div>
   </div>
 
@@ -118,28 +119,28 @@
 const CAPS = [
   { domain: "事件模型与登记", name: "事件收敛（标准事件模型）", align: "aligned", datong: "曝光/点击/页面/启动等少量标准事件承载全部行为", ours: "9 个标准事件 + 注册表强校验，非标准事件直接进隔离区" },
   { domain: "事件模型与登记", name: "参数继承（页面→模块→元素）", align: "aligned", datong: "结构体参数沿可视层级自动下发", ours: "三端 SDK 自动继承 + children 链登记，叶子元素免重复携带" },
-  { domain: "事件模型与登记", name: "页面结构体", align: "partial", datong: "可视化登记页面结构，结构即校验约束", ours: "pages.yaml elements 绑定 + 网关强校验；登记仍是文本式，无可视化圈选" },
+  { domain: "事件模型与登记", name: "页面结构体", align: "partial", datong: "可视化登记页面结构，结构即校验约束", ours: "pages.yaml elements 绑定 + Visual Picker v2 截图圈选 / ViewTree 导入" },
   { domain: "事件模型与登记", name: "登记平台与流程", align: "partial", datong: "TAPD 登记单自动关联需求，平台内审批流", ours: "YAML + Git PR + 管理台 CRUD + status 生命周期；缺需求单关联" },
   { domain: "事件模型与登记", name: "代码生成（端上常量）", align: "aligned", datong: "登记后生成端上代码，禁止裸字符串", ours: "CI 从注册表生成 TS/Java/Swift 常量，--check 挂 PR" },
-  { domain: "事件模型与登记", name: "版本化结构体", align: "missing", datong: "v1.0 / v2.0 结构体并存，按版本选校验规则", ours: "有 status 和版本维度统计，但校验规则全版本一套" },
+  { domain: "事件模型与登记", name: "版本化结构体", align: "partial", datong: "v1.0 / v2.0 结构体并存，按版本选校验规则", ours: "登记 since + SemVer 按 app_vrsn 选规则；无结构体多版本并存编辑" },
   { domain: "校验与联调", name: "实时联调", align: "aligned", datong: "开发/测试实时查看自己设备的上报与校验结果", ours: "SSE 实时流 + did/事件/状态过滤 + 校验明细展开" },
   { domain: "校验与联调", name: "入库前强校验", align: "aligned", datong: "错误结构进不了仓", ours: "ok / missing / error 三分类，error 进隔离 topic 可回放" },
   { domain: "校验与联调", name: "联调用例固化", align: "partial", datong: "UI 自动化遍历 + 自动校验上报", ours: "断言 API + 管理台 UI；触发仍靠人工，无 UI 自动化遍历" },
   { domain: "校验与联调", name: "客户端/服务端事实分流", align: "aligned", datong: "资金结算以服务端为准", ours: "source 登记 + 网关拦截端上冒充 + sdk/server 直写 Kafka" },
-  { domain: "校验与联调", name: "测试/生产环境分流", align: "missing", datong: "测试流量与生产数据物理隔离", ours: "单一管道；debug 模式只是不攒批，联调数据会混进生产表" },
+  { domain: "校验与联调", name: "测试/生产环境分流", align: "partial", datong: "测试流量与生产数据物理隔离", ours: "common.env 全链路落 Doris + 管理台/对账可按 env 过滤；未做物理库隔离" },
   { domain: "数据链路", name: "高可靠上报", align: "aligned", datong: "攒批、重试、本地持久化", ours: "三端攒批 + 指数退避 + 本地持久化；网关 acks=all + spill 自动回放" },
   { domain: "数据链路", name: "数据落地与分层", align: "aligned", datong: "实时入仓，分层建模", ours: "Kafka → Doris Routine Load → ODS → DWD → ADS 看板 SQL" },
-  { domain: "数据链路", name: "隔离区修复回放", align: "partial", datong: "错误数据修复后回灌", ours: "giso_events_quarantine 带 _issues 明细，缺一键重校验回灌工具" },
-  { domain: "数据链路", name: "采样与降级", align: "missing", datong: "按事件配置采样率，高峰降级", ours: "远程配置只覆盖曝光/攒批，无 per-event 采样率" },
+  { domain: "数据链路", name: "隔离区修复回放", align: "aligned", datong: "错误数据修复后回灌", ours: "giso_events_quarantine + replay_quarantine.py 抽样/批量 POST 回放" },
+  { domain: "数据链路", name: "采样与降级", align: "partial", datong: "按事件配置采样率，高峰降级", ours: "/v1/config event_sample_rates + events_disabled；网关按配置丢弃" },
   { domain: "质量监控", name: "质量报表", align: "aligned", datong: "校验明细报表", ours: "事件/参数/版本三维度 + Prometheus + 6 条告警规则" },
   { domain: "质量监控", name: "数据对账", align: "aligned", datong: "链路丢数监控", ours: "网关小时计数 vs Doris 落地行数对账脚本" },
-  { domain: "质量监控", name: "埋点覆盖率", align: "missing", datong: "登记了却没上报的埋点可发现", ours: "只校验「上报未登记」；「登记未上报」无报表" },
+  { domain: "质量监控", name: "埋点覆盖率", align: "partial", datong: "登记了却没上报的埋点可发现", ours: "GET /admin/api/coverage 登记未上报 + CH/Doris 按 space 持久化 seen 集合" },
   { domain: "分析应用", name: "行为分析看板", align: "partial", datong: "对接灯塔/DataTalk，全套分析产品", ours: "Metabase + 8 个预置看板 SQL，无自助拖拽分析" },
-  { domain: "分析应用", name: "指标字典 / 口径中心", align: "missing", datong: "指标定义与埋点登记关联，口径唯一", ours: "口径散落在 SQL 注释和文档里" },
+  { domain: "分析应用", name: "指标字典 / 口径中心", align: "partial", datong: "指标定义与埋点登记关联，口径唯一", ours: "schema/metrics.yaml 指标 code + ADS SQL 引用；无 UI 口径中心" },
   { domain: "分析应用", name: "实验归因", align: "partial", datong: "与 AB 平台打通", ours: "pt 透传包可带实验分桶直达 Doris，无实验平台集成" },
-  { domain: "平台治理", name: "权限管理", align: "partial", datong: "按角色/业务域授权", ours: "admin / viewer 两级；无业务域粒度授权" },
-  { domain: "平台治理", name: "多应用 / 多租户", align: "partial", datong: "多 app 共用平台，登记隔离", ours: "信封有 app_id，但注册表是单一命名空间" },
-  { domain: "平台治理", name: "注册表存储", align: "missing", datong: "平台 DB 存储，支撑多实例", ours: "YAML + 单实例网关；多实例写回会脑裂" },
+  { domain: "平台治理", name: "权限管理", align: "partial", datong: "按角色/业务域授权", ours: "system_admin + 空间 owner/editor/viewer；无细粒度业务域 RBAC" },
+  { domain: "平台治理", name: "多应用 / 多租户", align: "aligned", datong: "多 app 共用平台，登记隔离", ours: "Spaces + space_app_keys + 注册表/联调/SSE 按空间隔离" },
+  { domain: "平台治理", name: "注册表存储", align: "aligned", datong: "平台 DB 存储，支撑多实例", ours: "PostgreSQL registry_entries + RegistryWatcher 多实例只读热更新" },
 ];
 const TAG = { aligned: ["ok","已对齐"], partial: ["warn","部分对齐"], missing: ["bad","缺失"] };
 let filter = "all";

@@ -1,0 +1,167 @@
+openapi: 3.0.3
+info:
+  title: GISO Admin API
+  version: 1.1.0
+  description: 管理控制台 REST API（需 Cookie 会话或 Basic Auth）
+servers:
+  - url: /admin/api
+paths:
+  /me:
+    get:
+      summary: 当前用户与空间列表
+      parameters:
+        - $ref: '#/components/parameters/SpaceHeader'
+      responses:
+        '200': { description: OK }
+  /spaces:
+    get:
+      summary: 列出空间
+      responses:
+        '200': { description: OK }
+    post:
+      summary: 创建空间（system_admin）
+      responses:
+        '200': { description: OK }
+  /spaces/{spaceKey}/members:
+    get:
+      summary: 空间成员
+      parameters:
+        - name: spaceKey
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /registry:
+    get:
+      summary: 当前空间注册表全量
+      parameters:
+        - $ref: '#/components/parameters/SpaceHeader'
+      responses:
+        '200': { description: OK }
+  /registry/pending:
+    get:
+      summary: 待审批条目
+      parameters:
+        - $ref: '#/components/parameters/SpaceHeader'
+      responses:
+        '200': { description: OK }
+  /settings:
+    get:
+      summary: 系统设置（Copilot + 出口管道）
+      responses:
+        '200': { description: assistant, sinks, sink_catalog, writable }
+    put:
+      summary: 更新系统设置（system_admin，立即生效）
+      responses:
+        '200': { description: ok, active_sinks, assistant_provider }
+  /assistant/status:
+    get:
+      summary: Copilot provider status
+      responses:
+        '200': { description: provider, ready, topics }
+  /assistant/chat:
+    post:
+      summary: Copilot Q&A (product & tracking flow)
+      parameters:
+        - $ref: '#/components/parameters/SpaceHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string }
+                topic: { type: string, enum: [product, tracking_flow, registry, deploy, quarantine] }
+                history:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role: { type: string }
+                      content: { type: string }
+      responses:
+        '200': { description: answer, sources, suggested_followups }
+  /registry/visual-draft:
+    post:
+      summary: Visual picker — bulk create element drafts and bind page
+      description: Accepts pgid, screenshot URL, elements with bounds/selectors
+      parameters:
+        - $ref: '#/components/parameters/SpaceHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pgid, elements]
+              properties:
+                pgid: { type: string }
+                screenshot: { type: string, format: uri }
+                elements:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      eid: { type: string }
+                      desc: { type: string }
+                      bounds: { type: object }
+                      selectors: { type: array }
+      responses:
+        '200': { description: created_elements + errors }
+  /registry/{kind}:
+    post:
+      summary: 新增/更新登记
+      parameters:
+        - $ref: '#/components/parameters/SpaceHeader'
+        - name: kind
+          in: path
+          required: true
+          schema:
+            enum: [params, pages, elements, events]
+      responses:
+        '200': { description: OK }
+  /events:
+    get:
+      summary: 近期事件（联调缓冲）
+      parameters:
+        - $ref: '#/components/parameters/SpaceHeader'
+        - name: limit
+          in: query
+          schema: { type: integer, default: 200 }
+      responses:
+        '200': { description: OK }
+  /coverage:
+    get:
+      summary: 登记覆盖率
+      parameters:
+        - $ref: '#/components/parameters/SpaceHeader'
+        - name: env
+          in: query
+          schema: { type: string, default: prod }
+      responses:
+        '200': { description: OK }
+  /hourly:
+    get:
+      summary: 按空间小时接收量
+      parameters:
+        - $ref: '#/components/parameters/SpaceHeader'
+      responses:
+        '200': { description: OK }
+  /stream:
+    get:
+      summary: SSE 实时联调（query space=）
+      parameters:
+        - name: space
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: text/event-stream }
+components:
+  parameters:
+    SpaceHeader:
+      name: X-GISO-Space
+      in: header
+      schema: { type: string, default: default }

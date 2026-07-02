@@ -42,15 +42,16 @@ def dsn_from_env() -> str:
     return f"postgresql://{user}:{password}@{host}:{port}/{name}"
 
 
-def fetch_entries(conn) -> dict[str, list[dict]]:
+def fetch_entries(conn, space_key: str = "default") -> dict[str, list[dict]]:
     reg = {k: [] for k in FILES}
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT kind, body::text FROM giso.registry_entries
-            WHERE deleted_at IS NULL
+            WHERE space_key = %s AND deleted_at IS NULL
             ORDER BY kind, entry_key
-            """
+            """,
+            (space_key,),
         )
         for kind, body_text in cur.fetchall():
             reg[kind].append(json.loads(body_text))
@@ -70,6 +71,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dsn")
     parser.add_argument("--out", type=Path, default=SCHEMA)
+    parser.add_argument("--space", default="default", help="export this space_key")
     parser.add_argument("--check", action="store_true", help="compare export with repo schema/")
     args = parser.parse_args()
 
@@ -82,7 +84,7 @@ def main() -> int:
     dsn = args.dsn or dsn_from_env()
     conn = psycopg2.connect(dsn)
     try:
-        reg = fetch_entries(conn)
+        reg = fetch_entries(conn, args.space)
     finally:
         conn.close()
 

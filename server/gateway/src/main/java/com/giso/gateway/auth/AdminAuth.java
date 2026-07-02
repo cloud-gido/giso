@@ -2,6 +2,7 @@ package com.giso.gateway.auth;
 
 import com.giso.gateway.GatewayConfig;
 import com.giso.gateway.registry.PostgresRegistryStore;
+import com.giso.gateway.space.SpaceService;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -20,16 +21,18 @@ public final class AdminAuth {
     private static final String SESSION_COOKIE = "giso_admin_sess";
 
     private final AdminUserStore store;
+    private final SpaceService spaces;
 
-    public AdminAuth(GatewayConfig config, PostgresRegistryStore registryStore) throws Exception {
+    public AdminAuth(GatewayConfig config, PostgresRegistryStore registryStore, SpaceService spaces)
+            throws Exception {
         if ("postgres".equalsIgnoreCase(config.registryBackend) && registryStore != null) {
             this.store = PostgresAdminUserStore.create(registryStore.dataSource(), config);
         } else {
             this.store = new ConfigAdminUserStore(config);
         }
+        this.spaces = spaces;
     }
 
-    /** 未配置账号时视为 admin（仅本地 yaml 模式）。 */
     public String role(HttpExchange ex) {
         try {
             if (!store.authEnabled()) return AdminUser.ROLE_ADMIN;
@@ -62,7 +65,7 @@ public final class AdminAuth {
         }
     }
 
-    public Map<String, Object> me(HttpExchange ex) throws Exception {
+    public Map<String, Object> me(HttpExchange ex, String currentSpace) throws Exception {
         String role = role(ex);
         if (role == null && store.authEnabled()) return null;
         String username = operator(ex);
@@ -70,10 +73,21 @@ public final class AdminAuth {
         out.put("username", username);
         out.put("role", role == null ? AdminUser.ROLE_ADMIN : role);
         out.put("auth_enabled", store.authEnabled());
+        out.put("current_space", currentSpace);
+        if (spaces != null) {
+            out.put("spaces", spaces.spacesForUser(username, role == null ? AdminUser.ROLE_ADMIN : role));
+            String spaceRole = spaces.spaceRole(username, role, currentSpace);
+            out.put("space_role", spaceRole);
+        } else {
+            out.put("spaces", List.of(Map.of(
+                    "space_key", SpaceService.DEFAULT_SPACE,
+                    "display_name", "默认空间",
+                    "role", role == null ? AdminUser.ROLE_ADMIN : role)));
+            out.put("space_role", role == null ? AdminUser.ROLE_ADMIN : role);
+        }
         return out;
     }
 
-    /** 登录成功写入 HttpOnly Cookie（供 SSE 等同源请求携带）。 */
     public boolean login(HttpExchange ex, String username, String password) throws Exception {
         if (!store.authEnabled()) return false;
         String role = store.authenticate(username, password);

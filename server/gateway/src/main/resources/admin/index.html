@@ -12,89 +12,100 @@
 </head>
 <body>
 
-<!-- 图标精灵 -->
+<!-- 图标精灵（1.5px 线宽，每项独立） -->
 <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
-  <symbol id="ico-debug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.5"/><path d="M12 5C5.6 5 2 12 2 12s3.6 7 10 7 10-7 10-7-3.6-7-10-7z"/></symbol>
-  <symbol id="ico-assert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/></symbol>
-  <symbol id="ico-registry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8M8 11h8M8 15h5"/></symbol>
-  <symbol id="ico-stats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/></symbol>
-  <symbol id="ico-compare" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".75" fill="currentColor" stroke="none"/></symbol>
-  <symbol id="ico-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
-  <symbol id="ico-approval" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></symbol>
-  <symbol id="ico-family" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+  <symbol id="ico-debug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+  <symbol id="ico-assert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2 2 4-4"/><rect x="4" y="3" width="16" height="18" rx="2"/></symbol>
+  <symbol id="ico-approval" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="ico-registry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h11a2 2 0 0 1 2 2v14H8a2 2 0 0 1-2-2V4z"/><path d="M6 8h13M8 12h9M8 16h6"/></symbol>
+  <symbol id="ico-visual" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="11" rx="1.5"/><path d="M17 7h4v4"/><path d="M21 7l-6 6"/><circle cx="8" cy="10" r="1.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="ico-stats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-4M12 16V8M16 16v-7"/></symbol>
+  <symbol id="ico-copilot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a5 5 0 0 1 5 5v1h1a3 3 0 0 1 0 6h-1l-1 3H8l-1-3H6a3 3 0 0 1 0-6h1V8a5 5 0 0 1 5-5z"/><circle cx="9.5" cy="10" r=".75" fill="currentColor" stroke="none"/><circle cx="14.5" cy="10" r=".75" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="ico-space" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L3 7l9 5 9-5-9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/></symbol>
+  <symbol id="ico-account" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></symbol>
+  <symbol id="ico-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><circle cx="8" cy="7" r="2"/><path d="M4 12h16"/><circle cx="15" cy="12" r="2"/><path d="M4 17h16"/><circle cx="10" cy="17" r="2"/></symbol>
+  <symbol id="ico-hub" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="ico-gap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8h8v8H8z"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/></symbol>
+  <symbol id="ico-family" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><circle cx="12" cy="12" r="2"/></symbol>
 </svg>
 
-<!-- ── 侧边导航 ─────────────────────────────── -->
+<!-- ── 侧边导航（核心工作流，一屏可见） ───────────────── -->
 <aside class="sidebar">
-  <div class="brand">
+  <div class="brand brand-compact">
     <div class="brand-mark">
       <img src="assets/logo-mark.svg" alt="" width="22" height="22">
     </div>
-    <div>
-      <div class="brand-text">GISO 玑源<span>GIDO 的数据源头</span></div>
-      <div class="brand-family"><svg><use href="#ico-family"/></svg>GIDO · 数据产品族</div>
-    </div>
+    <div class="brand-text">GISO 玑源</div>
   </div>
 
-  <nav>
-    <div class="nav-group">联调验证</div>
+  <nav class="nav-core">
     <button class="nav-item active" data-view="debug">
-      <svg><use href="#ico-debug"/></svg>
-      实时联调
+      <span class="nav-ico nav-ico--blue"><svg><use href="#ico-debug"/></svg></span>
+      <span data-i18n="nav.debug">实时联调</span>
     </button>
     <button class="nav-item" data-view="assert">
-      <svg><use href="#ico-assert"/></svg>
-      用例断言
-    </button>
-    <div class="nav-group">治理配置</div>
-    <button class="nav-item nav-admin-only" data-view="approval">
-      <svg><use href="#ico-approval"/></svg>
-      待审批 <span class="nav-badge" id="nav-pending-badge" hidden>0</span>
+      <span class="nav-ico nav-ico--teal"><svg><use href="#ico-assert"/></svg></span>
+      <span data-i18n="nav.assert">用例断言</span>
     </button>
     <button class="nav-item" data-view="registry">
-      <svg><use href="#ico-registry"/></svg>
-      注册表配置
+      <span class="nav-ico nav-ico--purple"><svg><use href="#ico-registry"/></svg></span>
+      <span data-i18n="nav.registry">注册表配置</span>
+    </button>
+    <button class="nav-item nav-admin-only" data-view="approval">
+      <span class="nav-ico nav-ico--amber"><svg><use href="#ico-approval"/></svg></span>
+      <span data-i18n="nav.approval">待审批</span>
+      <span class="nav-badge" id="nav-pending-badge" hidden>0</span>
     </button>
     <button class="nav-item" data-view="stats">
-      <svg><use href="#ico-stats"/></svg>
-      质量统计
+      <span class="nav-ico nav-ico--green"><svg><use href="#ico-stats"/></svg></span>
+      <span data-i18n="nav.stats">质量统计</span>
     </button>
-    <button class="nav-item nav-admin-only" data-view="users">
-      <svg><use href="#ico-users"/></svg>
-      账号管理
-    </button>
-    <div class="nav-group">参考</div>
-    <a class="nav-item nav-link" href="/" target="_blank">
-      <svg><use href="#ico-family"/></svg>
-      产品导航
-    </a>
-    <a class="nav-item nav-link" href="/admin/datong-gap.html" target="_blank">
-      <svg><use href="#ico-compare"/></svg>
-      大同对比评审
-    </a>
   </nav>
-
-  <div class="conn" id="conn"><span class="conn-dot"></span>连接中…</div>
-  <div class="user-row">
-    <div class="user-pill" id="user-pill" hidden></div>
-    <button type="button" class="btn-logout" id="btn-logout" hidden>退出</button>
-  </div>
-  <div class="sidebar-foot">
-    <div class="family-line">GIDO</div>
-    <div class="family-desc">埋点 · 分析 · 治理</div>
-  </div>
 </aside>
 
 <!-- ── 主内容区 ─────────────────────────────── -->
 <div class="main">
   <header class="topbar">
-    <div>
+    <div class="topbar-left">
       <div class="product-meta">
         <span class="family-tag">GIDO</span>
         <span class="product-tag">GISO · 埋点治理</span>
       </div>
       <h1 id="page-title">实时联调</h1>
       <p id="page-desc"></p>
+    </div>
+    <div class="topbar-actions">
+      <span class="conn-mini" id="conn" title="SSE 实时流"><span class="conn-dot"></span><span class="conn-label" data-i18n="conn.connecting">连接中…</span></span>
+      <button type="button" class="top-btn top-btn--guide" data-view="copilot">
+        <span class="nav-ico nav-ico--violet"><svg><use href="#ico-copilot"/></svg></span>
+        <span data-i18n="nav.copilot">接入助手</span>
+      </button>
+      <div class="top-menu nav-platform-only" id="menu-platform">
+        <button type="button" class="top-menu-btn" aria-haspopup="true">
+          <span data-i18n="top.platform">平台</span> ▾
+        </button>
+        <div class="top-menu-pop">
+          <button type="button" class="top-menu-item nav-admin-only" data-view="spaces" data-i18n="nav.spaces">空间管理</button>
+          <button type="button" class="top-menu-item" data-view="users" data-i18n="nav.users">账号管理</button>
+          <button type="button" class="top-menu-item" data-view="settings" data-i18n="nav.settings">系统设置</button>
+        </div>
+      </div>
+      <div class="top-menu" id="menu-more">
+        <button type="button" class="top-menu-btn" aria-haspopup="true">
+          <span data-i18n="top.more">更多</span> ▾
+        </button>
+        <div class="top-menu-pop">
+          <a class="top-menu-item" href="/" target="_blank" data-i18n="nav.product">产品导航</a>
+          <a class="top-menu-item" href="/admin/datong-gap.html" target="_blank" data-i18n="nav.gap">大同对比评审</a>
+        </div>
+      </div>
+      <label class="space-switch">
+        <span class="muted" data-i18n="top.space">空间</span>
+        <select id="space-switcher"></select>
+      </label>
+      <div class="user-pill" id="user-pill" hidden></div>
+      <button type="button" class="top-icon-btn" id="btn-locale" title="Switch language" data-i18n="locale">English</button>
+      <button type="button" class="top-icon-btn top-icon-btn--danger" id="btn-logout" hidden data-i18n="top.logout">退出</button>
     </div>
   </header>
 
@@ -178,10 +189,84 @@ biz_event code=video_play_start</textarea>
         <span class="muted" id="reg-count"></span>
         <span class="muted" id="reg-meta"></span>
         <span class="spacer"></span>
+        <button type="button" id="btn-visual-picker" class="ghost nav-admin-only" data-i18n="nav.visual">可视化圈选</button>
         <button id="btn-add" class="primary">＋ 新增</button>
       </div>
       <div id="reg-table" class="table-wrap"></div>
     </div>
+  </section>
+
+  <!-- 可视化圈选 v2 -->
+  <section id="view-visual" class="view">
+    <div class="card">
+      <div class="toolbar vp-toolbar">
+        <input id="vp-pgid" data-i18n-placeholder="vp.pgidPh" pattern="[a-z][a-z0-9_]{0,31}">
+        <input id="vp-screenshot" data-i18n-placeholder="vp.screenshotPh" style="flex:1;min-width:200px">
+        <button type="button" id="vp-load-img" data-i18n="vp.load">加载截图</button>
+        <button type="button" id="vp-reset" class="ghost" data-i18n="vp.reset">清空框选</button>
+        <button type="button" id="vp-submit" class="primary" data-i18n="vp.save">保存草稿</button>
+      </div>
+      <div class="vp-stage">
+        <img id="vp-image" alt="" crossorigin="anonymous" hidden>
+        <canvas id="vp-canvas"></canvas>
+      </div>
+      <p class="hint" data-i18n-html="vp.hint">在截图上拖拽框选元素，或粘贴 ViewTree JSON。</p>
+      <textarea id="vp-viewtree" rows="4" data-i18n-placeholder="vp.vtPh" spellcheck="false"></textarea>
+      <button type="button" id="vp-import-vt" class="ghost" data-i18n="vp.importVt">导入 ViewTree</button>
+      <div id="vp-rect-list" class="vp-list"></div>
+    </div>
+  </section>
+
+  <!-- 接入助手 -->
+  <section id="view-copilot" class="view">
+    <div class="card copilot-card">
+      <div class="toolbar copilot-head">
+        <span class="muted"><span data-i18n="copilot.provider">知识源</span>: <b id="copilot-provider">doc</b></span>
+        <span class="spacer"></span>
+        <button type="button" id="copilot-clear" class="ghost" data-i18n="copilot.clear">清空对话</button>
+      </div>
+      <div id="copilot-prompts" class="copilot-prompts"></div>
+      <div id="copilot-messages" class="copilot-messages"></div>
+      <div id="copilot-meta" class="copilot-meta"></div>
+      <form id="copilot-form" class="copilot-form">
+        <input id="copilot-input" type="text" data-i18n-placeholder="copilot.inputPh" autocomplete="off">
+        <button type="submit" id="copilot-send" class="primary" data-i18n="copilot.send">发送</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- 系统设置 -->
+  <section id="view-settings" class="view">
+    <p id="settings-readonly-note" class="hint" hidden>当前为 yaml 模式，设置只读；生产请使用 PostgreSQL + 平台管理员账号。</p>
+    <form id="settings-form">
+      <div class="card">
+        <div class="card-title" data-i18n="settings.assistantTitle">接入助手（LLM）</div>
+        <div class="settings-grid">
+          <label class="chk"><input type="checkbox" id="set-assistant-enabled"> <span data-i18n="settings.assistantEnable">启用接入助手</span></label>
+          <label>Provider
+            <select id="set-assistant-provider">
+              <option value="doc">doc · 本地 FAQ</option>
+              <option value="openai">openai · 阿里云 MaaS</option>
+              <option value="gido_proxy">gido_proxy · GIDO 平台</option>
+            </select>
+          </label>
+          <label>LLM Base URL<input id="set-openai-base" type="url" placeholder="https://.../compatible-mode/v1"></label>
+          <label>Model<input id="set-openai-model" placeholder="qwen-plus"></label>
+          <label>API Key<input id="set-openai-key" type="password" autocomplete="new-password"></label>
+          <label>GIDO Proxy URL<input id="set-gido-proxy" type="url" placeholder="http://gido-copilot/..."></label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">数据出口（可多选）</div>
+        <p id="settings-sink-hint" class="hint"></p>
+        <div id="settings-sinks"></div>
+        <p class="muted">当前生效：<span id="settings-active-sinks">—</span></p>
+      </div>
+      <div class="toolbar">
+        <button type="button" id="settings-refresh" class="ghost">刷新</button>
+        <button type="submit" class="primary save">保存并立即生效</button>
+      </div>
+    </form>
   </section>
 
   <!-- 质量统计 -->
@@ -211,6 +296,13 @@ biz_event code=video_play_start</textarea>
     </div>
   </section>
 
+  <!-- 空间管理 -->
+  <section id="view-spaces" class="view">
+    <div class="card">
+      <div id="spaces-panel"></div>
+    </div>
+  </section>
+
   <!-- 账号管理 -->
   <section id="view-users" class="view">
     <div class="card">
@@ -220,9 +312,8 @@ biz_event code=video_play_start</textarea>
         <input name="password" type="password" placeholder="密码（至少 6 位）" required minlength="6">
         <input name="display_name" placeholder="显示名（可选）">
         <select name="role">
-          <option value="editor">编辑员 · 可提交待审批</option>
-          <option value="viewer">只读 · 联调/统计</option>
-          <option value="admin">管理员</option>
+          <option value="user">平台用户 · 空间权限另配</option>
+          <option value="system_admin">平台管理员</option>
         </select>
         <button type="submit" class="primary">创建</button>
       </form>

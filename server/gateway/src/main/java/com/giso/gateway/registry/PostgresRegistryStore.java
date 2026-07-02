@@ -3,7 +3,9 @@ package com.giso.gateway.registry;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.giso.gateway.DbMigrationSql;
+import com.giso.gateway.DbMigrator;
 import com.giso.gateway.GatewayConfig;
+import com.giso.gateway.space.SpaceService;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.yaml.snakeyaml.Yaml;
@@ -50,17 +52,17 @@ public final class PostgresRegistryStore implements RegistryStore {
         HikariDataSource ds = new HikariDataSource(hc);
         Path bootstrap = config.registryBootstrapFromYaml ? Path.of(config.schemaDir) : null;
         PostgresRegistryStore store = new PostgresRegistryStore(ds, config.dbSchema, bootstrap);
-        store.migrate();
+        DbMigrator migrator = new DbMigrator(ds, config.dbSchema, PostgresRegistryStore.class);
+        migrator.migrate();
         store.bootstrapIfEmpty();
+        migrator.syncDefaultRegistryToLongvideo();
         return store;
     }
 
-    /** 供 RegistryWatcher LISTEN 使用（独立长连接，勿与池混用）。 */
     public String jdbcUrl() {
         return ds.getJdbcUrl();
     }
 
-    /** 与 admin_users 共用连接池（勿重复建池）。 */
     public HikariDataSource dataSource() {
         return ds;
     }
@@ -75,24 +77,26 @@ public final class PostgresRegistryStore implements RegistryStore {
 
     @Override
     public RegistrySnapshot load() throws Exception {
-        Map<String, Map<String, Map<String, Object>>> tables = RegistryKinds.emptyTables();
+        Map<String, Map<String, Map<String, Map<String, Object>>>> bySpace = new LinkedHashMap<>();
         String sql = """
-                SELECT kind, entry_key, body::text
+                SELECT space_key, kind, entry_key, body::text
                 FROM %s.registry_entries
                 WHERE deleted_at IS NULL
-                ORDER BY kind, entry_key
+                ORDER BY space_key, kind, entry_key
                 """.formatted(dbSchema);
         try (Connection c = ds.getConnection();
              Statement st = c.createStatement();
              ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
-                String kind = rs.getString(1);
-                String key = rs.getString(2);
-                Map<String, Object> body = M.readValue(rs.getString(3), new TypeReference<>() { });
-                tables.get(kind).put(key, body);
+                String spaceKey = rs.getString(1);
+                String kind = rs.getString(2);
+                String key = rs.getString(3);
+                Map<String, Object> body = M.readValue(rs.getString(4), new TypeReference<>() { });
+                bySpace.computeIfAbsent(spaceKey, k -> RegistryKinds.emptyTables())
+                        .get(kind).put(key, body);
             }
         }
-        return new RegistrySnapshot(tables, fetchGlobalRevision());
+        return new RegistrySnapshot(bySpace, fetchGlobalRevision());
     }
 
     @Override
@@ -109,7 +113,8 @@ public final class PostgresRegistryStore implements RegistryStore {
     }
 
     @Override
-    public WriteResult upsert(String kind, Map<String, Object> item, String operator) throws Exception {
+    public WriteResult upsert(String spaceKey, String kind, Map<String, Object> item, String operator)
+            throws Exception {
         String idField = RegistryKinds.idField(kind);
         String key = String.valueOf(item.get(idField));
         String status = resolveStatus(item);
@@ -118,13 +123,13 @@ public final class PostgresRegistryStore implements RegistryStore {
         try (Connection c = ds.getConnection()) {
             c.setAutoCommit(false);
             try {
-                Map<String, Object> before = fetchBody(c, kind, key);
+                Map<String, Object> before = fetchBody(c, spaceKey, kind, key);
                 String action = before == null ? "create" : "update";
                 String upsert = """
                         INSERT INTO %s.registry_entries
-                            (kind, entry_key, body, status, revision, created_by, updated_by)
-                        VALUES (?, ?, ?::jsonb, ?, 1, ?, ?)
-                        ON CONFLICT (kind, entry_key) DO UPDATE SET
+                            (space_key, kind, entry_key, body, status, revision, created_by, updated_by)
+                        VALUES (?, ?, ?, ?::jsonb, ?, 1, ?, ?)
+                        ON CONFLICT (space_key, kind, entry_key) DO UPDATE SET
                             body = EXCLUDED.body,
                             status = EXCLUDED.status,
                             revision = %s.registry_entries.revision + 1,
@@ -133,15 +138,19 @@ public final class PostgresRegistryStore implements RegistryStore {
                             deleted_at = NULL
                         """.formatted(dbSchema, dbSchema);
                 try (PreparedStatement ps = c.prepareStatement(upsert)) {
-                    ps.setString(1, kind);
-                    ps.setString(2, key);
-                    ps.setString(3, bodyJson);
-                    ps.setString(4, status);
-                    ps.setString(5, operator);
+                    ps.setString(1, spaceKey);
+                    ps.setString(2, kind);
+                    ps.setString(3, key);
+                    ps.setString(4, bodyJson);
+                    ps.setString(5, status);
                     ps.setString(6, operator);
+                    ps.setString(7, operator);
                     ps.executeUpdate();
                 }
-                insertAudit(c, kind, key, action, before, item, operator);
+                insertAudit(c, spaceKey, kind, key, action, before, item, operator);
+                if (SpaceService.DEFAULT_SPACE.equals(spaceKey)) {
+                    mirrorUpsert(c, "longvideo", kind, key, bodyJson, status, operator);
+                }
                 long revision = bumpRevision(c);
                 notifyReload(c, revision);
                 c.commit();
@@ -154,11 +163,11 @@ public final class PostgresRegistryStore implements RegistryStore {
     }
 
     @Override
-    public WriteResult delete(String kind, String key, String operator) throws Exception {
+    public WriteResult delete(String spaceKey, String kind, String key, String operator) throws Exception {
         try (Connection c = ds.getConnection()) {
             c.setAutoCommit(false);
             try {
-                Map<String, Object> before = fetchBody(c, kind, key);
+                Map<String, Object> before = fetchBody(c, spaceKey, kind, key);
                 if (before == null) {
                     c.rollback();
                     return WriteResult.fail("不存在: " + key);
@@ -166,18 +175,22 @@ public final class PostgresRegistryStore implements RegistryStore {
                 String del = """
                         UPDATE %s.registry_entries
                         SET deleted_at = now(), updated_at = now(), updated_by = ?
-                        WHERE kind = ? AND entry_key = ? AND deleted_at IS NULL
+                        WHERE space_key = ? AND kind = ? AND entry_key = ? AND deleted_at IS NULL
                         """.formatted(dbSchema);
                 try (PreparedStatement ps = c.prepareStatement(del)) {
                     ps.setString(1, operator);
-                    ps.setString(2, kind);
-                    ps.setString(3, key);
+                    ps.setString(2, spaceKey);
+                    ps.setString(3, kind);
+                    ps.setString(4, key);
                     if (ps.executeUpdate() == 0) {
                         c.rollback();
                         return WriteResult.fail("不存在: " + key);
                     }
                 }
-                insertAudit(c, kind, key, "delete", before, null, operator);
+                insertAudit(c, spaceKey, kind, key, "delete", before, null, operator);
+                if (SpaceService.DEFAULT_SPACE.equals(spaceKey)) {
+                    mirrorDelete(c, "longvideo", kind, key, operator);
+                }
                 long revision = bumpRevision(c);
                 notifyReload(c, revision);
                 c.commit();
@@ -223,23 +236,25 @@ public final class PostgresRegistryStore implements RegistryStore {
     }
 
     @Override
-    public List<Map<String, Object>> audit(String kind, String key, int limit) throws Exception {
+    public List<Map<String, Object>> audit(String spaceKey, String kind, String key, int limit) throws Exception {
         int lim = Math.min(Math.max(limit, 1), 200);
         String sql = """
                 SELECT id, kind, entry_key, action, before_body::text, after_body::text,
                        operator, comment, created_at
                 FROM %s.registry_audit
-                WHERE (? = '' OR kind = ?) AND (? = '' OR entry_key = ?)
+                WHERE space_key = ?
+                  AND (? = '' OR kind = ?) AND (? = '' OR entry_key = ?)
                 ORDER BY id DESC
                 LIMIT ?
                 """.formatted(dbSchema);
         List<Map<String, Object>> rows = new ArrayList<>();
         try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, kind == null ? "" : kind);
+            ps.setString(1, spaceKey);
             ps.setString(2, kind == null ? "" : kind);
-            ps.setString(3, key == null ? "" : key);
+            ps.setString(3, kind == null ? "" : kind);
             ps.setString(4, key == null ? "" : key);
-            ps.setInt(5, lim);
+            ps.setString(5, key == null ? "" : key);
+            ps.setInt(6, lim);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     Map<String, Object> row = new LinkedHashMap<>();
@@ -260,31 +275,31 @@ public final class PostgresRegistryStore implements RegistryStore {
     }
 
     @Override
-    public WriteResult publish(String kind, String key, String operator) throws Exception {
-        return transitionStatus(kind, key, operator, "live", "publish", null);
+    public WriteResult publish(String spaceKey, String kind, String key, String operator) throws Exception {
+        return transitionStatus(spaceKey, kind, key, operator, "live", "publish", null);
     }
 
     @Override
-    public WriteResult deprecate(String kind, String key, String operator) throws Exception {
-        return transitionStatus(kind, key, operator, "deprecated", "deprecate", null);
+    public WriteResult deprecate(String spaceKey, String kind, String key, String operator) throws Exception {
+        return transitionStatus(spaceKey, kind, key, operator, "deprecated", "deprecate", null);
     }
 
     @Override
-    public WriteResult approve(String kind, String key, String operator) throws Exception {
-        return transitionStatus(kind, key, operator, "live", "approve", "pending");
+    public WriteResult approve(String spaceKey, String kind, String key, String operator) throws Exception {
+        return transitionStatus(spaceKey, kind, key, operator, "live", "approve", "pending");
     }
 
     @Override
-    public WriteResult reject(String kind, String key, String operator) throws Exception {
-        return transitionStatus(kind, key, operator, "draft", "reject", "pending");
+    public WriteResult reject(String spaceKey, String kind, String key, String operator) throws Exception {
+        return transitionStatus(spaceKey, kind, key, operator, "draft", "reject", "pending");
     }
 
-    private WriteResult transitionStatus(String kind, String key, String operator,
+    private WriteResult transitionStatus(String spaceKey, String kind, String key, String operator,
             String targetStatus, String action, String requiredFrom) throws Exception {
         try (Connection c = ds.getConnection()) {
             c.setAutoCommit(false);
             try {
-                Map<String, Object> before = fetchBody(c, kind, key);
+                Map<String, Object> before = fetchBody(c, spaceKey, kind, key);
                 if (before == null) {
                     c.rollback();
                     return WriteResult.fail("不存在: " + key);
@@ -301,20 +316,21 @@ public final class PostgresRegistryStore implements RegistryStore {
                         UPDATE %s.registry_entries
                         SET body = ?::jsonb, status = ?, revision = revision + 1,
                             updated_at = now(), updated_by = ?
-                        WHERE kind = ? AND entry_key = ? AND deleted_at IS NULL
+                        WHERE space_key = ? AND kind = ? AND entry_key = ? AND deleted_at IS NULL
                         """.formatted(dbSchema);
                 try (PreparedStatement ps = c.prepareStatement(upd)) {
                     ps.setString(1, bodyJson);
                     ps.setString(2, targetStatus);
                     ps.setString(3, operator);
-                    ps.setString(4, kind);
-                    ps.setString(5, key);
+                    ps.setString(4, spaceKey);
+                    ps.setString(5, kind);
+                    ps.setString(6, key);
                     if (ps.executeUpdate() == 0) {
                         c.rollback();
                         return WriteResult.fail("不存在: " + key);
                     }
                 }
-                insertAudit(c, kind, key, action, before, after, operator);
+                insertAudit(c, spaceKey, kind, key, action, before, after, operator);
                 long revision = bumpRevision(c);
                 notifyReload(c, revision);
                 c.commit();
@@ -331,52 +347,6 @@ public final class PostgresRegistryStore implements RegistryStore {
         return M.readValue(json, new TypeReference<>() { });
     }
 
-    private void migrate() throws IOException, SQLException {
-        ensureSchema();
-        runSqlResource("/db/V1__registry.sql");
-        runSqlResource("/db/V2__admin_users.sql");
-        runSqlResource("/db/V3__approval.sql");
-    }
-
-    /** 本地/超管可自动建 schema；public（GIDO 默认）无需授权。 */
-    private void ensureSchema() throws SQLException {
-        if (DbMigrationSql.isBuiltinPublic(dbSchema)) return;
-        String ident = DbMigrationSql.quoteIdent(dbSchema);
-        try (Connection c = ds.getConnection(); Statement st = c.createStatement()) {
-            st.execute("CREATE SCHEMA IF NOT EXISTS " + ident);
-        } catch (SQLException e) {
-            if (schemaExists()) return;
-            throw new SQLException(
-                    "schema '" + dbSchema + "' missing and DB user cannot CREATE SCHEMA; "
-                            + "set GISO_DB_SCHEMA=public (GIDO default) or run tools/registry/bootstrap_schema.sql",
-                    e);
-        }
-    }
-
-    private boolean schemaExists() throws SQLException {
-        String sql = "SELECT 1 FROM information_schema.schemata WHERE schema_name = ?";
-        try (Connection c = ds.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, dbSchema);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        }
-    }
-
-    private static String quoteIdent(String name) {
-        return DbMigrationSql.quoteIdent(name);
-    }
-
-    private void runSqlResource(String resourcePath) throws IOException, SQLException {
-        String sql = DbMigrationSql.load(PostgresRegistryStore.class, resourcePath, dbSchema);
-        try (Connection c = ds.getConnection(); Statement st = c.createStatement()) {
-            st.execute(sql);
-        } catch (Exception e) {
-            throw new SQLException("schema migration failed (" + resourcePath + "): " + e.getMessage(), e);
-        }
-    }
-
     private void bootstrapIfEmpty() throws Exception {
         if (bootstrapYamlDir == null || !Files.isDirectory(bootstrapYamlDir)) return;
         String countSql = "SELECT COUNT(*) FROM %s.registry_entries".formatted(dbSchema);
@@ -391,23 +361,24 @@ public final class PostgresRegistryStore implements RegistryStore {
             String kind = e.getKey();
             Path file = bootstrapYamlDir.resolve(e.getValue()[0]);
             if (!Files.exists(file)) continue;
-            Map<String, Object> doc = yaml.load(Files.readString(file));
+            Map<String, Object> doc = yaml.load(Files.readString(file, StandardCharsets.UTF_8));
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> items = (List<Map<String, Object>>) doc.get(e.getValue()[1]);
             for (Map<String, Object> item : items) {
-                upsert(kind, item, "bootstrap");
+                upsert(SpaceService.DEFAULT_SPACE, kind, item, "bootstrap");
             }
         }
     }
 
-    private Map<String, Object> fetchBody(Connection c, String kind, String key) throws Exception {
+    private Map<String, Object> fetchBody(Connection c, String spaceKey, String kind, String key) throws Exception {
         String sql = """
                 SELECT body::text FROM %s.registry_entries
-                WHERE kind = ? AND entry_key = ? AND deleted_at IS NULL
+                WHERE space_key = ? AND kind = ? AND entry_key = ? AND deleted_at IS NULL
                 """.formatted(dbSchema);
         try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, kind);
-            ps.setString(2, key);
+            ps.setString(1, spaceKey);
+            ps.setString(2, kind);
+            ps.setString(3, key);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) return null;
                 return M.readValue(rs.getString(1), new TypeReference<>() { });
@@ -415,20 +386,21 @@ public final class PostgresRegistryStore implements RegistryStore {
         }
     }
 
-    private void insertAudit(Connection c, String kind, String key, String action,
+    private void insertAudit(Connection c, String spaceKey, String kind, String key, String action,
             Map<String, Object> before, Map<String, Object> after, String operator) throws Exception {
         String sql = """
                 INSERT INTO %s.registry_audit
-                    (kind, entry_key, action, before_body, after_body, operator)
-                VALUES (?, ?, ?, ?::jsonb, ?::jsonb, ?)
+                    (space_key, kind, entry_key, action, before_body, after_body, operator)
+                VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?)
                 """.formatted(dbSchema);
         try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, kind);
-            ps.setString(2, key);
-            ps.setString(3, action);
-            ps.setString(4, before == null ? null : M.writeValueAsString(before));
-            ps.setString(5, after == null ? null : M.writeValueAsString(after));
-            ps.setString(6, operator);
+            ps.setString(1, spaceKey);
+            ps.setString(2, kind);
+            ps.setString(3, key);
+            ps.setString(4, action);
+            ps.setString(5, before == null ? null : M.writeValueAsString(before));
+            ps.setString(6, after == null ? null : M.writeValueAsString(after));
+            ps.setString(7, operator);
             ps.executeUpdate();
         }
     }
@@ -460,5 +432,47 @@ public final class PostgresRegistryStore implements RegistryStore {
         Object st = item.get("status");
         if (st == null || String.valueOf(st).isBlank()) return "live";
         return String.valueOf(st);
+    }
+
+    private void mirrorUpsert(Connection c, String targetSpace, String kind, String key,
+            String bodyJson, String status, String operator) throws SQLException {
+        String upsert = """
+                INSERT INTO %s.registry_entries
+                    (space_key, kind, entry_key, body, status, revision, created_by, updated_by)
+                VALUES (?, ?, ?, ?::jsonb, ?, 1, ?, ?)
+                ON CONFLICT (space_key, kind, entry_key) DO UPDATE SET
+                    body = EXCLUDED.body,
+                    status = EXCLUDED.status,
+                    revision = %s.registry_entries.revision + 1,
+                    updated_at = now(),
+                    updated_by = EXCLUDED.updated_by,
+                    deleted_at = NULL
+                """.formatted(dbSchema, dbSchema);
+        try (PreparedStatement ps = c.prepareStatement(upsert)) {
+            ps.setString(1, targetSpace);
+            ps.setString(2, kind);
+            ps.setString(3, key);
+            ps.setString(4, bodyJson);
+            ps.setString(5, status);
+            ps.setString(6, operator);
+            ps.setString(7, operator);
+            ps.executeUpdate();
+        }
+    }
+
+    private void mirrorDelete(Connection c, String targetSpace, String kind, String key, String operator)
+            throws SQLException {
+        String del = """
+                UPDATE %s.registry_entries
+                SET deleted_at = now(), updated_at = now(), updated_by = ?
+                WHERE space_key = ? AND kind = ? AND entry_key = ? AND deleted_at IS NULL
+                """.formatted(dbSchema);
+        try (PreparedStatement ps = c.prepareStatement(del)) {
+            ps.setString(1, operator);
+            ps.setString(2, targetSpace);
+            ps.setString(3, kind);
+            ps.setString(4, key);
+            ps.executeUpdate();
+        }
     }
 }

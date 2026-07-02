@@ -9,13 +9,13 @@ public interface RegistryMeta {
 
     Map<String, Object> meta() throws Exception;
 
-    List<Map<String, Object>> audit(String kind, String key, int limit) throws Exception;
+    List<Map<String, Object>> audit(String spaceKey, String kind, String key, int limit) throws Exception;
 
-    WriteResult publish(String kind, String key, String operator) throws Exception;
+    WriteResult publish(String spaceKey, String kind, String key, String operator) throws Exception;
 
-    WriteResult deprecate(String kind, String key, String operator) throws Exception;
+    WriteResult deprecate(String spaceKey, String kind, String key, String operator) throws Exception;
 
-    WriteResult approve(String kind, String key, String operator) throws Exception;
+    WriteResult approve(String spaceKey, String kind, String key, String operator) throws Exception;
 
-    WriteResult reject(String kind, String key, String operator) throws Exception;
+    WriteResult reject(String spaceKey, String kind, String key, String operator) throws Exception;
 }

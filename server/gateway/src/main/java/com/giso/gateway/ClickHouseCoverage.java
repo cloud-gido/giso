@@ -1,19 +1,12 @@
 package com.giso.gateway;
 
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.HashSet;
 import java.util.Set;
 
-/** 从 ClickHouse 反算登记覆盖率所需的已见集合（与网关内存累计合并）。 */
+/** 从 ClickHouse / Doris HTTP 反算登记覆盖率所需的已见集合。 */
 public final class ClickHouseCoverage {
     private final String baseUrl;
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+    private final java.net.http.HttpClient http = java.net.http.HttpClient.newBuilder()
+            .connectTimeout(java.time.Duration.ofSeconds(3)).build();
 
     public ClickHouseCoverage(String baseUrl) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
@@ -23,28 +16,49 @@ public final class ClickHouseCoverage {
         return !baseUrl.isEmpty();
     }
 
+    public Set<String> seenPgids(String env, String spaceKey) {
+        return distinct("pgid", "pgid != ''", env, spaceKey);
+    }
+
+    public Set<String> seenEids(String env, String spaceKey) {
+        return distinct("eid", "eid != ''", env, spaceKey);
+    }
+
+    public Set<String> seenBizCodes(String env, String spaceKey) {
+        return distinct("biz_code", "biz_code != ''", env, spaceKey);
+    }
+
+    /** @deprecated 使用带 spaceKey 的重载 */
+    @Deprecated
     public Set<String> seenPgids(String env) {
-        return distinct("pgid", "pgid != ''", env);
+        return seenPgids(env, null);
     }
 
+    @Deprecated
     public Set<String> seenEids(String env) {
-        return distinct("eid", "eid != ''", env);
+        return seenEids(env, null);
     }
 
+    @Deprecated
     public Set<String> seenBizCodes(String env) {
-        return distinct("biz_code", "biz_code != ''", env);
+        return seenBizCodes(env, null);
     }
 
-    private Set<String> distinct(String column, String extraWhere, String env) {
-        Set<String> out = new HashSet<>();
+    private Set<String> distinct(String column, String extraWhere, String env, String spaceKey) {
+        Set<String> out = new java.util.HashSet<>();
         if (!enabled()) return out;
-        String envClause = env.isEmpty() ? "" : " AND env = '" + esc(env) + "'";
-        String sql = "SELECT DISTINCT " + column + " FROM tracking.ods_events WHERE " + extraWhere
-                + envClause + " FORMAT TabSeparated";
+        StringBuilder where = new StringBuilder(extraWhere);
+        if (env != null && !env.isEmpty()) where.append(" AND env = '").append(esc(env)).append("'");
+        if (spaceKey != null && !spaceKey.isBlank()) {
+            where.append(" AND space_key = '").append(esc(spaceKey)).append("'");
+        }
+        String sql = "SELECT DISTINCT " + column + " FROM tracking.ods_events WHERE " + where
+                + " FORMAT TabSeparated";
         try {
-            String url = baseUrl + "/?query=" + URLEncoder.encode(sql, StandardCharsets.UTF_8);
-            HttpRequest req = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10)).GET().build();
-            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+            String url = baseUrl + "/?query=" + java.net.URLEncoder.encode(sql, java.nio.charset.StandardCharsets.UTF_8);
+            var req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
+                    .timeout(java.time.Duration.ofSeconds(10)).GET().build();
+            var resp = http.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() != 200) return out;
             for (String line : resp.body().split("\n")) {
                 String v = line.strip();

@@ -1,0 +1,42 @@
+image:
+  repository: ghcr.io/cloud-gido/giso/giso-gateway
+  tag: latest          # rollback: 0.1 or main-<sha> (see git tag v0.1)
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  host: giso.example.com
+  className: nginx
+  annotations: {}
+  tls: []
+
+secrets:
+  create: false
+  data: {}
+  # create: true 时注入敏感项，Deployment 通过 envFrom 挂载：
+  # GISO_DB_PASSWORD: ""
+  # GISO_ADMIN_PASSWORD: ""
+
+env:
+  GISO_REGISTRY_BACKEND: postgres
+  GISO_DB_SCHEMA: public
+  # GISO_S3_BUCKET: ""
+  # GISO_S3_PREFIX: "giso/"
+  # GISO_ASSISTANT_PROVIDER: openai
+  # GISO_LLM_BASE_URL: https://ws-df7ipa997hhtkd8h.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+  # GISO_LLM_MODEL: qwen-plus
+  # GISO_LLM_API_KEY: ""   # use secrets.data when secrets.create: true
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
