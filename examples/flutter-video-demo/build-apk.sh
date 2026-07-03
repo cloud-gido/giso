@@ -12,8 +12,8 @@ sdk.dir=$ANDROID_HOME
 flutter.sdk=${HOME}/flutter
 EOF
 
-echo "==> Ensuring Android NDK (required for Flutter native build)..."
-bash "$REPO_ROOT/scripts/install-android-ndk.sh"
+echo "==> Bootstrapping Android SDK (NDK + CMake + build-tools 35 + platform 36)..."
+bash "$REPO_ROOT/scripts/bootstrap-android-sdk.sh"
 
 cd "$ROOT"
 flutter pub get

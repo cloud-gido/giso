@@ -34,15 +34,20 @@ cd examples/flutter-video-demo
 adb install -r build/app/outputs/flutter-apk/app-debug.apk
 ```
 
-若仅缺 NDK，可单独执行：
+若仅缺 SDK 组件，可单独执行：
 
 ```bash
-bash scripts/install-android-ndk.sh
+bash scripts/bootstrap-android-sdk.sh   # NDK + CMake 3.22.1 + build-tools 35 + platform 36
 ```
 
-**常见失败：NDK not configured** — 访问 `dl.google.com` 超时（SSL handshake）。不要用 Android Studio 在线拉取失败就卡住；用仓库脚本走国内镜像即可。
+**常见失败**
 
-**常见失败：Gradle / AGP 版本警告** — 工程已对齐 Gradle 8.14 + AGP 8.11.1；仍报错可临时加 `--android-skip-build-dependency-validation`。
+| 报错 | 处理 |
+|------|------|
+| `NDK not configured` | 运行 `bootstrap-android-sdk.sh`（走 googledownloads.cn） |
+| `Build Tools revision 35.0.0` | 运行 `bootstrap-android-sdk.sh`（含 build-tools 35 + platform 36） |
+| `repo.maven.apache.org` TLS 失败 | `android/settings.gradle.kts` 已优先阿里云 Maven |
+| `CMake '3.22.1' was not found` | 运行 `bootstrap-android-sdk.sh`（含 CMake；镜像无包时从 cmake.org 拉取） |
 
 **Android 原生版**（ExoPlayer，功能更完整）见 [../android-video-demo/README.md](../android-video-demo/README.md)。
 

@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.giso.demo.flutter"
-    compileSdk = flutter.compileSdkVersion
+    // Flutter 3.44 plugins need SDK 36; packages from scripts/bootstrap-android-sdk.sh.
+    compileSdk = 36
+    buildToolsVersion = "35.0.0"
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -20,7 +22,7 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
