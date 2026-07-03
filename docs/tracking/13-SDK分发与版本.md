@@ -15,6 +15,7 @@
 | 2 | **Android Maven 坐标** | `com.giso:tracker:1.0.0` | 平台 |
 | 3 | **Web npm 包名** | `@cloud-gido/giso-tracker-web@1.0.0` | 平台 |
 | 4 | **iOS 引用方式** | SwiftPM：`cloud-gido/giso`，tag `v1.0.0`，产品 `GISOTracker` | 平台 |
+| 4b | **Flutter 引用方式** | Git：`giso_tracker` @ tag `v1.0.0`，path `sdk/flutter/giso_tracker` | 平台 |
 | 5 | **私有仓库读权限** | GitHub PAT（`read:packages`）或组织成员身份 | 平台开通 |
 | 6 | **上报 endpoint** | `https://gamelinelab-giso.envir.dev/v1/track` | 平台（测试）；生产另给域名 |
 | 7 | **远程配置 URL** | 同上域名，`GET /v1/config`（SDK 自动拉） | 平台 |
@@ -37,7 +38,7 @@
 | Android | `com.giso:tracker:<version>` | `https://maven.pkg.github.com/cloud-gido/giso` |
 | Web | `@cloud-gido/giso-tracker-web@<version>` | `https://npm.pkg.github.com` |
 | iOS | SwiftPM 根 `Package.swift`，target `GISOTracker` | Git tag `v<version>` on `cloud-gido/giso` |
-| **Flutter** | **暂无官方包** — Dart 直连接 `/v1/track` | 见 [14-Flutter接入指南](14-Flutter接入指南.md) |
+| **Flutter** | **`giso_tracker`** Git path @ tag `v<version>` | `sdk/flutter/giso_tracker` on `cloud-gido/giso` |
 
 发布流水线：GitHub Actions [`.github/workflows/sdk-publish.yml`](../../.github/workflows/sdk-publish.yml)  
 触发方式：打 tag `v*`（如 `v1.0.0`），或 Actions 手动 `workflow_dispatch` 填版本号。
@@ -109,6 +110,48 @@ Xcode → **File → Add Package Dependencies**：
 ```
 
 > iOS 当前为**源码 target 按 tag 分发**（仍无需业务方接触 Gateway 等服务端代码）。后续可改为 XCFramework 二进制 target，坐标不变。
+
+### 3.5 Flutter（Dart / git path）
+
+GitHub（推荐）或 GitLab 镜像，**与 Android/iOS 同一 Git tag**（如 `v1.0.0`）：
+
+```yaml
+# pubspec.yaml
+dependencies:
+  giso_tracker:
+    git:
+      url: https://github.com/cloud-gido/giso.git
+      ref: v1.0.0
+      path: sdk/flutter/giso_tracker
+```
+
+**GitLab 镜像：**
+
+```yaml
+      url: https://gitlab.com/gamelinelab/data/giso.git
+```
+
+**鉴权：**
+
+- HTTPS：PAT（`read:packages` 或 repo read）写入 CI 密钥或本机 `~/.netrc`
+- SSH：`git@github.com:cloud-gido/giso.git`（组织成员）
+
+**初始化：**
+
+```dart
+await GisoTracker.instance.init(GisoConfig(
+  appId: 'video-android-beta',
+  appKey: 'video-android-beta',
+  appVersion: packageInfo.version,
+  endpoint: 'https://gamelinelab-giso.envir.dev/v1/track',
+  debug: kDebugMode,
+));
+GisoLifecycleBinding.attach();
+```
+
+CI 打 tag 时会 `flutter analyze` + `flutter test`，并上传 `giso_tracker-<version>.tar.gz` 构建产物（Actions artifacts）。完整 API 见 [sdk/flutter/giso_tracker/README.md](../../sdk/flutter/giso_tracker/README.md) 与 [14-Flutter接入指南](14-Flutter接入指南.md)。
+
+管理台 **接入助手** 页可下载 **Flutter 接入清单**（`/admin/templates/flutter-onboarding-checklist.md`）。
 
 ---
 
@@ -290,7 +333,8 @@ git push origin v1.0.0
 | [06-接入指南](06-接入指南.md) | 六步埋点开发 |
 | [07-外部视频App接入问卷](07-外部视频App接入问卷.md) | 接入前登记 |
 | [08-接入常见问题FAQ](08-接入常见问题FAQ.md) | App Key、Kafka、心跳、SSE |
-| [14-Flutter接入指南](14-Flutter接入指南.md) | **Flutter 无官方包时的 Dart 接入** |
+| [14-Flutter接入指南](14-Flutter接入指南.md) | **Flutter `giso_tracker` 包** |
+| [sdk/flutter/giso_tracker/README.md](../../sdk/flutter/giso_tracker/README.md) | Flutter API 摘要 |
 | [02-上报协议规范](02-上报协议规范.md) | 协议字段 |
 | [deploy/DEPLOYMENT.md](../../deploy/DEPLOYMENT.md) | 测试环境域名与 Doppler |
 | [sdk/android/README.md](../../sdk/android/README.md) | Android API 摘要 |
@@ -309,6 +353,7 @@ git push origin v1.0.0
   仓库: https://maven.pkg.github.com/cloud-gido/giso
 - iOS: SwiftPM cloud-gido/giso tag v1.0.0, product GISOTracker
 - Web: @cloud-gido/giso-tracker-web@1.0.0
+- Flutter: giso_tracker @ git tag v1.0.0, path sdk/flutter/giso_tracker
 
 二、环境与密钥
 - Endpoint: https://gamelinelab-giso.envir.dev/v1/track
@@ -323,6 +368,7 @@ git push origin v1.0.0
 - 分发说明: docs/tracking/13-SDK分发与版本.md
 - 接入步骤: docs/tracking/06-接入指南.md
 - FAQ: docs/tracking/08-接入常见问题FAQ.md
+- Flutter: docs/tracking/14-Flutter接入指南.md（管理台可下载 Flutter 接入清单）
 
 五、联调
 - 内测包请 debug=true；联调 did 发群，我们开管理台实时联调

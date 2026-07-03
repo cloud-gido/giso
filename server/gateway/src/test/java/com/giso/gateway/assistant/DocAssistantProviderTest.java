@@ -31,4 +31,16 @@ class DocAssistantProviderTest {
         assertTrue(resp.answer().contains("登记") || resp.answer().contains("SDK"),
                 resp.answer());
     }
+
+    @Test
+    void answersFlutterIntegration() throws Exception {
+        GatewayConfig c = new GatewayConfig();
+        c.assistantDocsDirs = java.util.List.of();
+        c.assistantCorpusClasspath = "copilot/corpus";
+        var provider = new DocAssistantProvider(c);
+        ChatResponse resp = provider.chat(new ChatRequest(
+                "Flutter 怎么接入 GISO", java.util.List.of(), null, "default", ""));
+        assertTrue(resp.answer().contains("giso_tracker") || resp.answer().contains("Flutter"),
+                resp.answer());
+    }
 }

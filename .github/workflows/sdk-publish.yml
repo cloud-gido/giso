@@ -107,3 +107,49 @@ jobs:
             exit 0
           fi
           npm publish --access restricted
+
+  publish-flutter:
+    name: Publish Flutter SDK (validate + tarball)
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="${{ inputs.version }}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - name: Set package version
+        working-directory: sdk/flutter/giso_tracker
+        run: |
+          sed -i "s/^version: .*/version: ${VERSION}/" pubspec.yaml
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+      - name: Analyze and test
+        working-directory: sdk/flutter/giso_tracker
+        run: |
+          flutter pub get
+          flutter analyze --fatal-infos
+          flutter test
+      - name: Pack SDK tarball
+        run: |
+          VERSION='${{ steps.ver.outputs.version }}'
+          mkdir -p dist
+          COPYFILE_DISABLE=1 tar -czf "dist/giso_tracker-${VERSION}.tar.gz" \
+            --exclude='.dart_tool' --exclude='build' \
+            -C sdk/flutter giso_tracker
+      - name: Upload tarball (tag builds)
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: giso_tracker-${{ steps.ver.outputs.version }}
+          path: dist/giso_tracker-*.tar.gz
+          retention-days: 90

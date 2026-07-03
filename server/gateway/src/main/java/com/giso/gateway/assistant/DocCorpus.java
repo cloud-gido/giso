@@ -83,7 +83,7 @@ final class DocCorpus {
         String prefix = base.startsWith("/") ? base.substring(1) : base;
         List<String> names = List.of(
                 "tracking-flow.md", "faq-architecture.md", "faq-app-key.md",
-                "faq-quarantine.md", "integration-steps.md", "product-overview.md");
+                "faq-quarantine.md", "faq-flutter.md", "integration-steps.md", "product-overview.md");
         ClassLoader cl = DocCorpus.class.getClassLoader();
         for (String name : names) {
             String path = prefix + "/" + name;

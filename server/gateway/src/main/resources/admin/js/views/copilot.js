@@ -10,6 +10,7 @@ const PROMPTS = {
     '事件进隔离区怎么办？',
     '注册表存在哪里？',
     'SSE 联调怎么用？',
+    'Flutter 怎么接入 GISO？',
   ],
   en: [
     'What is the full tracking flow?',
@@ -17,6 +18,7 @@ const PROMPTS = {
     'How to handle quarantine events?',
     'Where is the registry stored?',
     'How does SSE live debug work?',
+    'How do Flutter apps integrate GISO?',
   ],
 };
 

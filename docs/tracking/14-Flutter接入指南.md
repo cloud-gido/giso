@@ -10,7 +10,7 @@
 | 问题 | 答案 |
 |------|------|
 | 能用 `com.giso:tracker` Android AAR 吗？ | **不推荐**。自动化元素埋点依赖原生 View 树，对标准 Flutter UI **基本无效**。 |
-| 官方 Flutter SDK？ | **暂无**。路线是 Dart 薄客户端 + `POST /v1/track`。 |
+| 官方 Flutter SDK？ | **有** — `giso_tracker` Dart 包（Git tag 依赖）；无 `bind()` 自动化。 |
 | 还能用 GISO 吗？ | **可以**。页面 / 业务 / 生命周期事件 + 管理台登记 + 联调校验全链路可用。 |
 | 元素曝光 / 点击怎么办？ | Dart 侧**手动上报** `element_exposure` / `element_click`，或用 `VisibilityDetector` 等实现与 Web/Android **同口径**（≥50% 可视 ≥500ms）。 |
 
@@ -65,14 +65,28 @@ GISO Android SDK 的三项差异化能力（源码 `sdk/android/`）均绑定 **
 管理台 → **注册表配置** → 登记 `pgid` / `eid` / 参数 / 业务事件 → 联调通过后 **发布 live**。  
 命名见 [03-命名与登记规范](03-命名与登记规范.md)。**未登记 = 校验 error → 隔离区**。
 
-### 第 2 步：常量
+### 第 2 步：安装 SDK
+
+```yaml
+# pubspec.yaml
+dependencies:
+  giso_tracker:
+    git:
+      url: https://github.com/cloud-gido/giso.git
+      ref: v1.0.0
+      path: sdk/flutter/giso_tracker
+```
+
+详见 [sdk/flutter/giso_tracker/README.md](../../sdk/flutter/giso_tracker/README.md) 与 [13-SDK分发与版本 §3.5](13-SDK分发与版本.md)。
+
+### 第 3 步：常量
 
 三端 CI 从 `schema/*.yaml` 生成常量；Flutter 团队可：
 
 - 复制 Web 侧 `Pages` / `Elements` / `Params` / `BizEvents` 为 Dart `class` / `const`（或内部脚本从 YAML 生成）；
 - **禁止**在业务代码里手写 `"video_feed"` 等魔法字符串。
 
-### 第 3 步：初始化
+### 第 4 步：初始化
 
 | 配置项 | 说明 |
 |--------|------|
@@ -86,7 +100,7 @@ GISO Android SDK 的三项差异化能力（源码 `sdk/android/`）均绑定 **
 `did`：应用内生成 UUID 持久化（`shared_preferences` / Keychain）。  
 `session_id`：前后台间隔 >30min 重新生成（与 [02-上报协议规范 §2](02-上报协议规范.md) 一致）。
 
-### 第 4 步：页面事件（必做）
+### 第 5 步：页面事件（必做）
 
 在路由 **可见** 时 `page_enter`，**离开** 时 `page_exit`（含 `pg_stay`）。
 
@@ -144,7 +158,7 @@ class _TrackedPageShellState extends State<_TrackedPageShell> {
 
 **Navigator 2.0 / 其它路由**：原则相同——**Route 进栈 ≈ enterPage，出栈 ≈ exitPage**。切换页面前若未 `exitPage`，需在 `enterPage` 内先补发上一页 `page_exit`（与 Android/Web SDK 行为一致）。
 
-### 第 5 步：元素曝光 / 点击（手动）
+### 第 6 步：元素曝光 / 点击（手动）
 
 无自动 `bind()`，在 Widget 层显式上报：
 
@@ -175,7 +189,7 @@ GisoTracker.instance.track({
 
 参数合并（页面 → 父模块 → 自身）需在 **Dart 侧自己实现**一层 helper，逻辑等价于 Android `elementContext()`。
 
-### 第 6 步：业务事件
+### 第 7 步：业务事件
 
 ```dart
 GisoTracker.instance.bizEvent(
@@ -186,7 +200,7 @@ GisoTracker.instance.bizEvent(
 
 播放心跳、完播等见 [04-业务埋点设计](04-业务埋点设计.md)。
 
-### 第 7 步：App 生命周期
+### 第 8 步：App 生命周期
 
 Dart 侧监听 `WidgetsBindingObserver` / `AppLifecycleListener`：
 
@@ -324,7 +338,7 @@ Future<void> flush(List<Map<String, dynamic>> batch) async {
 
 ### Q4. 以后会有官方 Flutter Plugin 吗？
 
-规划方向是 **Dart 包 + 可选 Platform Channel 仅做 did/生命周期**，元素层仍以 Dart 可见性检测为主。发布后会写入 [13-SDK分发与版本](13-SDK分发与版本.md)。
+**已有 `giso_tracker` 包**（Git path @ tag）。元素层仍以 Dart 手动/可见性检测为主，不会提供 Android 式 `bind()` 自动化。
 
 ---
 

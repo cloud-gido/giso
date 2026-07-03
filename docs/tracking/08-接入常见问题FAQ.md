@@ -406,7 +406,7 @@ App **不需要**对 Gateway 建 WebSocket/SSE。
 ### Q23. Flutter App 能用 Android SDK 的 bind() 吗？
 
 **不能指望自动化。** Android SDK 的曝光/点击/参数继承依赖原生 `View` 树，标准 Flutter UI 不在该树上。  
-推荐：**Dart 薄客户端 + `POST /v1/track`**，路由层接 `page_enter`/`page_exit`，元素手动或 `VisibilityDetector` 上报。完整说明见 [14-Flutter接入指南](14-Flutter接入指南.md)。
+推荐：官方 **`giso_tracker`** 包（Git path 依赖）+ 路由层 `enterPage`/`exitPage`，元素手动或 `VisibilityDetector` 上报。完整说明见 [14-Flutter接入指南](14-Flutter接入指南.md)。
 
 ---
 

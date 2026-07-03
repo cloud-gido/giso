@@ -26,6 +26,15 @@ dependency-reduced-pom.xml
 ### Python ###
 .venv/
 
+### Flutter / Dart ###
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/pubspec.lock
+examples/flutter-video-demo/build/
+sdk/flutter/**/build/
+
 ### Gateway runtime data ###
 server/gateway/data/
 

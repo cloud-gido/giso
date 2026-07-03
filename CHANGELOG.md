@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Flutter SDK** (`sdk/flutter/giso_tracker`): `GisoTracker` page/element/biz/lifecycle events, gzip queue, schema codegen.
+- **Flutter demo** (`examples/flutter-video-demo`): long-video feed/detail sample.
+- **SDK CI**: `publish-flutter` job on `v*` tags (analyze, test, tarball artifact).
+- **Admin**: Flutter onboarding checklist download + Copilot `faq-flutter` corpus.
+
 ### Fixed
 
 - Admin console: stop login redirect loop on HTTPS (session cookie `Secure`, boot order).

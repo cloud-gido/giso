@@ -12,8 +12,8 @@
 
 ## 第 3 步：埋点代码
 
-- 页面：`page_enter` / `page_exit`
-- 元素：曝光/点击 + `ElementMeta`
+- 页面：`page_enter` / `page_exit`（Flutter：`TrackedPage` 或 `enterPage`/`exitPage`）
+- 元素：曝光/点击 + `ElementMeta`（Flutter：手动 `elementClick`/`elementExposure`）
 - 业务：`biz_event` + 登记 code
 
 ## 第 4 步：联调
