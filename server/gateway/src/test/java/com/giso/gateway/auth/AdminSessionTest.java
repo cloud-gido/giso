@@ -12,16 +12,16 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** 管理台会话：登录签发、凭 Cookie 解析、退出失效。 */
+/** 管理台会话：登录签发、同请求 profile、Cookie 解析、退出失效、单端登录。 */
 class AdminSessionTest {
     private AdminAuth auth;
 
@@ -35,9 +35,20 @@ class AdminSessionTest {
     }
 
     @Test
+    void loginProfileWithoutRequestCookie() throws Exception {
+        var loginEx = exchange("POST", "/admin/api/login", "");
+        Optional<AuthContext> ctx = auth.login(loginEx, "admin", "admin123");
+        assertTrue(ctx.isPresent());
+        Map<String, Object> profile = auth.userProfile(ctx.get(), "default", 0);
+        assertEquals("admin", profile.get("username"));
+        assertNotNull(profile.get("spaces"));
+    }
+
+    @Test
     void loginLogoutCycle() throws Exception {
         var loginEx = exchange("POST", "/admin/api/login", "");
-        assertTrue(auth.login(loginEx, "admin", "admin123"));
+        Optional<AuthContext> ctx = auth.login(loginEx, "admin", "admin123");
+        assertTrue(ctx.isPresent());
 
         String cookie = loginEx.responseHeaders.get("Set-Cookie").stream()
                 .filter(c -> c.startsWith(AdminSessionCookies.SESSION + "=") && !c.contains("=;"))
@@ -61,9 +72,25 @@ class AdminSessionTest {
     }
 
     @Test
+    void secondLoginRevokesFirstSession() throws Exception {
+        var first = exchange("POST", "/admin/api/login", "");
+        auth.login(first, "admin", "admin123");
+        String cookie1 = first.responseHeaders.get("Set-Cookie").stream()
+                .filter(c -> c.startsWith(AdminSessionCookies.SESSION + "=") && !c.contains("=;"))
+                .findFirst().orElseThrow().split(";")[0].trim();
+
+        var second = exchange("POST", "/admin/api/login", "");
+        auth.login(second, "admin", "admin123");
+
+        var stale = exchange("GET", "/admin/api/me", "");
+        stale.requestHeaders.set("Cookie", cookie1);
+        assertNull(auth.operator(stale));
+    }
+
+    @Test
     void badPasswordRejected() throws Exception {
         var ex = exchange("POST", "/admin/api/login", "");
-        assertFalse(auth.login(ex, "admin", "wrong"));
+        assertTrue(auth.login(ex, "admin", "wrong").isEmpty());
         List<String> cookies = ex.responseHeaders.get("Set-Cookie");
         assertTrue(cookies == null || cookies.stream().noneMatch(c ->
                 c.startsWith(AdminSessionCookies.SESSION + "=") && !c.contains("=;")));

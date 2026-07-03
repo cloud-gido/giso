@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-/** PostgreSQL 会话：多副本共享、退出即失效。 */
+/** PostgreSQL 会话：多副本共享、退出即失效、滑动续期。 */
 public final class PostgresAdminSessionStore implements AdminSessionStore {
     private final DataSource ds;
     private final String dbSchema;
@@ -60,6 +60,31 @@ public final class PostgresAdminSessionStore implements AdminSessionStore {
         String sql = "DELETE FROM %s.admin_sessions WHERE session_id = ?".formatted(dbSchema);
         try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, sessionId);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void revokeAllForUser(String username) throws SQLException {
+        if (username == null || username.isBlank()) return;
+        String sql = "DELETE FROM %s.admin_sessions WHERE username = ?".formatted(dbSchema);
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, username);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void touch(String sessionId, long ttlMs) throws SQLException {
+        if (sessionId == null || sessionId.isBlank()) return;
+        Instant expires = Instant.now().plusMillis(ttlMs);
+        String sql = """
+                UPDATE %s.admin_sessions SET expires_at = ?
+                WHERE session_id = ? AND expires_at > now()
+                """.formatted(dbSchema);
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setTimestamp(1, java.sql.Timestamp.from(expires));
+            ps.setString(2, sessionId);
             ps.executeUpdate();
         }
     }

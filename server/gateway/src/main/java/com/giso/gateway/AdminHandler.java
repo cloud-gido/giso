@@ -7,6 +7,7 @@ import com.giso.gateway.assistant.ChatMessage;
 import com.giso.gateway.auth.AdminAuth;
 import com.giso.gateway.auth.AdminPermissions;
 import com.giso.gateway.auth.AdminUser;
+import com.giso.gateway.auth.AuthContext;
 import com.giso.gateway.registry.RegistryKinds;
 import com.giso.gateway.registry.RegistryImportTemplates;
 import com.giso.gateway.settings.SystemSettingsService;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 管理 REST API（平台 system_admin + 空间角色）。
@@ -107,14 +109,15 @@ public final class AdminHandler implements HttpHandler {
             Http.json(ex, 400, "{\"error\":\"用户名和密码不能为空\"}");
             return;
         }
-        if (!auth.login(ex, username, password)) {
-            Http.json(ex, 401, "{\"error\":\"用户名或密码错误\"}");
+        Optional<AuthContext> ctx = auth.login(ex, username, password);
+        if (ctx.isEmpty()) {
+            Http.json(ex, 401, "{\"error\":\"用户名或密码错误\",\"code\":\"invalid_credentials\"}");
             return;
         }
         String spaceKey = Http.spaceKey(ex);
-        var me = auth.me(ex, spaceKey);
-        me.put("pending_count", registry.pendingCount(spaceKey));
-        Http.json(ex, 200, M.writeValueAsString(me));
+        var profile = auth.userProfile(ctx.get(), spaceKey, registry.pendingCount(spaceKey));
+        profile.put("ok", true);
+        Http.json(ex, 200, M.writeValueAsString(profile));
     }
 
     private boolean authorize(HttpExchange ex, String globalRole, String spaceRole,
@@ -203,13 +206,12 @@ public final class AdminHandler implements HttpHandler {
     private void route(HttpExchange ex, String method, String path, String globalRole,
             String spaceRole, String spaceKey) throws Exception {
         if (path.equals("/me") && method.equals("GET")) {
-            var me = auth.me(ex, spaceKey);
-            if (me == null) {
+            var profile = auth.userProfile(ex, spaceKey, registry.pendingCount(spaceKey));
+            if (profile == null) {
                 Http.unauthorizedJson(ex);
                 return;
             }
-            me.put("pending_count", registry.pendingCount(spaceKey));
-            Http.json(ex, 200, M.writeValueAsString(me));
+            Http.json(ex, 200, M.writeValueAsString(profile));
             return;
         }
         if (path.startsWith("/spaces")) {

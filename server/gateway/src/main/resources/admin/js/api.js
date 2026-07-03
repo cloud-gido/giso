@@ -1,5 +1,5 @@
 /* 管理 API 封装（Cookie 会话 + 空间头 X-GISO-Space） */
-import { logout as authLogout, requireLoginRedirect } from './auth.js';
+import { signOut, requireLoginRedirect } from './auth.js';
 
 const SPACE_KEY = 'giso_space';
 let currentSpace = localStorage.getItem(SPACE_KEY) || 'default';
@@ -49,5 +49,5 @@ export function connectSSE(onEvent, onState) {
 
 export async function logout() {
   disconnectSSE();
-  await authLogout();
+  await signOut();
 }

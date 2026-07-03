@@ -98,7 +98,7 @@ final class Http {
 
     /** 管理 API 未登录（配合登录页，不触发浏览器 Basic 弹窗）。 */
     static void unauthorizedJson(HttpExchange ex) throws IOException {
-        json(ex, 401, "{\"error\":\"unauthorized\"}");
+        json(ex, 401, "{\"error\":\"unauthorized\",\"code\":\"unauthorized\"}");
     }
 
     static void redirect(HttpExchange ex, String location) throws IOException {

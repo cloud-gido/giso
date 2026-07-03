@@ -1,6 +1,5 @@
 package com.giso.gateway.auth;
 
-import java.sql.SQLException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +34,20 @@ public final class InMemoryAdminSessionStore implements AdminSessionStore {
     @Override
     public void delete(String sessionId) {
         if (sessionId != null) sessions.remove(sessionId);
+    }
+
+    @Override
+    public void revokeAllForUser(String username) {
+        if (username == null) return;
+        sessions.entrySet().removeIf(e -> username.equals(e.getValue().username()));
+    }
+
+    @Override
+    public void touch(String sessionId, long ttlMs) {
+        Entry e = sessions.get(sessionId);
+        if (e != null) {
+            sessions.put(sessionId, new Entry(e.username(), e.role(), System.currentTimeMillis() + ttlMs));
+        }
     }
 
     private void purgeExpired() {

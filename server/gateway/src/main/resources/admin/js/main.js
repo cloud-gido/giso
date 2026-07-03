@@ -1,7 +1,7 @@
 /* GISO 玑源 · 管理控制台入口 */
 import { $, $$ } from './util.js';
 import { api, logout, getSpace, setSpace } from './api.js';
-import { requireLoginRedirect } from './auth.js';
+import { requireUser, setUser as cacheUser } from './auth.js';
 import { setMe } from './session.js';
 import { initDebug, renderDebug } from './views/debug.js';
 import { initAssert } from './views/assert.js';
@@ -158,11 +158,12 @@ $('#btn-locale')?.addEventListener('click', () => {
 
 async function boot() {
   try {
-    let me = await api('/me');
+    let me = await requireUser();
     if (me?.error) throw new Error(me.error);
     if (me.current_space && me.current_space !== getSpace()) {
       setSpace(me.current_space);
       me = await api('/me');
+      cacheUser(me);
     }
     setMe(me);
     function onSpaceChange(fresh) {
@@ -177,7 +178,7 @@ async function boot() {
     applyRole(me);
     show('debug');
   } catch {
-    requireLoginRedirect();
+    /* requireUser 已跳转登录页 */
   }
 }
 
@@ -185,6 +186,7 @@ boot();
 
 document.addEventListener('giso:pending-changed', () => {
   api('/me').then((me) => {
+    cacheUser(me);
     setMe(me);
     updatePendingBadge(me.pending_count || 0);
   });

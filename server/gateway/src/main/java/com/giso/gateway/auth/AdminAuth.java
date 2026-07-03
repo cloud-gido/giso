@@ -7,14 +7,15 @@ import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
- * 管理台鉴权（对齐 GIDO：Ingress IP 白名单 + 应用层账号）。
+ * 管理台鉴权门面（对齐 GIDO：Ingress 白名单 + 应用层账号 + 服务端会话）。
  * <p>
- * 会话模型：opaque session id + HttpOnly Cookie；密码不落 Cookie，退出删服务端会话。
+ * 职责划分：{@link AdminUserStore} 校验凭证 · {@link AdminSessionManager} 管会话 ·
+ * {@link AdminUserProfile} 组装 /me · {@link AdminPermissions} 管授权。
  */
 public final class AdminAuth {
     private final AdminUserStore store;
@@ -37,64 +38,55 @@ public final class AdminAuth {
         this.sessions = new AdminSessionManager(sessionStore);
     }
 
-    public AuthContext resolve(HttpExchange ex) {
+    /** 当前请求是否未登录（auth 开启且 Cookie 无效时为 true）。 */
+    public boolean unauthorized(HttpExchange ex) {
+        return currentUser(ex).isEmpty() && authEnabled();
+    }
+
+    /** 解析当前登录用户；免登录模式恒为 dev admin。 */
+    public Optional<AuthContext> currentUser(HttpExchange ex) {
         try {
-            if (!store.authEnabled()) {
-                return new AuthContext("admin", AdminUser.ROLE_ADMIN);
+            if (!authEnabled()) {
+                return Optional.of(new AuthContext("admin", AdminUser.ROLE_ADMIN));
             }
             return sessions.resolve(ex);
         } catch (Exception e) {
-            return null;
+            return Optional.empty();
         }
     }
 
     public String role(HttpExchange ex) {
-        AuthContext ctx = resolve(ex);
-        return ctx == null ? null : ctx.role();
+        return currentUser(ex).map(AuthContext::role).orElse(null);
     }
 
     public String operator(HttpExchange ex) {
-        AuthContext ctx = resolve(ex);
-        return ctx == null ? null : ctx.username();
+        return currentUser(ex).map(AuthContext::username).orElse(null);
     }
 
-    public boolean unauthorized(HttpExchange ex) {
-        try {
-            return resolve(ex) == null && store.authEnabled();
-        } catch (Exception e) {
-            return true;
-        }
+    /** GET /me：凭 Cookie 解析用户并返回画像。 */
+    public Map<String, Object> userProfile(HttpExchange ex, String currentSpace, int pendingCount)
+            throws Exception {
+        Optional<AuthContext> ctx = currentUser(ex);
+        if (ctx.isEmpty() && authEnabled()) return null;
+        AuthContext user = ctx.orElse(new AuthContext("admin", AdminUser.ROLE_ADMIN));
+        return AdminUserProfile.build(user, spaces, currentSpace, authEnabled(), pendingCount);
     }
 
-    public Map<String, Object> me(HttpExchange ex, String currentSpace) throws Exception {
-        String role = role(ex);
-        if (role == null && store.authEnabled()) return null;
-        String username = operator(ex);
-        var out = new LinkedHashMap<String, Object>();
-        out.put("username", username);
-        out.put("role", role == null ? AdminUser.ROLE_ADMIN : role);
-        out.put("auth_enabled", store.authEnabled());
-        out.put("current_space", currentSpace);
-        if (spaces != null) {
-            out.put("spaces", spaces.spacesForUser(username, role == null ? AdminUser.ROLE_ADMIN : role));
-            String spaceRole = spaces.spaceRole(username, role, currentSpace);
-            out.put("space_role", spaceRole);
-        } else {
-            out.put("spaces", List.of(Map.of(
-                    "space_key", SpaceService.DEFAULT_SPACE,
-                    "display_name", "默认空间",
-                    "role", role == null ? AdminUser.ROLE_ADMIN : role)));
-            out.put("space_role", role == null ? AdminUser.ROLE_ADMIN : role);
-        }
-        return out;
+    /** POST /login 成功后：用已校验用户组装画像（不读 Cookie）。 */
+    public Map<String, Object> userProfile(AuthContext ctx, String currentSpace, int pendingCount)
+            throws Exception {
+        return AdminUserProfile.build(ctx, spaces, currentSpace, authEnabled(), pendingCount);
     }
 
-    public boolean login(HttpExchange ex, String username, String password) throws Exception {
-        if (!store.authEnabled()) return false;
+    /**
+     * 登录：校验密码 → 建立服务端会话 → 返回用户上下文。
+     * 失败返回 empty（用户名/密码错误或 auth 未启用）。
+     */
+    public Optional<AuthContext> login(HttpExchange ex, String username, String password) throws Exception {
+        if (!authEnabled()) return Optional.empty();
         String role = store.authenticate(username, password);
-        if (role == null) return false;
-        sessions.login(ex, username, role);
-        return true;
+        if (role == null) return Optional.empty();
+        return Optional.of(sessions.establish(ex, username, role));
     }
 
     public void logout(HttpExchange ex) throws IOException {

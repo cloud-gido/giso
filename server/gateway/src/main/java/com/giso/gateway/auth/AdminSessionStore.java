@@ -13,4 +13,10 @@ public interface AdminSessionStore {
     Optional<Session> find(String sessionId) throws SQLException;
 
     void delete(String sessionId) throws SQLException;
+
+    /** 登录时撤销该用户其它会话（管理台单端登录）。 */
+    void revokeAllForUser(String username) throws SQLException;
+
+    /** 滑动续期：活跃请求延长 expires_at。 */
+    void touch(String sessionId, long ttlMs) throws SQLException;
 }

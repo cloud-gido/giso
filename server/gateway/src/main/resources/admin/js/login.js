@@ -1,4 +1,4 @@
-import { fetchMe, login } from './auth.js';
+import { redirectIfAuthenticated, signIn } from './auth.js';
 
 const form = document.getElementById('login-form');
 const err = document.getElementById('err');
@@ -10,7 +10,7 @@ form.addEventListener('submit', async (e) => {
   btn.disabled = true;
   const fd = new FormData(form);
   try {
-    await login(
+    await signIn(
       fd.get('username')?.toString().trim() ?? '',
       fd.get('password')?.toString() ?? '',
     );
@@ -23,9 +23,4 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-fetchMe().then((me) => {
-  if (me) {
-    const next = new URLSearchParams(location.search).get('next') || '/admin/';
-    location.replace(next);
-  }
-});
+redirectIfAuthenticated();
