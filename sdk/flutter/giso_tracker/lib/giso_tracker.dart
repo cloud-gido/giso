@@ -1,4 +1,5 @@
 /// GISO Flutter tracking SDK — protocol-aligned page/biz/element events.
+library;
 
 export 'src/config.dart';
 export 'src/generated.dart';

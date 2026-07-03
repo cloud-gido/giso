@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.4] - 2026-07-03
+
+### Fixed
+
+- **Flutter SDK**: use unnamed `library;` so top-level doc comment passes `dangling_library_doc_comments` under `--fatal-infos`.
+
+---
+
 ## [1.0.3] - 2026-07-03
 
 ### Fixed
