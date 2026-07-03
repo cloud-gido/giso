@@ -103,6 +103,13 @@ def const_name(s: str) -> str:
     return s.upper()
 
 
+def dart_const_name(s: str) -> str:
+    parts = s.split("_")
+    if not parts:
+        return s
+    return parts[0] + "".join(p[:1].upper() + p[1:] for p in parts[1:] if p)
+
+
 def gen_ts(reg) -> str:
     def block(name, items, key, desc):
         lines = [f"export const {name} = {{"]
@@ -148,7 +155,6 @@ def gen_java(reg) -> dict[str, str]:
 def gen_dart(reg) -> str:
     def block(class_name, items, key, desc):
         lines = [
-            f"// {HEADER}",
             "",
             f"/// Registry constants for `{class_name}`.",
             f"class {class_name} {{",
@@ -157,16 +163,17 @@ def gen_dart(reg) -> str:
         ]
         for it in items:
             lines.append(f"  /// {it[desc]}")
-            lines.append(f"  static const String {const_name(it[key])} = '{it[key]}';")
+            lines.append(f"  static const String {dart_const_name(it[key])} = '{it[key]}';")
         lines.append("}")
-        return "\n".join(lines) + "\n"
+        return "\n".join(lines)
 
     return (
-        f"// {HEADER}\n\n"
+        f"// {HEADER}\n"
         + block("Pages", reg["pages"], "pgid", "desc")
-        + "\n" + block("Elements", reg["elements"], "eid", "desc")
-        + "\n" + block("Params", reg["params"], "key", "desc")
-        + "\n" + block("BizEvents", reg["events"], "code", "desc")
+        + block("Elements", reg["elements"], "eid", "desc")
+        + block("Params", reg["params"], "key", "desc")
+        + block("BizEvents", reg["events"], "code", "desc")
+        + "\n"
     )
 
 

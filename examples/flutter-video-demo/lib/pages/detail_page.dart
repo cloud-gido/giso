@@ -19,13 +19,13 @@ class _DetailPageState extends State<DetailPage> {
     setState(() => _playing = !_playing);
     if (_playing) {
       GisoTracker.instance.bizEvent(
-        BizEvents.VIDEO_PLAY_START,
-        {Params.VID: widget.vid},
+        BizEvents.videoPlayStart,
+        {Params.vid: widget.vid},
       );
     } else {
       GisoTracker.instance.bizEvent(
-        BizEvents.VIDEO_PLAY_END,
-        {Params.VID: widget.vid, Params.PLAY_DUR: 3000, Params.PLAY_POS: 3000},
+        BizEvents.videoPlayEnd,
+        {Params.vid: widget.vid, Params.playDur: 3000, Params.playPos: 3000},
       );
     }
   }
@@ -33,8 +33,8 @@ class _DetailPageState extends State<DetailPage> {
   @override
   Widget build(BuildContext context) {
     return TrackedPage(
-      pgid: Pages.VIDEO_DETAIL,
-      pgParams: {Params.VID: widget.vid},
+      pgid: Pages.videoDetail,
+      pgParams: {Params.vid: widget.vid},
       child: Scaffold(
         appBar: AppBar(title: Text('播放 · ${widget.vid}')),
         body: Center(
@@ -54,8 +54,8 @@ class _DetailPageState extends State<DetailPage> {
               OutlinedButton(
                 onPressed: () {
                   GisoTracker.instance.elementClick(
-                    eid: Elements.LIKE_BTN,
-                    params: {Params.VID: widget.vid},
+                    eid: Elements.likeBtn,
+                    params: {Params.vid: widget.vid},
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('已上报 element_click · like_btn')),

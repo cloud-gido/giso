@@ -1,4 +1,5 @@
-/// Protocol types aligned with docs/tracking/02-上报协议规范.md.
+// Protocol types aligned with docs/tracking/02-上报协议规范.md.
+library;
 
 typedef Params = Map<String, Object?>;
 typedef Passthrough = Map<String, dynamic>;

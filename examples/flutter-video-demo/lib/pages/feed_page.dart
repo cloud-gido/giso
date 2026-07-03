@@ -34,8 +34,8 @@ class _FeedPageState extends State<FeedPage> {
   @override
   Widget build(BuildContext context) {
     return TrackedPage(
-      pgid: Pages.VIDEO_FEED,
-      pgParams: {Params.TAB_NAME: 'recommend'},
+      pgid: Pages.videoFeed,
+      pgParams: {Params.tabName: 'recommend'},
       child: Scaffold(
         appBar: AppBar(title: const Text('GISO Flutter · 推荐流')),
         body: Column(
@@ -77,9 +77,9 @@ class _FeedPageState extends State<FeedPage> {
                     subtitle: Text(vid),
                     onTap: () {
                       GisoTracker.instance.elementClick(
-                        eid: Elements.VIDEO_CARD,
+                        eid: Elements.videoCard,
                         pos: index,
-                        params: {Params.VID: vid},
+                        params: {Params.vid: vid},
                       );
                       Navigator.pushNamed(
                         context,

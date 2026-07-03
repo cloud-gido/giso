@@ -44,22 +44,22 @@ Future<void> main() async {
 
 ```dart
 TrackedPage(
-  pgid: Pages.VIDEO_FEED,
-  pgParams: {Params.TAB_NAME: 'recommend'},
+  pgid: Pages.videoFeed,
+  pgParams: {Params.tabName: 'recommend'},
   child: FeedList(),
 )
 ```
 
 ```dart
 GisoTracker.instance.elementClick(
-  eid: Elements.VIDEO_CARD,
+  eid: Elements.videoCard,
   pos: index,
-  params: {Params.VID: video.id},
+  params: {Params.vid: video.id},
 );
 
 GisoTracker.instance.bizEvent(
-  BizEvents.VIDEO_PLAY_START,
-  {Params.VID: vid},
+  BizEvents.videoPlayStart,
+  {Params.vid: vid},
 );
 ```
 
