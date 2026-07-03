@@ -64,6 +64,7 @@ Initial open-source baseline (pre-SDK package publish).
 
 ---
 
-[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/cloud-gido/giso/releases/tag/v1.0.1
 [1.0.0]: https://github.com/cloud-gido/giso/releases/tag/v1.0.0
 [0.1.0]: https://github.com/cloud-gido/giso/releases/tag/v0.1
