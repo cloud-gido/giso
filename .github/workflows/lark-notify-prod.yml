@@ -1,0 +1,42 @@
+# 正式 Lark — 仅手动触发，须勾选确认 + secret LARK_WEBHOOK_URL_PROD
+name: Lark notify (prod)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 通知类型
+        required: true
+        default: push
+        type: choice
+        options:
+          - push
+          - release
+      version:
+        description: release 模式版本号（如 1.0.1）
+        required: false
+        default: "1.0.1"
+      confirm_prod:
+        description: 确认发送到正式 Lark 群
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    if: github.repository == 'cloud-gido/giso' && inputs.confirm_prod == true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send to prod Lark
+        env:
+          LARK_WEBHOOK_URL_PROD: ${{ secrets.LARK_WEBHOOK_URL_PROD }}
+          GISO_COMMIT: ${{ github.sha }}
+          GISO_COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'manual dispatch' }}
+          GISO_VERSION: ${{ inputs.version }}
+        run: |
+          python3 scripts/lark-notify.py \
+            --mode "${{ inputs.mode }}" \
+            --channel prod \
+            --approve-prod

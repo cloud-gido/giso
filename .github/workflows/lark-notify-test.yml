@@ -1,0 +1,27 @@
+# push main → 测试 Lark 群（secret: LARK_WEBHOOK_URL_TEST）
+name: Lark notify (test)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    if: github.repository == 'cloud-gido/giso'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Send push card to test Lark
+        env:
+          LARK_WEBHOOK_URL_TEST: ${{ secrets.LARK_WEBHOOK_URL_TEST }}
+          GISO_COMMIT: ${{ github.sha }}
+          GISO_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          if [[ -z "$LARK_WEBHOOK_URL_TEST" ]]; then
+            echo "LARK_WEBHOOK_URL_TEST not set, skip"
+            exit 0
+          fi
+          python3 scripts/lark-notify.py --mode push --channel test

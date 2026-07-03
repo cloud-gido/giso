@@ -74,3 +74,10 @@ examples/web-news-demo/dist/
 examples/android-video-demo.zip
 **/*.zip
 !gradle/wrapper/*.jar
+
+### Lark webhook（本地密钥，勿提交）###
+.env.lark.local
+
+### Web SDK build output ###
+sdk/web/dist/
+sdk/web/package-lock.json

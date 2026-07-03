@@ -54,6 +54,18 @@
 
 外部 App 对接常见问题见 [**08-接入常见问题FAQ**](docs/tracking/08-接入常见问题FAQ.md)。English: [**docs/en/**](docs/en/README.md).
 
+## 管理控制台一览
+
+v1.0.1 管理台 v2：五栏侧栏 + GIDO 风格顶栏，覆盖联调、登记、审批、质量、平台治理。完整截图说明见 [**15-管理控制台产品介绍**](docs/tracking/15-管理控制台产品介绍.md)。
+
+| | |
+|---|---|
+| ![实时联调](docs/images/admin/01-live-debug.png) | **实时联调** — SSE 推送，绿/黄/红三分类，按 did 过滤 |
+| ![注册表](docs/images/admin/02-registry.png) | **注册表** — 四池登记、批量/CSV、PostgreSQL 持久化 |
+| ![接入助手](docs/images/admin/05-copilot.png) | **接入助手** — FAQ 语料 + 可选 LLM，接入答疑 |
+
+更多界面（待审批、质量统计、空间/账号/系统设置、产品导航）见 [15-管理控制台产品介绍](docs/tracking/15-管理控制台产品介绍.md)。
+
 ## 快速开始
 
 ### 本地开发（Docker Compose）
@@ -101,6 +113,7 @@ java -jar target/giso-gateway.jar --config gateway.yaml --port 8123
 | [09-账号与权限体系](docs/tracking/09-账号与权限体系.md) | 管理台登录、角色、审批 |
 | [02-上报协议规范](docs/tracking/02-上报协议规范.md) | 信封、session_id、pt 透传 |
 | [00-开源产品全景方案](docs/tracking/00-开源产品全景方案.md) | **模块清单 · 路线图 · 文档索引** |
+| [**15-管理控制台产品介绍**](docs/tracking/15-管理控制台产品介绍.md) | **管理台 v2 截图与功能说明** |
 | [11-建设路线图](docs/tracking/11-建设路线图.md) | 分阶段交付与验收 |
 | [CHANGELOG.md](CHANGELOG.md) | **版本说明（1.0.0 / 1.0.1）** |
 | [deploy/DEPLOYMENT](deploy/DEPLOYMENT.md) | 测试环境 · ArgoCD · Doppler |
@@ -122,7 +135,8 @@ server/doris/              Doris DDL + Routine Load
 server/paimon/             Flink + Paimon 湖仓 SQL
 deploy/                    Docker Compose（含 Postgres）
 k8s/ · helm/giso/          Gateway K8s / Helm 清单
-docs/tracking/             00–14 产品文档 · FAQ · 接入指南
+docs/tracking/             00–15 产品文档 · FAQ · 接入指南 · 管理台介绍
+docs/images/admin/         管理控制台界面截图（文档引用）
 docs/en/                   英文核心文档
 ```
 
