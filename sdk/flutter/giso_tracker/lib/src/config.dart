@@ -15,7 +15,7 @@ class GisoConfig {
     this.devBrand = '',
     this.devModel = '',
     this.screenRes = '',
-    this.netType = 'unknown',
+    this.netType = '',
     this.lang = '',
     this.tz = '',
   });
@@ -37,11 +37,23 @@ class GisoConfig {
   final String? env;
   final int batchSize;
   final int flushIntervalMs;
+
+  /// Overrides auto-detected OS version when non-empty.
   final String osVersion;
+
+  /// Overrides auto-detected device brand when non-empty.
   final String devBrand;
+
+  /// Overrides auto-detected device model when non-empty.
   final String devModel;
+
+  /// Overrides auto-detected logical screen size when non-empty.
   final String screenRes;
+
+  /// Overrides auto-detected network (`wifi` / `cellular` / `none`) when non-empty.
   final String netType;
+
+  /// Overrides auto-detected locale when non-empty.
   final String lang;
   final String tz;
 

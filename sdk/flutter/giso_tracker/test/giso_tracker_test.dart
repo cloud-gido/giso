@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:giso_tracker/giso_tracker.dart';
+import 'package:giso_tracker/src/device_collector.dart';
 
 void main() {
   test('PageContext serializes optional fields', () {
@@ -29,6 +30,11 @@ void main() {
     expect(json['pos'], 2);
     expect(json['exp_dur'], 800);
     expect(json['exp_ratio'], 0.72);
+  });
+
+  test('pickCommonField prefers explicit config overrides', () {
+    expect(pickCommonField('custom', 'auto'), 'custom');
+    expect(pickCommonField('', 'auto'), 'auto');
   });
 
   test('GisoConfig resolves env from debug flag', () {

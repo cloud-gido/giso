@@ -8,14 +8,14 @@
 
 **`giso_tracker` Dart 包**（路径 `sdk/flutter/giso_tracker`），与 Android/iOS/Web 共用 `POST /v1/track` 协议。
 
-安装（公开仓库，**ref: v1.0.4**，勿用 v1.0.1）：
+安装（公开仓库，**ref: v1.0.5**，勿用 v1.0.1）：
 
 ```yaml
 dependencies:
   giso_tracker:
     git:
       url: https://github.com/cloud-gido/giso.git
-      ref: v1.0.4
+      ref: v1.0.5
       path: sdk/flutter/giso_tracker
 ```
 

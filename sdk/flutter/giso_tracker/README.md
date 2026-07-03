@@ -15,7 +15,7 @@ dependencies:
   giso_tracker:
     git:
       url: https://github.com/cloud-gido/giso.git
-      ref: v1.0.4
+      ref: v1.0.5
       path: sdk/flutter/giso_tracker
 ```
 
@@ -35,6 +35,7 @@ Future<void> main() async {
     appKey: 'video-android-beta',
     appVersion: '1.0.0',
     endpoint: 'https://gamelinelab-giso.envir.dev/v1/track',
+    channel: 'google_play', // optional; device fields auto-collected when empty
     debug: kDebugMode,
   ));
   GisoLifecycleBinding.attach();
@@ -72,6 +73,8 @@ GisoTracker.instance.bizEvent(
 | `elementExposure` | `element_exposure` |
 | `bizEvent` | `biz_event` |
 | lifecycle via `GisoLifecycleBinding` | `app_install`, `app_launch`, `app_foreground`, `app_background` |
+
+`common.os_vrsn` / `dev_brand` / `dev_model` / `screen_res` / `net_type` / `lang` are **auto-collected** on mobile (same as Android SDK). Pass non-empty values in `GisoConfig` only to override.
 
 ## Versioning
 

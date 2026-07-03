@@ -3,9 +3,10 @@ import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
+import 'device_collector.dart';
 import 'types.dart';
 
-const sdkVersion = '1.0.1';
+const sdkVersion = '1.0.5';
 const _didKey = 'giso_did';
 const _sessionKey = 'giso_session';
 const _activatedKey = 'giso_activated';
@@ -67,7 +68,11 @@ Future<CommonParams> buildCommon({
   required SharedPreferences prefs,
   required String uid,
   required String platform,
+  DeviceCollector? device,
 }) async {
+  final net = device != null
+      ? await device.netType()
+      : (config.netType != 'unknown' ? config.netType : 'unknown');
   return CommonParams(
     appId: config.appId,
     platform: platform,
@@ -78,12 +83,15 @@ Future<CommonParams> buildCommon({
     sessionId: await touchSession(prefs),
     channel: config.channel,
     env: config.resolvedEnv(),
-    osVersion: config.osVersion,
-    devBrand: config.devBrand,
-    devModel: config.devModel,
-    screenRes: config.screenRes,
-    netType: config.netType,
-    lang: config.lang,
+    osVersion: pickCommonField(config.osVersion, device?.osVersion ?? ''),
+    devBrand: pickCommonField(config.devBrand, device?.devBrand ?? ''),
+    devModel: pickCommonField(config.devModel, device?.devModel ?? ''),
+    screenRes: pickCommonField(config.screenRes, device?.screenRes() ?? ''),
+    netType: pickCommonField(
+      config.netType != 'unknown' ? config.netType : '',
+      net,
+    ),
+    lang: pickCommonField(config.lang, device?.lang() ?? ''),
     tz: config.tz.isNotEmpty ? config.tz : tzOffset(),
   );
 }

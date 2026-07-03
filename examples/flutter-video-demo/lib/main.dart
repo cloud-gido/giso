@@ -14,17 +14,20 @@ const gisoAppKey = String.fromEnvironment(
   'GISO_APP_KEY',
   defaultValue: 'video-android-beta',
 );
+const gisoChannel = String.fromEnvironment(
+  'GISO_CHANNEL',
+  defaultValue: 'demo',
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await GisoTracker.instance.init(GisoConfig(
     appId: gisoAppKey,
     appKey: gisoAppKey,
-    appVersion: '1.0.4-demo',
+    appVersion: '1.0.5-demo',
     endpoint: gisoEndpoint,
+    channel: gisoChannel,
     debug: kDebugMode,
-    devBrand: 'flutter-demo',
-    devModel: 'demo',
   ));
   GisoLifecycleBinding.attach();
   runApp(const VideoDemoApp());

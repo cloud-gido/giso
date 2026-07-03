@@ -1,9 +1,9 @@
 # GISO · 玑源
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.4-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.5-green.svg)](CHANGELOG.md)
 [![Maven SDK](https://img.shields.io/badge/Maven-com.giso%3Atracker-1.0.0-blue)](docs/tracking/13-SDK分发与版本.md)
-[![Flutter SDK](https://img.shields.io/badge/Flutter-giso__tracker-1.0.4-blue)](docs/tracking/14-Flutter接入指南.md)
+[![Flutter SDK](https://img.shields.io/badge/Flutter-giso__tracker-1.0.5-blue)](docs/tracking/14-Flutter接入指南.md)
 
 **GIDO 的数据源头** — Schema 驱动的移动端 + Web 行为分析平台。
 
@@ -11,7 +11,7 @@
 
 | | |
 |---|---|
-| **版本** | [1.0.4](CHANGELOG.md#104---2026-07-03)（Flutter SDK · 长视频双端 Demo） |
+| **版本** | [1.0.5](CHANGELOG.md#105---2026-07-03)（Flutter SDK 自动设备采集 · 长视频双端 Demo） |
 | **协议** | [Apache License 2.0](LICENSE) · [NOTICE](NOTICE) |
 | **维护者** | Felix Zhu \<[troyzhujingbin@163.com](mailto:troyzhujingbin@163.com)\> |
 | **源码** | [github.com/cloud-gido/giso](https://github.com/cloud-gido/giso) |

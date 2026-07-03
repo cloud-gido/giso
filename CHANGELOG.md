@@ -18,14 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **长视频 Flutter Demo**（`examples/flutter-video-demo`）：与 Android demo 对齐的推荐流 / 播放 / 剧集 / 播放心跳 / 联调面板；含 `android/` 工程与 `build-apk.sh`。
-- **`scripts/install-android-ndk.sh`**：国内镜像（googledownloads.cn）安装 NDK，解决 Flutter 构建 `dl.google.com` 不可达。
-- **文档**：[16-长视频双端Demo与接入对照](docs/tracking/16-长视频双端Demo与接入对照.md) — Android / Flutter 同一注册表、埋点差异、联调清单。
+- **Flutter SDK**（`giso_tracker`）：`common` 自动采集 `os_vrsn` / `dev_brand` / `dev_model` / `screen_res` / `net_type` / `lang`（`device_info_plus`、`connectivity_plus`），与 Android SDK 对齐；`GisoConfig` 非空字段可覆盖。
+- **长视频 Flutter Demo**（`examples/flutter-video-demo`）：推荐流 / 播放 / 剧集 / 播放心跳 / 联调面板；`android/` 工程与 `build-apk.sh`。
+- **`scripts/bootstrap-android-sdk.sh`**、**`scripts/install-android-cmake.sh`**：国内镜像安装 NDK、CMake 3.22.1、build-tools 35、platform 36。
+- **文档**：[16-长视频双端Demo与接入对照](docs/tracking/16-长视频双端Demo与接入对照.md)。
 
 ### Changed
 
-- Flutter / SDK 接入文档示例依赖统一为 **`ref: v1.0.4`**（修复 v1.0.1 `Params` 重复导出）。
-- Android demo 版本号 `1.0.4-demo`；README 互链 Flutter 版。
+- Flutter / SDK 接入文档示例依赖统一为 **`ref: v1.0.5`**（v1.0.4 无自动设备采集；勿用 v1.0.1 `Params` 重复导出）。
+- Flutter demo：`android/build.gradle.kts` 为插件子工程配置 buildscript 阿里云镜像（`connectivity_plus` 等）。
+
+### Fixed
+
+- Flutter 真机 `common` 设备字段为空（此前需手填 `GisoConfig`，demo 曾写死 `flutter-demo`）。
 
 ---
 

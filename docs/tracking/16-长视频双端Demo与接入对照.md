@@ -11,7 +11,7 @@
 |--|--------------|---------|
 | 路径 | `examples/android-video-demo/` | `examples/flutter-video-demo/` |
 | 包名 | `com.giso.demo.video` | `com.giso.demo.flutter` |
-| SDK | `sdk/android` · `com.giso:tracker` | `sdk/flutter/giso_tracker` @ **`v1.0.4`** |
+| SDK | `sdk/android` · `com.giso:tracker` | `sdk/flutter/giso_tracker` @ **`v1.0.5`** |
 | 构建 | `./gradlew :app:assembleDebug` | `./build-apk.sh` |
 | APK | `app/build/outputs/apk/debug/app-debug.apk` | `build/app/outputs/flutter-apk/app-debug.apk` |
 
@@ -127,7 +127,7 @@ Flutter Demo 列表 UI 较简，Feed 上主要报 `video_card`；详情页才有
 | 曝光时机 | Android SDK 统一口径；Flutter Demo 列表项出现时即报（正式接入建议 `visibility_detector` 对齐 50%/500ms） |
 | Feed 卡片子元素 | Android 绑 `play_btn`/`like_btn`/`cp_avatar`/`share_btn`；Flutter Demo 主要 `video_card` |
 | `rec_trace_id` | Android 放 element params + pt；Flutter Demo 放 `pt` 透传（推荐） |
-| `common.dev_brand` | Flutter Demo 为 `flutter-demo`，便于区分 demo 包 |
+| `common` 设备字段 | Flutter SDK 1.0.2+ 自动采集，与 Android 原生一致 |
 
 ---
 
@@ -144,7 +144,7 @@ dependencies:
   giso_tracker:
     git:
       url: https://github.com/cloud-gido/giso.git
-      ref: v1.0.4
+      ref: v1.0.5
       path: sdk/flutter/giso_tracker
 ```
 
@@ -158,6 +158,7 @@ await GisoTracker.instance.init(GisoConfig(
   appKey: 'video-android-beta',
   appVersion: packageInfo.version,
   endpoint: 'https://gamelinelab-giso.envir.dev/v1/track',
+  channel: 'demo', // 或 flavor / --dart-define 注入
   debug: kDebugMode,
 ));
 GisoLifecycleBinding.attach();

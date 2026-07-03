@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'common.dart';
 import 'config.dart';
+import 'device_collector.dart';
 import 'event_queue.dart';
 import 'types.dart';
 
@@ -21,6 +22,7 @@ class GisoTracker with WidgetsBindingObserver {
   GisoConfig? _config;
   SharedPreferences? _prefs;
   EventQueue? _queue;
+  final DeviceCollector _device = DeviceCollector();
   String _uid = '';
   String _platform = 'android';
   bool _lifecycleHooked = false;
@@ -37,6 +39,7 @@ class GisoTracker with WidgetsBindingObserver {
     _config = config;
     _prefs = await SharedPreferences.getInstance();
     _platform = config.platform ?? _detectPlatform();
+    await _device.init(_platform);
     _queue = EventQueue(
       endpoint: config.endpoint,
       appKey: config.appKey,
@@ -208,6 +211,7 @@ class GisoTracker with WidgetsBindingObserver {
       prefs: prefs,
       uid: _uid,
       platform: _platform,
+      device: _device,
     );
     final envelope = <String, dynamic>{
       'event': event,

@@ -7,6 +7,20 @@ allprojects {
     }
 }
 
+// Flutter plugins (connectivity_plus, device_info_plus, …) ship their own
+// buildscript { repositories { google() } }; mirror first for China networks.
+subprojects {
+    buildscript {
+        repositories {
+            maven { url = uri("https://maven.aliyun.com/repository/google") }
+            maven { url = uri("https://maven.aliyun.com/repository/public") }
+            maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
+            google()
+            mavenCentral()
+        }
+    }
+}
+
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
         .dir("../../build")

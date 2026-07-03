@@ -47,6 +47,7 @@ bash scripts/bootstrap-android-sdk.sh   # NDK + CMake 3.22.1 + build-tools 35 + 
 | `NDK not configured` | 运行 `bootstrap-android-sdk.sh`（走 googledownloads.cn） |
 | `Build Tools revision 35.0.0` | 运行 `bootstrap-android-sdk.sh`（含 build-tools 35 + platform 36） |
 | `repo.maven.apache.org` TLS 失败 | `android/settings.gradle.kts` 已优先阿里云 Maven |
+| `dl.google.com` / 插件 AGP 下载失败 | `android/build.gradle.kts` 已为所有 Flutter 插件子工程配置 buildscript 镜像 |
 | `CMake '3.22.1' was not found` | 运行 `bootstrap-android-sdk.sh`（含 CMake；镜像无包时从 cmake.org 拉取） |
 
 **Android 原生版**（ExoPlayer，功能更完整）见 [../android-video-demo/README.md](../android-video-demo/README.md)。
@@ -91,13 +92,13 @@ giso_tracker:
   path: ../../sdk/flutter/giso_tracker
 ```
 
-对外团队可改用公开 Git 依赖（`ref: v1.0.4`）：
+对外团队可改用公开 Git 依赖（`ref: v1.0.5`）：
 
 ```yaml
 giso_tracker:
   git:
     url: https://github.com/cloud-gido/giso.git
-    ref: v1.0.4
+    ref: v1.0.5
     path: sdk/flutter/giso_tracker
 ```
 
