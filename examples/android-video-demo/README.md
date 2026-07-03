@@ -16,13 +16,16 @@
 
 ### 方式 A：测试环境（默认，全国任意网络）
 
-App 默认连 **EKS 测试网关**，无需局域网。已构建 debug APK：
+App 默认连 **EKS 测试网关**，无需局域网。构建 debug APK：
 
 ```bash
 cd examples/android-video-demo
 ./gradlew :app:assembleDebug
 # 安装包：app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+**Flutter 版**见 [../flutter-video-demo/README.md](../flutter-video-demo/README.md)，包名 `com.giso.demo.flutter`。
 
 | 构建 | endpoint | App Key | env | Kafka topic |
 |------|----------|---------|-----|-------------|

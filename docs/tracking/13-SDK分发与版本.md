@@ -121,7 +121,7 @@ dependencies:
   giso_tracker:
     git:
       url: https://github.com/cloud-gido/giso.git
-      ref: v1.0.1
+      ref: v1.0.4
       path: sdk/flutter/giso_tracker
 ```
 
@@ -149,7 +149,7 @@ await GisoTracker.instance.init(GisoConfig(
 GisoLifecycleBinding.attach();
 ```
 
-CI 打 tag 时会 `flutter analyze` + `flutter test`，并上传 `giso_tracker-<version>.tar.gz` 构建产物（Actions artifacts）。完整 API 见 [sdk/flutter/giso_tracker/README.md](../../sdk/flutter/giso_tracker/README.md) 与 [14-Flutter接入指南](14-Flutter接入指南.md)。
+CI 打 tag 时会 `flutter analyze` + `flutter test`，并上传 `giso_tracker-<version>.tar.gz` 构建产物（Actions artifacts）。完整 API 见 [sdk/flutter/giso_tracker/README.md](../../sdk/flutter/giso_tracker/README.md) 与 [14-Flutter接入指南](14-Flutter接入指南.md)。长视频 Android / Flutter 双端对照见 [16-长视频双端Demo与接入对照](16-长视频双端Demo与接入对照.md)。
 
 管理台 **接入助手** 页可下载 **Flutter 接入清单**（`/admin/templates/flutter-onboarding-checklist.md`）。
 
@@ -333,6 +333,7 @@ git push origin v1.0.0
 | [06-接入指南](06-接入指南.md) | 六步埋点开发 |
 | [07-外部视频App接入问卷](07-外部视频App接入问卷.md) | 接入前登记 |
 | [08-接入常见问题FAQ](08-接入常见问题FAQ.md) | App Key、Kafka、心跳、SSE |
+| [16-长视频双端Demo对照](16-长视频双端Demo与接入对照.md) | **长视频 Android / Flutter 同一注册表** |
 | [14-Flutter接入指南](14-Flutter接入指南.md) | **Flutter `giso_tracker` 包** |
 | [sdk/flutter/giso_tracker/README.md](../../sdk/flutter/giso_tracker/README.md) | Flutter API 摘要 |
 | [02-上报协议规范](02-上报协议规范.md) | 协议字段 |

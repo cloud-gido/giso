@@ -4,12 +4,13 @@ import 'package:giso_tracker/giso_tracker.dart';
 
 import 'pages/detail_page.dart';
 import 'pages/feed_page.dart';
+import 'pages/series_page.dart';
 
-const _endpoint = String.fromEnvironment(
+const gisoEndpoint = String.fromEnvironment(
   'GISO_ENDPOINT',
   defaultValue: 'https://gamelinelab-giso.envir.dev/v1/track',
 );
-const _appKey = String.fromEnvironment(
+const gisoAppKey = String.fromEnvironment(
   'GISO_APP_KEY',
   defaultValue: 'video-android-beta',
 );
@@ -17,10 +18,10 @@ const _appKey = String.fromEnvironment(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await GisoTracker.instance.init(GisoConfig(
-    appId: _appKey,
-    appKey: _appKey,
-    appVersion: '1.0.0-demo',
-    endpoint: _endpoint,
+    appId: gisoAppKey,
+    appKey: gisoAppKey,
+    appVersion: '1.0.4-demo',
+    endpoint: gisoEndpoint,
     debug: kDebugMode,
     devBrand: 'flutter-demo',
     devModel: 'demo',
@@ -35,16 +36,31 @@ class VideoDemoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'GISO Flutter Demo',
+      title: 'GISO Flutter 长视频',
       theme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true),
-      home: const FeedPage(),
+      home: FeedPage(endpoint: gisoEndpoint, appKey: gisoAppKey),
       onGenerateRoute: (settings) {
-        if (settings.name == DetailPage.routeName) {
-          final vid = settings.arguments as String? ?? 'v001';
-          return MaterialPageRoute<void>(
-            builder: (_) => DetailPage(vid: vid),
-            settings: settings,
-          );
+        switch (settings.name) {
+          case DetailPage.routeName:
+            final vid = settings.arguments as String? ?? 'vid_journey_01';
+            return MaterialPageRoute<void>(
+              builder: (_) => DetailPage(
+                vid: vid,
+                endpoint: gisoEndpoint,
+                appKey: gisoAppKey,
+              ),
+              settings: settings,
+            );
+          case SeriesPage.routeName:
+            final seriesId = settings.arguments as String? ?? 'series_journey';
+            return MaterialPageRoute<void>(
+              builder: (_) => SeriesPage(
+                seriesId: seriesId,
+                endpoint: gisoEndpoint,
+                appKey: gisoAppKey,
+              ),
+              settings: settings,
+            );
         }
         return null;
       },

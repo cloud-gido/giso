@@ -1,9 +1,9 @@
 # GISO · 玑源
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.1-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.4-green.svg)](CHANGELOG.md)
 [![Maven SDK](https://img.shields.io/badge/Maven-com.giso%3Atracker-1.0.0-blue)](docs/tracking/13-SDK分发与版本.md)
-[![Flutter SDK](https://img.shields.io/badge/Flutter-giso__tracker-1.0.1-blue)](docs/tracking/14-Flutter接入指南.md)
+[![Flutter SDK](https://img.shields.io/badge/Flutter-giso__tracker-1.0.4-blue)](docs/tracking/14-Flutter接入指南.md)
 
 **GIDO 的数据源头** — Schema 驱动的移动端 + Web 行为分析平台。
 
@@ -11,7 +11,7 @@
 
 | | |
 |---|---|
-| **版本** | [1.0.1](CHANGELOG.md#101---2026-07-03)（Flutter SDK + 管理台 v2） |
+| **版本** | [1.0.4](CHANGELOG.md#104---2026-07-03)（Flutter SDK · 长视频双端 Demo） |
 | **协议** | [Apache License 2.0](LICENSE) · [NOTICE](NOTICE) |
 | **维护者** | Felix Zhu \<[troyzhujingbin@163.com](mailto:troyzhujingbin@163.com)\> |
 | **源码** | [github.com/cloud-gido/giso](https://github.com/cloud-gido/giso) |
@@ -104,6 +104,7 @@ java -jar target/giso-gateway.jar --config gateway.yaml --port 8123
 
 | 文档 | 说明 |
 |---|---|
+| [**16-长视频双端Demo对照**](docs/tracking/16-长视频双端Demo与接入对照.md) | **Android / Flutter 同一注册表 · 埋点差异 · 联调** |
 | [**08-接入常见问题FAQ**](docs/tracking/08-接入常见问题FAQ.md) | **App 对接 QA：session_id、登记、App Key、隔离区、SSE 联调** |
 | [**13-SDK分发与版本**](docs/tracking/13-SDK分发与版本.md) | **外部 App 拿包、Maven/npm 坐标、Key、endpoint** |
 | [**14-Flutter接入指南**](docs/tracking/14-Flutter接入指南.md) | **Flutter / Dart 跨端 App 直连接入** |
@@ -129,13 +130,13 @@ schema/                    注册表 Git 镜像（codegen / 种子）
 tools/registry/            RDS 建库 · 导入 · 导出脚本
 tools/codegen/             五端常量生成（TS / Java / Swift / Dart）
 sdk/                       web · android · ios · flutter/giso_tracker · server
-examples/                  android-video-demo · flutter-video-demo · ios/web demo
+examples/                  android-video-demo · flutter-video-demo（长视频联调样例）
 server/gateway/            接入网关 + 管理台（PostgreSQL 注册表 · Session 鉴权）
 server/doris/              Doris DDL + Routine Load
 server/paimon/             Flink + Paimon 湖仓 SQL
 deploy/                    Docker Compose（含 Postgres）
 k8s/ · helm/giso/          Gateway K8s / Helm 清单
-docs/tracking/             00–15 产品文档 · FAQ · 接入指南 · 管理台介绍
+docs/tracking/             00–16 产品文档 · FAQ · 接入指南 · 长视频双端对照
 docs/images/admin/         管理控制台界面截图（文档引用）
 docs/en/                   英文核心文档
 ```

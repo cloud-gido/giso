@@ -8,16 +8,20 @@
 
 **`giso_tracker` Dart 包**（路径 `sdk/flutter/giso_tracker`），与 Android/iOS/Web 共用 `POST /v1/track` 协议。
 
-安装（Git tag，私有仓库）：
+安装（公开仓库，**ref: v1.0.4**，勿用 v1.0.1）：
 
 ```yaml
 dependencies:
   giso_tracker:
     git:
       url: https://github.com/cloud-gido/giso.git
-      ref: v1.0.1
+      ref: v1.0.4
       path: sdk/flutter/giso_tracker
 ```
+
+## 注册表要和 Android 分开吗？
+
+**不用。** 长视频共用 `video_feed` / `video_detail` 等登记与 `video-android-beta` App Key（`longvideo` 空间）。详见 `docs/tracking/16-长视频双端Demo与接入对照.md`。
 
 ## 必须自己实现什么？
 
@@ -46,4 +50,5 @@ dependencies:
 ## 完整文档
 
 - `docs/tracking/14-Flutter接入指南.md`
+- `docs/tracking/16-长视频双端Demo与接入对照.md`
 - 管理台下载：**Flutter 接入清单**（`/admin/templates/flutter-onboarding-checklist.md`）

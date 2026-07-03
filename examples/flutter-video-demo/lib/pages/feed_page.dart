@@ -1,98 +1,201 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:giso_tracker/giso_tracker.dart';
 
+import '../model/demo_catalog.dart';
+import '../model/video_episode.dart';
+import '../widgets/debug_panel.dart';
 import 'detail_page.dart';
+import 'series_page.dart';
 
 class FeedPage extends StatefulWidget {
-  const FeedPage({super.key});
+  const FeedPage({
+    super.key,
+    required this.endpoint,
+    required this.appKey,
+  });
+
+  final String endpoint;
+  final String appKey;
 
   @override
   State<FeedPage> createState() => _FeedPageState();
 }
 
 class _FeedPageState extends State<FeedPage> {
-  static const _videos = [
-    ('v001', 'Ocean Documentary'),
-    ('v002', 'City Night Walk'),
-    ('v003', 'Cooking Basics'),
-  ];
+  static const _tabRecommend = 'recommend';
+  static const _tabSeries = 'series';
 
-  String? _did;
+  int _tabIndex = 0;
+  int _navIndex = 0;
+  late String _recTraceId = _newTraceId();
 
-  @override
-  void initState() {
-    super.initState();
-    _loadDid();
+  String get _currentTab => _tabIndex == 0 ? _tabRecommend : _tabSeries;
+
+  String _newTraceId() => 'rec-${DateTime.now().microsecondsSinceEpoch}';
+
+  List<VideoEpisode> get _items => _tabIndex == 0
+      ? DemoCatalog.feedItems()
+      : DemoCatalog.seriesList();
+
+  void _onTabChanged(int index) {
+    setState(() {
+      _tabIndex = index;
+      _recTraceId = _newTraceId();
+    });
   }
 
-  Future<void> _loadDid() async {
-    // did is internal; demo shows tracker is alive via page events in admin SSE.
-    setState(() => _did = 'see admin SSE filter');
+  void _openDetail(VideoEpisode ep, int pos) {
+    GisoTracker.instance.elementClick(
+      eid: Elements.videoCard,
+      pos: pos,
+      params: {
+        Params.vid: ep.vid,
+        Params.cpId: ep.cpId,
+        Params.seriesId: ep.seriesId.isEmpty ? ep.vid : ep.seriesId,
+        if (ep.epNum > 0) Params.epNum: ep.epNum,
+      },
+      pt: {Params.recTraceId: _recTraceId},
+    );
+    Navigator.pushNamed(
+      context,
+      DetailPage.routeName,
+      arguments: ep.vid,
+    );
+  }
+
+  void _openSeries(String seriesId) {
+    Navigator.pushNamed(
+      context,
+      SeriesPage.routeName,
+      arguments: seriesId,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return TrackedPage(
+      key: ValueKey(_currentTab),
       pgid: Pages.videoFeed,
-      pgParams: {Params.tabName: 'recommend'},
+      pgParams: {Params.tabName: _currentTab},
+      pt: {Params.recTraceId: _recTraceId},
       child: Scaffold(
-        appBar: AppBar(title: const Text('GISO Flutter · 推荐流')),
+        appBar: AppBar(title: const Text('GISO Flutter · 长视频')),
         body: Column(
           children: [
-            if (_did != null)
-              Material(
-                color: Colors.black87,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '联调：管理台实时联调按 did 过滤（init 后自动上报 page_enter）',
-                          style: TextStyle(color: Colors.grey.shade300, fontSize: 12),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Clipboard.setData(const ClipboardData(text: 'flutter-demo'));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('提示已复制')),
-                          );
-                        },
-                        child: const Text('复制提示', style: TextStyle(color: Colors.white70)),
-                      ),
-                    ],
-                  ),
-                ),
+            DebugPanel(
+              pgid: Pages.videoFeed,
+              endpoint: widget.endpoint,
+              appKey: widget.appKey,
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: SegmentedButton<int>(
+                segments: const [
+                  ButtonSegment(value: 0, label: Text('推荐')),
+                  ButtonSegment(value: 1, label: Text('追剧')),
+                ],
+                selected: {_tabIndex},
+                onSelectionChanged: (value) => _onTabChanged(value.first),
               ),
+            ),
             Expanded(
               child: ListView.builder(
-                itemCount: _videos.length,
+                itemCount: _items.length,
                 itemBuilder: (context, index) {
-                  final (vid, title) = _videos[index];
-                  return ListTile(
-                    leading: CircleAvatar(child: Text('${index + 1}')),
-                    title: Text(title),
-                    subtitle: Text(vid),
-                    onTap: () {
-                      GisoTracker.instance.elementClick(
-                        eid: Elements.videoCard,
-                        pos: index,
-                        params: {Params.vid: vid},
-                      );
-                      Navigator.pushNamed(
-                        context,
-                        DetailPage.routeName,
-                        arguments: vid,
-                      );
-                    },
+                  final ep = _items[index];
+                  return _VideoCardTile(
+                    episode: ep,
+                    index: index,
+                    recTraceId: _recTraceId,
+                    onTap: () => _openDetail(ep, index),
                   );
                 },
               ),
             ),
           ],
         ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _navIndex,
+          onDestinationSelected: (index) {
+            setState(() => _navIndex = index);
+            if (index == 1) {
+              final series = DemoCatalog.seriesList();
+              if (series.isNotEmpty && series.first.seriesId.isNotEmpty) {
+                _openSeries(series.first.seriesId);
+              }
+            } else if (index == 2) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('演示版仅展示长视频埋点链路')),
+              );
+            }
+          },
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.home), label: '首页'),
+            NavigationDestination(icon: Icon(Icons.video_library), label: '剧集'),
+            NavigationDestination(icon: Icon(Icons.person), label: '我的'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoCardTile extends StatefulWidget {
+  const _VideoCardTile({
+    required this.episode,
+    required this.index,
+    required this.recTraceId,
+    required this.onTap,
+  });
+
+  final VideoEpisode episode;
+  final int index;
+  final String recTraceId;
+  final VoidCallback onTap;
+
+  @override
+  State<_VideoCardTile> createState() => _VideoCardTileState();
+}
+
+class _VideoCardTileState extends State<_VideoCardTile> {
+  bool _exposed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reportExposure());
+  }
+
+  void _reportExposure() {
+    if (_exposed) return;
+    _exposed = true;
+    final ep = widget.episode;
+    GisoTracker.instance.elementExposure(
+      eid: Elements.videoCard,
+      pos: widget.index,
+      params: {
+        Params.vid: ep.vid,
+        Params.cpId: ep.cpId,
+        Params.seriesId: ep.seriesId.isEmpty ? ep.vid : ep.seriesId,
+        if (ep.epNum > 0) Params.epNum: ep.epNum,
+      },
+      expDur: 0,
+      expRatio: 1.0,
+      pt: {Params.recTraceId: widget.recTraceId},
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ep = widget.episode;
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: ListTile(
+        leading: CircleAvatar(child: Text('${widget.index + 1}')),
+        title: Text(ep.title),
+        subtitle: Text('${ep.cpName} · ${ep.definition} · ${ep.durationLabel()}'),
+        trailing: const Icon(Icons.play_circle_outline),
+        onTap: widget.onTap,
       ),
     );
   }
