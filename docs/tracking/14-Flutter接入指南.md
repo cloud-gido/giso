@@ -73,7 +73,7 @@ dependencies:
   giso_tracker:
     git:
       url: https://github.com/cloud-gido/giso.git
-      ref: v1.0.0
+      ref: v1.0.1
       path: sdk/flutter/giso_tracker
 ```
 

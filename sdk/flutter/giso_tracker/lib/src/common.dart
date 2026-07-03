@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'types.dart';
 
-const sdkVersion = '1.0.0';
+const sdkVersion = '1.0.1';
 const _didKey = 'giso_did';
 const _sessionKey = 'giso_session';
 const _activatedKey = 'giso_activated';

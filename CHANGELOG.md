@@ -12,19 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.0.1] - 2026-07-03
+
 ### Added
 
 - **Flutter SDK** (`sdk/flutter/giso_tracker`): `GisoTracker` page/element/biz/lifecycle events, gzip queue, schema codegen.
 - **Flutter demo** (`examples/flutter-video-demo`): long-video feed/detail sample.
 - **SDK CI**: `publish-flutter` job on `v*` tags (analyze, test, tarball artifact).
 - **Admin**: Flutter onboarding checklist download + Copilot `faq-flutter` corpus.
-
-### Fixed
-
-- Admin console: stop login redirect loop on HTTPS (session cookie `Secure`, boot order).
-- Admin console: sticky header, GIDO-style space picker, user menu sign-out.
-- Android SDK: Java 8 compatibility in `ViewTreeCapture` for Maven publish.
-- CI: idempotent `sdk-publish` when package version already exists on GitHub Packages.
+- **Docs**: [14-Flutter接入指南](docs/tracking/14-Flutter接入指南.md).
 
 ---
 
