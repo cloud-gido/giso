@@ -1,7 +1,7 @@
 // Protocol types aligned with docs/tracking/02-上报协议规范.md.
-library;
 
-typedef Params = Map<String, Object?>;
+/// Runtime parameter map on page/element/biz contexts (keys use [Params] constants).
+typedef ParamMap = Map<String, Object?>;
 typedef Passthrough = Map<String, dynamic>;
 
 class CommonParams {
@@ -71,7 +71,7 @@ class PageContext {
   });
 
   final String pgid;
-  final Params? pgParams;
+  final ParamMap? pgParams;
   final String? refPgid;
   final String? refEid;
   final int? pgStay;
@@ -99,7 +99,7 @@ class ElementContext {
   final String eid;
   final String? mod;
   final int? pos;
-  final Params? params;
+  final ParamMap? params;
   final int? expDur;
   final double? expRatio;
 
@@ -118,7 +118,7 @@ class BizContext {
   const BizContext({required this.code, this.params});
 
   final String code;
-  final Params? params;
+  final ParamMap? params;
 
   Map<String, Object?> toJson() {
     final m = <String, Object?>{'code': code};

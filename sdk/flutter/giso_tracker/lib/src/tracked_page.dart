@@ -14,7 +14,7 @@ class TrackedPage extends StatefulWidget {
   });
 
   final String pgid;
-  final Params? pgParams;
+  final ParamMap? pgParams;
   final Passthrough? pt;
   final Widget child;
 

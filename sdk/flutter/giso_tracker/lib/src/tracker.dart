@@ -88,7 +88,7 @@ class GisoTracker with WidgetsBindingObserver {
 
   Future<void> enterPage(
     String pgid, [
-    Params? pgParams,
+    ParamMap? pgParams,
     Passthrough? pt,
   ]) async {
     if (_curPage != null) await exitPage();
@@ -114,7 +114,7 @@ class GisoTracker with WidgetsBindingObserver {
     required String eid,
     String? mod,
     int? pos,
-    Params? params,
+    ParamMap? params,
     Passthrough? pt,
   }) async {
     _refEid = eid;
@@ -129,7 +129,7 @@ class GisoTracker with WidgetsBindingObserver {
     required String eid,
     String? mod,
     int? pos,
-    Params? params,
+    ParamMap? params,
     required int expDur,
     required double expRatio,
     Passthrough? pt,
@@ -150,7 +150,7 @@ class GisoTracker with WidgetsBindingObserver {
 
   Future<void> bizEvent(
     String code, [
-    Params? params,
+    ParamMap? params,
     Passthrough? pt,
   ]) async {
     await _emit(
@@ -183,7 +183,7 @@ class GisoTracker with WidgetsBindingObserver {
     }
     return PageContext(
       pgid: json['pgid'] as String,
-      pgParams: json['pg_params'] as Params?,
+      pgParams: json['pg_params'] as ParamMap?,
       refPgid: json['ref_pgid'] as String?,
       refEid: json['ref_eid'] as String?,
       pgStay: json['pg_stay'] as int?,
@@ -269,7 +269,7 @@ class _PageState {
   });
 
   final String pgid;
-  final Params? params;
+  final ParamMap? params;
   final Passthrough? pt;
   final int enterTs;
 }
