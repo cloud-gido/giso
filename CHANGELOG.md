@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.2] - 2026-07-03
+
+### Fixed
+
+- **Flutter SDK**: registry constants use Dart `lowerCamelCase` (`videoFeed`, `newsRead`) so `flutter analyze --fatal-infos` passes in `sdk-publish` CI.
+- **Codegen**: `tools/codegen/generate.py` `dart_const_name()` aligned with Swift style.
+
+---
+
 ## [1.0.1] - 2026-07-03
 
 ### Added
@@ -64,7 +73,8 @@ Initial open-source baseline (pre-SDK package publish).
 
 ---
 
-[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/cloud-gido/giso/releases/tag/v1.0.2
 [1.0.1]: https://github.com/cloud-gido/giso/releases/tag/v1.0.1
 [1.0.0]: https://github.com/cloud-gido/giso/releases/tag/v1.0.0
 [0.1.0]: https://github.com/cloud-gido/giso/releases/tag/v0.1
