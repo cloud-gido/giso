@@ -403,6 +403,11 @@ App **不需要**对 Gateway 建 WebSocket/SSE。
 
 客户端可报 **意图**（如 `bet_submit`）；**事实**（`bet_placed`）由后端 `sdk/server` 直写 Kafka。
 
+### Q23. Flutter App 能用 Android SDK 的 bind() 吗？
+
+**不能指望自动化。** Android SDK 的曝光/点击/参数继承依赖原生 `View` 树，标准 Flutter UI 不在该树上。  
+推荐：**Dart 薄客户端 + `POST /v1/track`**，路由层接 `page_enter`/`page_exit`，元素手动或 `VisibilityDetector` 上报。完整说明见 [14-Flutter接入指南](14-Flutter接入指南.md)。
+
 ---
 
 ## 八、文档索引
@@ -414,6 +419,7 @@ App **不需要**对 Gateway 建 WebSocket/SSE。
 | [03-命名与登记规范](03-命名与登记规范.md) | 命名规则、status 生命周期 |
 | [07-外部视频App接入问卷](07-外部视频App接入问卷.md) | 外部 App 登记清单 |
 | [13-SDK分发与版本](13-SDK分发与版本.md) | **外部 App 拿包、坐标、Key、endpoint** |
+| [14-Flutter接入指南](14-Flutter接入指南.md) | **Flutter 直连接入（无官方 Plugin）** |
 | [09-账号与权限体系](09-账号与权限体系.md) | 管理台登录、角色、Doppler |
 | [10-空间与多租户](10-空间与多租户.md) | 空间路由、Kafka 单写、SSE 联调 |
 | [deploy/DEPLOYMENT.md](../../deploy/DEPLOYMENT.md) | 测试环境发布、Doppler、RDS |

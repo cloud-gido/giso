@@ -37,6 +37,7 @@
 | Android | `com.giso:tracker:<version>` | `https://maven.pkg.github.com/cloud-gido/giso` |
 | Web | `@cloud-gido/giso-tracker-web@<version>` | `https://npm.pkg.github.com` |
 | iOS | SwiftPM 根 `Package.swift`，target `GISOTracker` | Git tag `v<version>` on `cloud-gido/giso` |
+| **Flutter** | **暂无官方包** — Dart 直连接 `/v1/track` | 见 [14-Flutter接入指南](14-Flutter接入指南.md) |
 
 发布流水线：GitHub Actions [`.github/workflows/sdk-publish.yml`](../../.github/workflows/sdk-publish.yml)  
 触发方式：打 tag `v*`（如 `v1.0.0`），或 Actions 手动 `workflow_dispatch` 填版本号。
@@ -289,6 +290,7 @@ git push origin v1.0.0
 | [06-接入指南](06-接入指南.md) | 六步埋点开发 |
 | [07-外部视频App接入问卷](07-外部视频App接入问卷.md) | 接入前登记 |
 | [08-接入常见问题FAQ](08-接入常见问题FAQ.md) | App Key、Kafka、心跳、SSE |
+| [14-Flutter接入指南](14-Flutter接入指南.md) | **Flutter 无官方包时的 Dart 接入** |
 | [02-上报协议规范](02-上报协议规范.md) | 协议字段 |
 | [deploy/DEPLOYMENT.md](../../deploy/DEPLOYMENT.md) | 测试环境域名与 Doppler |
 | [sdk/android/README.md](../../sdk/android/README.md) | Android API 摘要 |
