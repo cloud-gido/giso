@@ -130,6 +130,33 @@ public final class SpaceService {
         return null;
     }
 
+    public List<Map<String, Object>> listMemberCandidates(String spaceKey) throws SQLException {
+        String sql = """
+                SELECT u.username, u.display_name, u.role
+                FROM %s.admin_users u
+                WHERE u.disabled_at IS NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM %s.space_members m
+                    WHERE m.space_key = ? AND m.username = u.username
+                  )
+                ORDER BY u.username
+                """.formatted(dbSchema, dbSchema);
+        List<Map<String, Object>> out = new ArrayList<>();
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, spaceKey);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("username", rs.getString(1));
+                    row.put("display_name", rs.getString(2));
+                    row.put("global_role", rs.getString(3));
+                    out.add(row);
+                }
+            }
+        }
+        return out;
+    }
+
     public List<Map<String, Object>> listMembers(String spaceKey) throws SQLException {
         String sql = """
                 SELECT m.username, m.role, m.created_at::text, u.display_name
@@ -155,9 +182,15 @@ public final class SpaceService {
     }
 
     public String saveMember(String spaceKey, String username, String role) throws SQLException {
+        if (username == null || username.isBlank()) return "请选择要添加的成员";
+        username = username.trim();
         if (!List.of(AdminUser.ROLE_SPACE_ADMIN, AdminUser.ROLE_EDITOR, AdminUser.ROLE_VIEWER).contains(role)) {
             return "role 非法（space_admin/editor/viewer）";
         }
+        if (!adminUserExists(username)) {
+            return "用户「" + username + "」不存在，请平台管理员先在「账号管理」中创建账号";
+        }
+        boolean alreadyMember = isMember(spaceKey, username);
         String sql = """
                 INSERT INTO %s.space_members (username, space_key, role) VALUES (?, ?, ?)
                 ON CONFLICT (username, space_key) DO UPDATE SET role = EXCLUDED.role
@@ -169,7 +202,31 @@ public final class SpaceService {
             ps.executeUpdate();
         }
         invalidateSpaceRoleCache();
-        return null;
+        return alreadyMember ? "UPDATED:" + username : "ADDED:" + username;
+    }
+
+    private boolean adminUserExists(String username) throws SQLException {
+        String sql = """
+                SELECT 1 FROM %s.admin_users WHERE username = ? AND disabled_at IS NULL
+                """.formatted(dbSchema);
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, username);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private boolean isMember(String spaceKey, String username) throws SQLException {
+        String sql = "SELECT 1 FROM %s.space_members WHERE space_key = ? AND username = ?"
+                .formatted(dbSchema);
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, spaceKey);
+            ps.setString(2, username);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
     }
 
     public String removeMember(String spaceKey, String username) throws SQLException {

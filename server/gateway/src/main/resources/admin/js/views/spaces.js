@@ -7,6 +7,9 @@ import { t } from '../i18n.js';
 const SPACE_ROLE_LABEL = {
   space_admin: '空间管理员', editor: '编辑员', viewer: '只读',
 };
+const GLOBAL_ROLE_LABEL = {
+  system_admin: '平台管理员', admin: '平台管理员', user: '平台用户',
+};
 
 function spaceAccentClass(key) {
   if (!key) return 'space-accent--default';
@@ -128,6 +131,33 @@ export function initSpaceSwitcher(onChange) {
   document.addEventListener('click', closeSpacePicker);
 }
 
+function memberSelectHtml(candidates) {
+  if (!candidates.length) {
+    return `<select name="username" disabled>
+      <option value="">暂无可添加账号</option>
+    </select>`;
+  }
+  const opts = candidates.map((u) => {
+    const label = u.display_name
+      ? `${u.username}（${u.display_name}）`
+      : u.username;
+    const global = GLOBAL_ROLE_LABEL[u.global_role] || u.global_role || '';
+    const suffix = global ? ` · ${global}` : '';
+    return `<option value="${esc(u.username)}">${esc(label)}${esc(suffix)}</option>`;
+  }).join('');
+  return `<select name="username" required aria-label="选择成员">
+    <option value="" disabled selected>选择账号…</option>
+    ${opts}
+  </select>`;
+}
+
+function memberHintHtml(candidates) {
+  if (!candidates.length) {
+    return `<p class="member-form-hint warn">所有平台账号已在本空间，或尚无账号。请平台管理员在「账号管理」中先创建用户。</p>`;
+  }
+  return `<p class="member-form-hint">可选 ${candidates.length} 个平台账号（不含已在本空间的成员）。</p>`;
+}
+
 export async function renderSpaces() {
   const wrap = $('#spaces-panel');
   if (!wrap) return;
@@ -140,24 +170,32 @@ export async function renderSpaces() {
 
   let membersHtml = '';
   if (isSpaceAdmin()) {
-    const members = await api(`/spaces/${encodeURIComponent(getSpace())}/members`);
+    const spaceKey = getSpace();
+    const [members, candidates] = await Promise.all([
+      api(`/spaces/${encodeURIComponent(spaceKey)}/members`),
+      api(`/spaces/${encodeURIComponent(spaceKey)}/member-candidates`),
+    ]);
     const list = Array.isArray(members) ? members : [];
+    const pickList = Array.isArray(candidates) ? candidates : [];
     membersHtml = `<h3>本空间成员</h3>
       <table><thead><tr><th>用户名</th><th>角色</th><th>操作</th></tr></thead>
       <tbody>${list.map((m) => `<tr>
-        <td>${esc(m.username)}</td>
+        <td>${esc(m.username)}${m.display_name ? ` <span class="muted">(${esc(m.display_name)})</span>` : ''}</td>
         <td>${SPACE_ROLE_LABEL[m.role] || esc(m.role)}</td>
         <td><button class="danger" data-rm="${esc(m.username)}">移除</button></td>
       </tr>`).join('') || '<tr><td colspan="3" class="muted">暂无成员</td></tr>'}
       </tbody></table>
       <form id="member-form" class="inline-form">
-        <input name="username" placeholder="用户名" required>
-        <select name="role">
+        <label class="muted" style="font-size:12px;font-weight:600">添加成员</label>
+        ${memberSelectHtml(pickList)}
+        <select name="role" aria-label="空间角色">
           <option value="space_admin">空间管理员</option>
           <option value="editor" selected>编辑员</option>
           <option value="viewer">只读</option>
         </select>
-        <button type="submit">添加成员</button>
+        <button type="submit" ${pickList.length ? '' : 'disabled'}>添加成员</button>
+        <div id="member-form-feedback" hidden></div>
+        ${memberHintHtml(pickList)}
       </form>`;
   }
 
@@ -181,25 +219,44 @@ export async function renderSpaces() {
         <input name="space_key" placeholder="space_key（snake_case）" required>
         <input name="display_name" placeholder="显示名称">
         <button type="submit">创建</button>
-      </form>`;
+      </form>
+      <p class="member-form-hint">创建后可在下方「本空间成员」从平台账号列表中添加成员。</p>`;
   }
 
   wrap.innerHTML = `${createHtml}
     ${membersHtml}
     ${appKeysHtml}`;
 
+  const showMemberFeedback = (text, kind) => {
+    const el = $('#member-form-feedback');
+    if (!el) return;
+    el.hidden = false;
+    el.className = `form-feedback ${kind}`;
+    el.textContent = text;
+  };
+
   wrap.querySelector('#member-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const body = {
-      username: fd.get('username').toString().trim(),
-      role: fd.get('role').toString(),
-    };
+    const username = fd.get('username')?.toString().trim();
+    const role = fd.get('role')?.toString();
+    if (!username) {
+      showMemberFeedback('请先选择要添加的平台账号', 'error');
+      toast('请选择成员账号', 'error');
+      return;
+    }
     const r = await api(`/spaces/${encodeURIComponent(getSpace())}/members`, {
-      method: 'POST', body: JSON.stringify(body),
+      method: 'POST', body: JSON.stringify({ username, role }),
     });
-    if (r.error) toast(r.error, 'error');
-    else { toast('已添加成员'); renderSpaces(); }
+    if (r.error) {
+      showMemberFeedback(r.error, 'error');
+      toast(r.error, 'error');
+      return;
+    }
+    const msg = r.message || `已添加成员「${username}」`;
+    showMemberFeedback(msg, 'ok');
+    toast(msg);
+    renderSpaces();
   });
 
   wrap.querySelectorAll('button[data-rm]').forEach((btn) => {
@@ -210,32 +267,36 @@ export async function renderSpaces() {
         `/spaces/${encodeURIComponent(getSpace())}/members?username=${encodeURIComponent(u)}`,
         { method: 'DELETE' });
       if (r.error) toast(r.error, 'error');
-      else { toast('已移除'); renderSpaces(); }
+      else { toast(`已移除成员「${u}」`); renderSpaces(); }
     };
   });
 
   wrap.querySelector('#appkey-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const appKey = fd.get('app_key').toString().trim();
     const r = await api(`/spaces/${encodeURIComponent(getSpace())}/app-keys`, {
       method: 'POST',
-      body: JSON.stringify({ app_key: fd.get('app_key').toString().trim() }),
+      body: JSON.stringify({ app_key: appKey }),
     });
     if (r.error) toast(r.error, 'error');
-    else { toast('已绑定'); e.target.reset(); renderSpaces(); }
+    else { toast(`已绑定 App Key「${appKey}」`); e.target.reset(); renderSpaces(); }
   });
 
   wrap.querySelector('#space-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const spaceKey = fd.get('space_key').toString().trim();
+    const displayName = fd.get('display_name').toString().trim();
     const r = await api('/spaces', {
       method: 'POST',
-      body: JSON.stringify({
-        space_key: fd.get('space_key').toString().trim(),
-        display_name: fd.get('display_name').toString().trim(),
-      }),
+      body: JSON.stringify({ space_key: spaceKey, display_name: displayName }),
     });
     if (r.error) toast(r.error, 'error');
-    else { toast('空间已创建'); e.target.reset(); location.reload(); }
+    else {
+      toast(`空间「${displayName || spaceKey}」已创建，可在成员列表中添加账号`);
+      e.target.reset();
+      location.reload();
+    }
   });
 }

@@ -133,6 +133,10 @@ public final class AdminHandler implements HttpHandler {
                 return require(ex, globalRole, spaceRole,
                         AdminPermissions.canManageSpaceMembers(globalRole, spaceRole), "无权管理空间成员");
             }
+            if (path.endsWith("/member-candidates")) {
+                return require(ex, globalRole, spaceRole,
+                        AdminPermissions.canManageSpaceMembers(globalRole, spaceRole), "无权管理空间成员");
+            }
             if (path.endsWith("/app-keys")) {
                 return require(ex, globalRole, spaceRole,
                         AdminPermissions.canManageSpaceMembers(globalRole, spaceRole), "无权管理 App Key");
@@ -332,6 +336,13 @@ public final class AdminHandler implements HttpHandler {
         }
         if (path.startsWith("/spaces/")) {
             String rest = path.substring("/spaces/".length());
+            if (rest.endsWith("/member-candidates")) {
+                String sk = rest.substring(0, rest.length() - "/member-candidates".length());
+                if (method.equals("GET")) {
+                    Http.json(ex, 200, M.writeValueAsString(spaces.listMemberCandidates(sk)));
+                    return;
+                }
+            }
             if (rest.endsWith("/members")) {
                 String sk = rest.substring(0, rest.length() - "/members".length());
                 if (method.equals("GET")) {
@@ -340,9 +351,24 @@ public final class AdminHandler implements HttpHandler {
                 }
                 if (method.equals("POST")) {
                     Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
-                    String err = spaces.saveMember(sk, str(body, "username"), str(body, "role"));
-                    if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
-                    else Http.json(ex, 200, "{\"ok\":true}");
+                    String username = str(body, "username");
+                    String role = str(body, "role");
+                    String result = spaces.saveMember(sk, username, role);
+                    if (result != null && !result.startsWith("ADDED:") && !result.startsWith("UPDATED:")) {
+                        Http.json(ex, 400, M.writeValueAsString(Map.of("error", result)));
+                        return;
+                    }
+                    Map<String, Object> ok = new java.util.LinkedHashMap<>();
+                    ok.put("ok", true);
+                    if (result != null && result.startsWith("UPDATED:")) {
+                        ok.put("message", "已更新成员「" + result.substring(8) + "」的空间角色");
+                    } else {
+                        String name = result != null && result.startsWith("ADDED:")
+                                ? result.substring(6) : username;
+                        ok.put("message", "已添加成员「" + name + "」");
+                    }
+                    ok.put("role", role);
+                    Http.json(ex, 200, M.writeValueAsString(ok));
                     return;
                 }
                 if (method.equals("DELETE")) {
