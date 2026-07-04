@@ -22,4 +22,7 @@ public interface AdminUserStore {
 
     /** 修改自己的密码；需校验当前密码。返回 null 成功，否则错误信息。 */
     String changePassword(String username, String currentPassword, String newPassword) throws Exception;
+
+    /** 查询账号当前 role；不存在或已禁用返回 null。 */
+    String lookupRole(String username) throws Exception;
 }

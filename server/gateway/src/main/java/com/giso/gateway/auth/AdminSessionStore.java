@@ -19,4 +19,7 @@ public interface AdminSessionStore {
 
     /** 滑动续期：活跃请求延长 expires_at。 */
     void touch(String sessionId, long ttlMs) throws SQLException;
+
+    /** 账号 role 在库中变更后，同步到活跃会话（避免须重新登录）。 */
+    void updateRole(String sessionId, String role) throws SQLException;
 }

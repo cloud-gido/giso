@@ -50,6 +50,13 @@ public final class AdminSessionManager {
         return Optional.of(new AuthContext(s.username(), s.role()));
     }
 
+    /** 将当前请求的会话 role 与库中保持一致。 */
+    public void syncRole(HttpExchange ex, String role) throws SQLException {
+        String sessionId = AdminSessionCookies.readSessionId(ex);
+        if (sessionId == null || sessionId.isBlank() || role == null || role.isBlank()) return;
+        store.updateRole(sessionId, role);
+    }
+
     public void logout(HttpExchange ex) throws SQLException {
         String sessionId = AdminSessionCookies.readSessionId(ex);
         if (sessionId != null) {

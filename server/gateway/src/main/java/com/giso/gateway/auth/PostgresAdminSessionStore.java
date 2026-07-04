@@ -89,6 +89,20 @@ public final class PostgresAdminSessionStore implements AdminSessionStore {
         }
     }
 
+    @Override
+    public void updateRole(String sessionId, String role) throws SQLException {
+        if (sessionId == null || sessionId.isBlank() || role == null || role.isBlank()) return;
+        String sql = """
+                UPDATE %s.admin_sessions SET role = ?
+                WHERE session_id = ? AND expires_at > now()
+                """.formatted(dbSchema);
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, role);
+            ps.setString(2, sessionId);
+            ps.executeUpdate();
+        }
+    }
+
     private void purgeExpired() throws SQLException {
         String sql = "DELETE FROM %s.admin_sessions WHERE expires_at <= now()".formatted(dbSchema);
         try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {

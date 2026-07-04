@@ -180,7 +180,13 @@ async function boot() {
   try {
     let me = await requireUser();
     if (me?.error) throw new Error(me.error);
-    if (me.current_space && me.current_space !== getSpace()) {
+    const spaces = me.spaces || [];
+    const cur = getSpace();
+    if (spaces.length && !spaces.some((s) => s.space_key === cur)) {
+      setSpace(spaces[0].space_key);
+      me = await api('/me');
+      cacheUser(me);
+    } else if (me.current_space && me.current_space !== cur) {
       setSpace(me.current_space);
       me = await api('/me');
       cacheUser(me);
@@ -197,7 +203,13 @@ async function boot() {
     initSpaceSwitcher(onSpaceChange);
     applyRole(me);
     show('debug');
-  } catch {
+  } catch (e) {
+    if (e?.code === 'forbidden') {
+      const title = $('#page-title');
+      const desc = $('#page-desc');
+      if (title) title.textContent = '无法进入控制台';
+      if (desc) desc.textContent = e.message || '尚未加入任何空间，请联系空间管理员';
+    }
     /* requireUser 已跳转登录页 */
   }
 }

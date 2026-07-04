@@ -32,6 +32,16 @@ final class AdminUserProfile {
         if (pendingCount >= 0) {
             out.put("pending_count", pendingCount);
         }
+        if (spaces != null) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> spaceList = (List<Map<String, Object>>) out.get("spaces");
+            boolean ready = AdminUser.isSystemAdmin(role)
+                    || (spaceList != null && !spaceList.isEmpty());
+            out.put("onboarding_complete", ready);
+            if (!ready) {
+                out.put("onboarding_hint", "请联系平台管理员在「账号管理」或「空间 → 成员」中授权");
+            }
+        }
         return out;
     }
 }

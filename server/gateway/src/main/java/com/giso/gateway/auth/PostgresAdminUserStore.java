@@ -166,6 +166,10 @@ public final class PostgresAdminUserStore implements AdminUserStore {
     @Override
     public String disableUser(String username) throws SQLException {
         if (username == null || username.isBlank()) return "username 不能为空";
+        String current = fetchRole(username);
+        if (current != null && AdminUser.isSystemAdmin(current) && countActiveSystemAdmins() <= 1) {
+            return "不能禁用最后一个平台管理员";
+        }
         String sql = """
                 UPDATE %s.admin_users SET disabled_at = now(), updated_at = now()
                 WHERE username = ? AND disabled_at IS NULL
@@ -178,6 +182,12 @@ public final class PostgresAdminUserStore implements AdminUserStore {
     }
 
     private String fetchRole(String username) throws SQLException {
+        return lookupRole(username);
+    }
+
+    @Override
+    public String lookupRole(String username) throws SQLException {
+        if (username == null || username.isBlank()) return null;
         String sql = "SELECT role FROM %s.admin_users WHERE username = ? AND disabled_at IS NULL"
                 .formatted(dbSchema);
         try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
@@ -254,18 +264,23 @@ public final class PostgresAdminUserStore implements AdminUserStore {
     private void ensureSeedPlatformAdminRoles() throws SQLException {
         for (AdminUser u : seedUsers) {
             if (!AdminUser.isSystemAdmin(u.role())) continue;
-            String current = fetchRole(u.username());
-            if (current == null || AdminUser.ROLE_SYSTEM_ADMIN.equals(current)) continue;
-            String sql = """
-                    UPDATE %s.admin_users SET role = ?, updated_at = now()
-                    WHERE username = ? AND disabled_at IS NULL
-                    """.formatted(dbSchema);
-            try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
-                ps.setString(1, AdminUser.ROLE_SYSTEM_ADMIN);
-                ps.setString(2, u.username());
-                if (ps.executeUpdate() > 0) {
-                    System.out.println("[giso] restored platform admin role for seed user: " + u.username());
-                }
+            restorePlatformAdminRole(u.username());
+        }
+    }
+
+    private void restorePlatformAdminRole(String username) throws SQLException {
+        if (username == null || username.isBlank()) return;
+        String current = fetchRole(username);
+        if (current == null || AdminUser.ROLE_SYSTEM_ADMIN.equals(current)) return;
+        String sql = """
+                UPDATE %s.admin_users SET role = ?, updated_at = now()
+                WHERE username = ? AND disabled_at IS NULL
+                """.formatted(dbSchema);
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, AdminUser.ROLE_SYSTEM_ADMIN);
+            ps.setString(2, username);
+            if (ps.executeUpdate() > 0) {
+                System.out.println("[giso] restored platform admin role for seed user: " + username);
             }
         }
     }
@@ -273,10 +288,11 @@ public final class PostgresAdminUserStore implements AdminUserStore {
     private int countActiveSystemAdmins() throws SQLException {
         String sql = """
                 SELECT COUNT(*) FROM %s.admin_users
-                WHERE role = ? AND disabled_at IS NULL
+                WHERE role IN (?, ?) AND disabled_at IS NULL
                 """.formatted(dbSchema);
         try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, AdminUser.ROLE_SYSTEM_ADMIN);
+            ps.setString(2, AdminUser.ROLE_ADMIN);
             try (ResultSet rs = ps.executeQuery()) {
                 rs.next();
                 return rs.getInt(1);

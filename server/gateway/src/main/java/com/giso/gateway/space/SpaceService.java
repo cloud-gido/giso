@@ -308,7 +308,7 @@ public final class SpaceService {
 
     /** 用户可访问的空间及在该空间的角色。 */
     public List<Map<String, Object>> spacesForUser(String username, String globalRole) throws SQLException {
-        if (AdminUser.ROLE_SYSTEM_ADMIN.equals(globalRole)) {
+        if (AdminUser.isSystemAdmin(globalRole)) {
             List<Map<String, Object>> out = new ArrayList<>();
             for (Map<String, Object> sp : listSpaces()) {
                 if (!"active".equals(sp.get("status"))) continue;
@@ -343,7 +343,7 @@ public final class SpaceService {
     }
 
     public String spaceRole(String username, String globalRole, String spaceKey) throws SQLException {
-        if (AdminUser.ROLE_SYSTEM_ADMIN.equals(globalRole)) return AdminUser.ROLE_SPACE_ADMIN;
+        if (AdminUser.isSystemAdmin(globalRole)) return AdminUser.ROLE_SPACE_ADMIN;
         String cacheKey = username + "\0" + spaceKey;
         long now = System.currentTimeMillis();
         CachedSpaceRole cached = spaceRoleCache.get(cacheKey);
@@ -373,6 +373,32 @@ public final class SpaceService {
 
     public boolean canAccessSpace(String username, String globalRole, String spaceKey) throws SQLException {
         return spaceRole(username, globalRole, spaceKey) != null;
+    }
+
+    /** 用户在各空间的成员角色（账号管理列表展示）。 */
+    public List<Map<String, Object>> listMembershipsForUser(String username) throws SQLException {
+        if (username == null || username.isBlank()) return List.of();
+        String sql = """
+                SELECT m.space_key, s.display_name, m.role
+                FROM %s.space_members m
+                JOIN %s.spaces s ON s.space_key = m.space_key
+                WHERE m.username = ? AND s.status = 'active'
+                ORDER BY m.space_key
+                """.formatted(dbSchema, dbSchema);
+        List<Map<String, Object>> out = new ArrayList<>();
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, username);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("space_key", rs.getString(1));
+                    row.put("display_name", rs.getString(2));
+                    row.put("role", rs.getString(3));
+                    out.add(row);
+                }
+            }
+        }
+        return out;
     }
 
     public boolean spaceExists(String spaceKey) throws SQLException {

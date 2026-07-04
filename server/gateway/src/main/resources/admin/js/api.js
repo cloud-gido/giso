@@ -1,5 +1,5 @@
 /* 管理 API 封装（Cookie 会话 + 空间头 X-GISO-Space） */
-import { signOut, requireLoginRedirect } from './auth.js';
+import { signOut, requireLoginRedirect, getUser } from './auth.js';
 
 const SPACE_KEY = 'giso_space';
 let currentSpace = localStorage.getItem(SPACE_KEY) || 'default';
@@ -21,10 +21,18 @@ export async function api(p, opt = {}) {
   }
   const data = await r.json();
   if (r.status === 403 && !opt._spaceRetried
-      && typeof data?.error === 'string' && data.error.includes('空间')
-      && currentSpace !== 'default') {
-    setSpace('default');
-    return api(p, { ...opt, _spaceRetried: true });
+      && typeof data?.error === 'string' && data.error.includes('空间')) {
+    const me = getUser();
+    const spaces = me?.spaces || [];
+    const fallback = spaces.find((s) => s.space_key === 'default')?.space_key || spaces[0]?.space_key;
+    if (fallback && fallback !== currentSpace) {
+      setSpace(fallback);
+      return api(p, { ...opt, _spaceRetried: true });
+    }
+    if (currentSpace !== 'default') {
+      setSpace('default');
+      return api(p, { ...opt, _spaceRetried: true });
+    }
   }
   return data;
 }

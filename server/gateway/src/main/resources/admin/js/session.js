@@ -16,6 +16,12 @@ export function isAdmin() { return isSystemAdmin(); }
 
 export function isEditor() { return me.space_role === 'editor'; }
 
+export function isViewer() { return me.space_role === 'viewer'; }
+
+export function hasSpaceAccess() {
+  return isSystemAdmin() || (Array.isArray(me.spaces) && me.spaces.length > 0);
+}
+
 export function canEditRegistry() {
   return isSpaceAdmin() || me.space_role === 'editor';
 }

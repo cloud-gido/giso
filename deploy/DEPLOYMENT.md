@@ -28,8 +28,9 @@ git push origin main
 | `INFRA_GISO_APP_KEYS` | `video-android-beta,video-android-prod,video-ios-beta,video-ios-prod` |
 | `INFRA_GISO_ADMIN_USER` | 可选；不配则用默认 `admin` / `admin123`（空库首次启动写入 PG，登录后改密） |
 | `INFRA_GISO_ADMIN_PASSWORD` | 可选 |
-| `INFRA_GISO_VIEWER_USER` | 可选 |
-| `INFRA_GISO_VIEWER_PASSWORD` | 可选 |
+| `INFRA_GISO_VIEWER_USER` | 可选；配置后自动创建只读账号并加入全部空间 |
+| `INFRA_GISO_VIEWER_PASSWORD` | 须与 VIEWER_USER 配对 |
+| `INFRA_GISO_ADMIN_USERS` | 可选；`user:pass:editor` 或 `user:pass:viewer` 逗号分隔，自动加空间 |
 | `INFRA_GISO_DB_SERVICE_URL` | `postgresql://...:5432/giso` | → `GISO_DB_URL` |
 | `INFRA_GISO_DB_SERVICE_USER` | `giso-user` | → `GISO_DB_USER` |
 | `INFRA_GISO_DB_SERVICE_PASSWORD` | `***` | → `GISO_DB_PASSWORD` |

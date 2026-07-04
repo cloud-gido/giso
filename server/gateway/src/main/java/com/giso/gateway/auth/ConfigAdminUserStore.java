@@ -58,4 +58,13 @@ public final class ConfigAdminUserStore implements AdminUserStore {
     public String changePassword(String username, String currentPassword, String newPassword) {
         return "本地配置模式请修改 gateway.yaml 中的密码";
     }
+
+    @Override
+    public String lookupRole(String username) {
+        if (username == null || username.isBlank()) return null;
+        for (AdminUser u : users) {
+            if (u.username().equals(username)) return u.role();
+        }
+        return null;
+    }
 }

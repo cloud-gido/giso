@@ -360,12 +360,22 @@ biz_event code=video_play_start</textarea>
         <input name="username" placeholder="用户名" required pattern="[a-z][a-z0-9_]{2,31}">
         <input name="password" type="password" placeholder="密码（至少 6 位）" required minlength="6">
         <input name="display_name" placeholder="显示名（可选）">
-        <select name="role">
-          <option value="user">平台用户 · 空间权限另配</option>
+        <select name="role" id="user-platform-role">
+          <option value="user">平台用户</option>
           <option value="system_admin">平台管理员</option>
+        </select>
+        <select name="space_role" id="user-space-role">
+          <option value="viewer">只读 · viewer</option>
+          <option value="editor">编辑员 · editor</option>
+          <option value="space_admin">空间管理员</option>
+        </select>
+        <select name="space_key" id="user-space-key">
+          <option value="default">默认空间</option>
+          <option value="__all__">全部空间</option>
         </select>
         <button type="submit" class="primary">创建</button>
       </form>
+      <p class="muted" id="user-form-hint">平台用户须指定空间角色；创建后自动加入所选空间（默认只读）。</p>
     </div>
     <div class="card">
       <div class="card-title">有效账号</div>

@@ -18,6 +18,9 @@ form.addEventListener('submit', async (e) => {
     location.replace(next);
   } catch (ex) {
     err.textContent = ex.message || '登录失败';
+    if (ex.code === 'no_space_membership') {
+      err.textContent = ex.message;
+    }
     if (ex.attemptsRemaining != null && ex.code === 'invalid_credentials') {
       err.textContent = ex.message;
     }

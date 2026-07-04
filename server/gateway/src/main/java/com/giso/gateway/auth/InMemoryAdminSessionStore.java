@@ -50,6 +50,15 @@ public final class InMemoryAdminSessionStore implements AdminSessionStore {
         }
     }
 
+    @Override
+    public void updateRole(String sessionId, String role) {
+        if (sessionId == null || sessionId.isBlank() || role == null || role.isBlank()) return;
+        Entry e = sessions.get(sessionId);
+        if (e != null) {
+            sessions.put(sessionId, new Entry(e.username(), role, e.expiresAt()));
+        }
+    }
+
     private void purgeExpired() {
         long now = System.currentTimeMillis();
         sessions.entrySet().removeIf(e -> e.getValue().expiresAt() <= now);

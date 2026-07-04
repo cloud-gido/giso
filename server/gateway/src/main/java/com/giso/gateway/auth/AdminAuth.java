@@ -7,6 +7,8 @@ import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -63,10 +65,20 @@ public final class AdminAuth {
             if (!authEnabled()) {
                 return Optional.of(new AuthContext("admin", AdminUser.ROLE_ADMIN));
             }
-            return sessions.resolve(ex);
+            Optional<AuthContext> ctx = sessions.resolve(ex);
+            if (ctx.isEmpty()) return Optional.empty();
+            return Optional.of(refreshSessionRole(ex, ctx.get()));
         } catch (Exception e) {
             return Optional.empty();
         }
+    }
+
+    /** 会话中的 role 在登录时写入；若库中已变更（如启动时恢复平台管理员），此处同步。 */
+    private AuthContext refreshSessionRole(HttpExchange ex, AuthContext ctx) throws Exception {
+        String fresh = store.lookupRole(ctx.username());
+        if (fresh == null || fresh.equals(ctx.role())) return ctx;
+        sessions.syncRole(ex, fresh);
+        return new AuthContext(ctx.username(), fresh);
     }
 
     public String role(HttpExchange ex) {
@@ -129,11 +141,46 @@ public final class AdminAuth {
     }
 
     public List<Map<String, Object>> listUsers() throws Exception {
-        return store.listUsers();
+        List<Map<String, Object>> users = store.listUsers();
+        if (spaces == null) return users;
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> row : users) {
+            Map<String, Object> enriched = new LinkedHashMap<>(row);
+            String username = (String) row.get("username");
+            if (username != null) {
+                enriched.put("spaces", spaces.listMembershipsForUser(username));
+            }
+            out.add(enriched);
+        }
+        return out;
     }
 
-    public String saveUser(String username, String password, String role, String displayName) throws Exception {
-        return store.saveUser(username, password, role, displayName);
+    public String saveUser(String username, String password, String role, String displayName)
+            throws Exception {
+        return saveUser(username, password, role, displayName, null, null, false);
+    }
+
+    /**
+     * 创建/更新账号；平台用户可同步授权空间成员（space_key / space_role / all_spaces）。
+     */
+    public String saveUser(String username, String password, String role, String displayName,
+            String spaceKey, String spaceRole, boolean allSpaces) throws Exception {
+        String err = store.saveUser(username, password, role, displayName);
+        if (err != null) return err;
+        String platformRole = RbacRoles.normalizePlatformRole(
+                role != null && !role.isBlank() ? role : store.lookupRole(username));
+        if (platformRole == null) return "role 非法";
+        if (!RbacRoles.requiresSpaceMembership(platformRole)) return null;
+        boolean shouldProvision = spaceRole != null && !spaceRole.isBlank()
+                || allSpaces
+                || RbacRoles.provisionAllSpaces(spaceKey)
+                || (role != null && (AdminUser.ROLE_EDITOR.equals(role) || AdminUser.ROLE_VIEWER.equals(role)));
+        if (!shouldProvision && spaces != null) {
+            shouldProvision = spaces.listMembershipsForUser(username).isEmpty();
+        }
+        if (!shouldProvision) return null;
+        return RbacProvisioning.provisionSpaceAccess(
+                spaces, username, platformRole, spaceKey, spaceRole, allSpaces);
     }
 
     public String disableUser(String username) throws Exception {

@@ -36,15 +36,20 @@ function isValidProfile(data) {
     && (data.ok === true || !!data.username);
 }
 
-/** 拉取 /me 并更新缓存；401 视为未登录。 */
+/** 拉取 /me 并更新缓存；401 视为未登录，403 保留会话（避免无空间权限时误跳登录页）。 */
 export async function refreshUser() {
   const r = await fetch('/admin/api/me', { credentials: 'same-origin' });
   if (r.status === 401) {
     clearUser();
     return null;
   }
-  if (!r.ok) return null;
   const data = await r.json().catch(() => null);
+  if (r.status === 403) {
+    const err = new Error(data?.error || '无权访问');
+    err.code = 'forbidden';
+    throw err;
+  }
+  if (!r.ok) return null;
   if (!isValidProfile(data)) {
     clearUser();
     return null;
@@ -56,21 +61,31 @@ export async function refreshUser() {
 /** 控制台启动：必须有有效会话，否则跳转登录。 */
 export async function requireUser() {
   if (cachedUser) return cachedUser;
-  const user = await refreshUser();
-  if (!user) {
-    requireLoginRedirect();
-    throw new Error('unauthorized');
+  try {
+    const user = await refreshUser();
+    if (!user) {
+      requireLoginRedirect();
+      throw new Error('unauthorized');
+    }
+    return user;
+  } catch (e) {
+    if (e?.code === 'forbidden') throw e;
+    throw e;
   }
-  return user;
 }
 
 /** 登录页：已有会话则直接进控制台。 */
 export async function redirectIfAuthenticated() {
-  const user = await refreshUser();
-  if (!user) return false;
-  const next = new URLSearchParams(location.search).get('next') || HOME;
-  location.replace(next);
-  return true;
+  try {
+    const user = await refreshUser();
+    if (!user) return false;
+    const next = new URLSearchParams(location.search).get('next') || HOME;
+    location.replace(next);
+    return true;
+  } catch (e) {
+    if (e?.code === 'forbidden') return false;
+    throw e;
+  }
 }
 
 /** 登录：服务端校验 + 签发 Cookie，响应含完整 user profile。 */

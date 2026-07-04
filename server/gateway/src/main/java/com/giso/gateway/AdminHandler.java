@@ -9,6 +9,7 @@ import com.giso.gateway.auth.AdminPermissions;
 import com.giso.gateway.auth.AdminUser;
 import com.giso.gateway.auth.AuthContext;
 import com.giso.gateway.auth.LoginResult;
+import com.giso.gateway.auth.RbacProvisioning;
 import com.giso.gateway.registry.RegistryKinds;
 import com.giso.gateway.registry.RegistryImportTemplates;
 import com.giso.gateway.settings.SystemSettingsService;
@@ -80,8 +81,18 @@ public final class AdminHandler implements HttpHandler {
             String spaceRole = resolveSpaceRole(ex, globalRole, spaceKey);
             if (spaceRole == null && auth.authEnabled() && spaces != null
                     && !AdminUser.isSystemAdmin(globalRole)) {
-                Http.json(ex, 403, "{\"error\":\"无权访问该空间\"}");
-                return;
+                if (path.equals("/me") && method.equals("GET")) {
+                    var resolved = resolveFirstAccessibleSpace(ex, globalRole);
+                    if (resolved == null) {
+                        Http.json(ex, 403, "{\"error\":\"尚未加入任何空间，请联系空间管理员\"}");
+                        return;
+                    }
+                    spaceKey = resolved.spaceKey();
+                    spaceRole = resolved.spaceRole();
+                } else {
+                    Http.json(ex, 403, "{\"error\":\"无权访问该空间\"}");
+                    return;
+                }
             }
             if (!authorize(ex, globalRole, spaceRole, method, path)) return;
             route(ex, method, path, globalRole, spaceRole, spaceKey);
@@ -97,6 +108,22 @@ public final class AdminHandler implements HttpHandler {
         String username = auth.operator(ex);
         return spaces.spaceRole(username, globalRole, spaceKey);
     }
+
+    /** 非平台管理员在当前空间无权限时，回退到其第一个可访问空间（供 /me 建立会话）。 */
+    private ResolvedSpace resolveFirstAccessibleSpace(HttpExchange ex, String globalRole)
+            throws Exception {
+        String username = auth.operator(ex);
+        if (username == null || spaces == null) return null;
+        for (Map<String, Object> sp : spaces.spacesForUser(username, globalRole)) {
+            String key = (String) sp.get("space_key");
+            if (key == null || key.isBlank()) continue;
+            String role = spaces.spaceRole(username, globalRole, key);
+            if (role != null) return new ResolvedSpace(key, role);
+        }
+        return null;
+    }
+
+    private record ResolvedSpace(String spaceKey, String spaceRole) { }
 
     private void routeLogin(HttpExchange ex) throws Exception {
         if (!auth.authEnabled()) {
@@ -122,6 +149,14 @@ public final class AdminHandler implements HttpHandler {
         }
         AuthContext ctx = result.context().orElseThrow();
         String spaceKey = Http.spaceKey(ex);
+        if (auth.authEnabled() && spaces != null && !AdminUser.isSystemAdmin(ctx.role())
+                && !RbacProvisioning.hasSpaceAccess(spaces, ctx.username(), ctx.role())) {
+            auth.logout(ex);
+            Http.json(ex, 403, M.writeValueAsString(Map.of(
+                    "error", "账号尚未加入任何空间，请联系平台管理员在「账号管理」或「空间 → 成员」中授权",
+                    "code", "no_space_membership")));
+            return;
+        }
         var profile = auth.userProfile(ctx, spaceKey, registry.pendingCount(spaceKey));
         profile.put("ok", true);
         Http.json(ex, 200, M.writeValueAsString(profile));
@@ -355,9 +390,21 @@ public final class AdminHandler implements HttpHandler {
         }
         if (path.equals("/spaces") && method.equals("POST")) {
             Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
-            String err = spaces.createSpace(str(body, "space_key"), str(body, "display_name"));
-            if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
-            else Http.json(ex, 200, "{\"ok\":true}");
+            String newSpaceKey = str(body, "space_key");
+            String err = spaces.createSpace(newSpaceKey, str(body, "display_name"));
+            if (err != null) {
+                Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+                return;
+            }
+            String operator = auth.operator(ex);
+            if (operator != null && !newSpaceKey.isBlank()) {
+                String memberErr = spaces.saveMember(newSpaceKey, operator, AdminUser.ROLE_SPACE_ADMIN);
+                if (memberErr != null && !memberErr.startsWith("ADDED:") && !memberErr.startsWith("UPDATED:")) {
+                    Http.json(ex, 400, M.writeValueAsString(Map.of("error", memberErr)));
+                    return;
+                }
+            }
+            Http.json(ex, 200, "{\"ok\":true}");
             return;
         }
         if (path.startsWith("/spaces/")) {
@@ -437,7 +484,10 @@ public final class AdminHandler implements HttpHandler {
                     str(body, "username"),
                     str(body, "password"),
                     str(body, "role"),
-                    str(body, "display_name"));
+                    str(body, "display_name"),
+                    str(body, "space_key"),
+                    str(body, "space_role"),
+                    bool(body, "all_spaces"));
             if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
             else Http.json(ex, 200, "{\"ok\":true}");
             return;
@@ -464,7 +514,8 @@ public final class AdminHandler implements HttpHandler {
                 Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
                 String pass = body.containsKey("password") ? str(body, "password") : null;
                 if (pass != null && pass.isBlank()) pass = null;
-                String err = auth.saveUser(username, pass, str(body, "role"), str(body, "display_name"));
+                String err = auth.saveUser(username, pass, str(body, "role"), str(body, "display_name"),
+                        str(body, "space_key"), str(body, "space_role"), bool(body, "all_spaces"));
                 if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
                 else Http.json(ex, 200, "{\"ok\":true}");
                 return;
@@ -734,6 +785,14 @@ public final class AdminHandler implements HttpHandler {
     private static String str(Map<String, Object> m, String key) {
         Object v = m.get(key);
         return v == null ? "" : String.valueOf(v).trim();
+    }
+
+    private static boolean bool(Map<String, Object> m, String key) {
+        Object v = m.get(key);
+        if (v == null) return false;
+        if (v instanceof Boolean b) return b;
+        String s = String.valueOf(v).trim();
+        return "true".equalsIgnoreCase(s) || "1".equals(s) || "yes".equalsIgnoreCase(s);
     }
 
     private static java.util.Set<String> merge(java.util.Set<String> a, java.util.Set<String> b) {
