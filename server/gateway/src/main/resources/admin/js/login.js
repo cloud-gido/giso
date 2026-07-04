@@ -18,6 +18,9 @@ form.addEventListener('submit', async (e) => {
     location.replace(next);
   } catch (ex) {
     err.textContent = ex.message || '登录失败';
+    if (ex.attemptsRemaining != null && ex.code === 'invalid_credentials') {
+      err.textContent = ex.message;
+    }
   } finally {
     btn.disabled = false;
   }

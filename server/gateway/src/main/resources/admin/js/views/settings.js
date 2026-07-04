@@ -41,10 +41,8 @@ function fillAssistantForm() {
     if (ro) el.setAttribute('disabled', '');
     else el.removeAttribute('disabled');
   });
-  if (ro && $('#settings-readonly-note')) {
-    $('#settings-readonly-note').hidden = false;
-  } else if ($('#settings-readonly-note')) {
-    $('#settings-readonly-note').hidden = true;
+  if ($('#settings-readonly-note')) {
+    $('#settings-readonly-note').hidden = !ro;
   }
 }
 

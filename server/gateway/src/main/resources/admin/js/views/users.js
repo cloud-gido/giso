@@ -20,9 +20,37 @@ export async function renderUsers() {
       <td>${ROLE_LABEL[u.role] || esc(u.role)}</td>
       <td>${esc(u.display_name || '—')}</td>
       <td class="muted">${esc(u.source || '—')}</td>
-      <td><button class="danger" data-user="${esc(u.username)}">禁用</button></td>
+      <td class="actions-cell">
+        ${u.locked ? '<span class="tag tag-warn">已锁定</span> ' : ''}
+        <button type="button" class="ghost" data-reset="${esc(u.username)}">重置密码</button>
+        ${u.locked ? `<button type="button" class="ghost" data-unlock="${esc(u.username)}">解锁</button>` : ''}
+        <button class="danger" data-user="${esc(u.username)}">禁用</button>
+      </td>
     </tr>`).join('') || '<tr><td colspan="5" class="muted">暂无账号</td></tr>'}
     </tbody></table>`;
+  wrap.querySelectorAll('button[data-reset]').forEach((btn) => {
+    btn.onclick = async () => {
+      const name = btn.dataset.reset;
+      const next = prompt(`为账号 ${name} 设置新密码（至少 6 位）`);
+      if (next == null) return;
+      if (next.length < 6) return toast('密码至少 6 位', 'error');
+      const r = await api('/users/' + encodeURIComponent(name), {
+        method: 'PUT',
+        body: JSON.stringify({ password: next }),
+      });
+      if (r.error) toast(r.error, 'error');
+      else toast(`已重置 ${name} 的密码`);
+    };
+  });
+  wrap.querySelectorAll('button[data-unlock]').forEach((btn) => {
+    btn.onclick = async () => {
+      const name = btn.dataset.unlock;
+      if (!confirm(`解锁账号 ${name}？`)) return;
+      const r = await api('/users/' + encodeURIComponent(name) + '/unlock', { method: 'POST' });
+      if (r.error) toast(r.error, 'error');
+      else { toast(r.message || `已解锁 ${name}`); renderUsers(); }
+    };
+  });
   wrap.querySelectorAll('button[data-user]').forEach((btn) => {
     btn.onclick = async () => {
       const name = btn.dataset.user;

@@ -270,6 +270,42 @@ public final class SpaceService {
         return out;
     }
 
+    /** 为配置种子账号（viewer/editor）补齐各 active 空间的成员关系，不覆盖已有成员。 */
+    public void syncSeedSpaceMembers(List<AdminUser> seeds) throws SQLException {
+        for (AdminUser u : seeds) {
+            String spaceRole = seedSpaceRole(u.role());
+            if (spaceRole == null || !adminUserExists(u.username())) continue;
+            for (Map<String, Object> sp : listSpaces()) {
+                if (!"active".equals(sp.get("status"))) continue;
+                String spaceKey = (String) sp.get("space_key");
+                if (isMember(spaceKey, u.username())) continue;
+                insertMemberIfAbsent(spaceKey, u.username(), spaceRole);
+                System.out.println("[giso] ensured space member: " + u.username()
+                        + " @ " + spaceKey + " (" + spaceRole + ")");
+            }
+        }
+    }
+
+    private static String seedSpaceRole(String configRole) {
+        if (AdminUser.ROLE_VIEWER.equals(configRole)) return AdminUser.ROLE_VIEWER;
+        if (AdminUser.ROLE_EDITOR.equals(configRole)) return AdminUser.ROLE_EDITOR;
+        return null;
+    }
+
+    private void insertMemberIfAbsent(String spaceKey, String username, String role) throws SQLException {
+        String sql = """
+                INSERT INTO %s.space_members (username, space_key, role) VALUES (?, ?, ?)
+                ON CONFLICT (username, space_key) DO NOTHING
+                """.formatted(dbSchema);
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, username);
+            ps.setString(2, spaceKey);
+            ps.setString(3, role);
+            ps.executeUpdate();
+        }
+        invalidateSpaceRoleCache();
+    }
+
     /** 用户可访问的空间及在该空间的角色。 */
     public List<Map<String, Object>> spacesForUser(String username, String globalRole) throws SQLException {
         if (AdminUser.ROLE_SYSTEM_ADMIN.equals(globalRole)) {

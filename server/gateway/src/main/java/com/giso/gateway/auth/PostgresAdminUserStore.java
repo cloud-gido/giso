@@ -30,6 +30,7 @@ public final class PostgresAdminUserStore implements AdminUserStore {
         PostgresAdminUserStore store = new PostgresAdminUserStore(
                 ds, config.dbSchema, GatewayConfig.resolveAuthUsers(config));
         store.bootstrapIfEmpty();
+        store.ensureMissingSeedUsers();
         return store;
     }
 
@@ -59,7 +60,7 @@ public final class PostgresAdminUserStore implements AdminUserStore {
     @Override
     public List<Map<String, Object>> listUsers() throws SQLException {
         String sql = """
-                SELECT username, role, display_name, created_at::text
+                SELECT username, role, display_name, created_at::text, locked_until::text
                 FROM %s.admin_users WHERE disabled_at IS NULL ORDER BY username
                 """.formatted(dbSchema);
         List<Map<String, Object>> out = new ArrayList<>();
@@ -72,6 +73,9 @@ public final class PostgresAdminUserStore implements AdminUserStore {
                 row.put("role", rs.getString(2));
                 row.put("display_name", rs.getString(3));
                 row.put("created_at", rs.getString(4));
+                String lockedUntil = rs.getString(5);
+                row.put("locked_until", lockedUntil);
+                row.put("locked", lockedUntil != null && !lockedUntil.isBlank());
                 row.put("source", "postgres");
                 out.add(row);
             }
@@ -134,6 +138,26 @@ public final class PostgresAdminUserStore implements AdminUserStore {
     }
 
     @Override
+    public String changePassword(String username, String currentPassword, String newPassword)
+            throws SQLException {
+        if (username == null || username.isBlank()) return "username 不能为空";
+        if (currentPassword == null || currentPassword.isBlank()) return "请输入当前密码";
+        if (newPassword == null || newPassword.length() < 6) return "新密码至少 6 位";
+        if (currentPassword.equals(newPassword)) return "新密码不能与当前密码相同";
+        if (authenticate(username, currentPassword) == null) return "当前密码不正确";
+        String sql = """
+                UPDATE %s.admin_users SET password_hash = ?, updated_at = now()
+                WHERE username = ? AND disabled_at IS NULL
+                """.formatted(dbSchema);
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, BCrypt.hashpw(newPassword, BCrypt.gensalt(12)));
+            ps.setString(2, username);
+            if (ps.executeUpdate() == 0) return "用户不存在或已禁用";
+        }
+        return null;
+    }
+
+    @Override
     public String disableUser(String username) throws SQLException {
         if (username == null || username.isBlank()) return "username 不能为空";
         String sql = """
@@ -190,6 +214,32 @@ public final class PostgresAdminUserStore implements AdminUserStore {
                 ps.setString(3, role);
                 ps.setString(4, u.username());
                 ps.executeUpdate();
+            }
+        }
+    }
+
+    /** 配置中的种子账号（viewer/editor1 等）在库已存在 admin 时也要补齐，且不覆盖已有密码。 */
+    private void ensureMissingSeedUsers() throws SQLException {
+        if (seedUsers.isEmpty()) return;
+        String insert = """
+                INSERT INTO %s.admin_users (username, password_hash, role, display_name)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (username) DO NOTHING
+                """.formatted(dbSchema);
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(insert)) {
+            for (AdminUser u : seedUsers) {
+                if (fetchRole(u.username()) != null) continue;
+                String role = u.role();
+                if (AdminUser.ROLE_ADMIN.equals(role)) role = AdminUser.ROLE_SYSTEM_ADMIN;
+                if (AdminUser.ROLE_EDITOR.equals(role) || AdminUser.ROLE_VIEWER.equals(role)) {
+                    role = AdminUser.ROLE_USER;
+                }
+                ps.setString(1, u.username());
+                ps.setString(2, BCrypt.hashpw(u.password(), BCrypt.gensalt(12)));
+                ps.setString(3, role);
+                ps.setString(4, u.username());
+                ps.executeUpdate();
+                System.out.println("[giso] ensured seed admin user: " + u.username());
             }
         }
     }

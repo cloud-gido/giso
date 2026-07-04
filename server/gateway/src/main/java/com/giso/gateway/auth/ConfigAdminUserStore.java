@@ -53,4 +53,9 @@ public final class ConfigAdminUserStore implements AdminUserStore {
     public String disableUser(String username) {
         return "本地配置模式不支持账号管理，请使用 PostgreSQL 后端";
     }
+
+    @Override
+    public String changePassword(String username, String currentPassword, String newPassword) {
+        return "本地配置模式请修改 gateway.yaml 中的密码";
+    }
 }

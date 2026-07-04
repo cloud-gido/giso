@@ -80,12 +80,20 @@
         <span class="nav-ico nav-ico--violet"><svg><use href="#ico-copilot"/></svg></span>
         <span data-i18n="nav.copilot">接入助手</span>
       </button>
-      <div class="top-menu nav-platform-only" id="menu-platform">
+      <div class="top-menu nav-space-only" id="menu-space" hidden>
+        <button type="button" class="top-menu-btn" aria-haspopup="true">
+          <span data-i18n="top.space">空间</span> ▾
+        </button>
+        <div class="top-menu-pop">
+          <button type="button" class="top-menu-item" data-view="spaces" data-i18n="nav.spaceSettings">空间设置</button>
+        </div>
+      </div>
+      <div class="top-menu nav-platform-only" id="menu-platform" hidden>
         <button type="button" class="top-menu-btn" aria-haspopup="true">
           <span data-i18n="top.platform">平台</span> ▾
         </button>
         <div class="top-menu-pop">
-          <button type="button" class="top-menu-item nav-admin-only" data-view="spaces" data-i18n="nav.spaces">空间管理</button>
+          <button type="button" class="top-menu-item" data-view="spaces" data-i18n="nav.spaces">空间管理</button>
           <button type="button" class="top-menu-item" data-view="users" data-i18n="nav.users">账号管理</button>
           <button type="button" class="top-menu-item" data-view="settings" data-i18n="nav.settings">系统设置</button>
         </div>
@@ -125,6 +133,7 @@
         </button>
         <div class="user-menu-pop" id="user-menu-pop">
           <div class="user-menu-meta" id="user-menu-meta"></div>
+          <button type="button" class="user-menu-item" id="btn-change-password" hidden data-i18n="top.changePassword">修改密码</button>
           <button type="button" class="user-menu-item user-menu-item--danger" id="btn-logout" hidden data-i18n="top.logout">退出登录</button>
         </div>
       </div>
@@ -376,6 +385,30 @@ biz_event code=video_play_start</textarea>
 </div>
 
 <!-- 编辑弹窗 -->
+<dialog id="password-dialog">
+  <form method="dialog" id="password-form">
+    <h3 data-i18n="password.title">修改密码</h3>
+    <p class="hint" data-i18n="password.hint">修改成功后需重新登录。</p>
+    <label class="field">
+      <span data-i18n="password.current">当前密码</span>
+      <input id="pwd-current" name="current_password" type="password" autocomplete="current-password" required>
+    </label>
+    <label class="field">
+      <span data-i18n="password.new">新密码</span>
+      <input id="pwd-new" name="new_password" type="password" autocomplete="new-password" required minlength="6">
+    </label>
+    <label class="field">
+      <span data-i18n="password.confirm">确认新密码</span>
+      <input id="pwd-confirm" name="confirm_password" type="password" autocomplete="new-password" required minlength="6">
+    </label>
+    <div class="err" id="pwd-err"></div>
+    <div class="dialog-actions">
+      <button type="button" class="ghost" id="pwd-cancel" data-i18n="password.cancel">取消</button>
+      <button type="submit" class="primary" id="pwd-submit" data-i18n="password.save">保存</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="editor">
   <form method="dialog" id="editor-form">
     <h3 id="editor-title">编辑</h3>

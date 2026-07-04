@@ -8,6 +8,7 @@ import com.giso.gateway.auth.AdminAuth;
 import com.giso.gateway.auth.AdminPermissions;
 import com.giso.gateway.auth.AdminUser;
 import com.giso.gateway.auth.AuthContext;
+import com.giso.gateway.auth.LoginResult;
 import com.giso.gateway.registry.RegistryKinds;
 import com.giso.gateway.registry.RegistryImportTemplates;
 import com.giso.gateway.settings.SystemSettingsService;
@@ -109,13 +110,19 @@ public final class AdminHandler implements HttpHandler {
             Http.json(ex, 400, "{\"error\":\"用户名和密码不能为空\"}");
             return;
         }
-        Optional<AuthContext> ctx = auth.login(ex, username, password);
-        if (ctx.isEmpty()) {
-            Http.json(ex, 401, "{\"error\":\"用户名或密码错误\",\"code\":\"invalid_credentials\"}");
+        LoginResult result = auth.attemptLogin(ex, Http.clientIp(ex), username, password);
+        if (!result.success()) {
+            var err = new java.util.LinkedHashMap<String, Object>();
+            err.put("error", result.message());
+            err.put("code", result.code());
+            if (result.retryAfterSec() > 0) err.put("retry_after_sec", result.retryAfterSec());
+            if (result.attemptsRemaining() != null) err.put("attempts_remaining", result.attemptsRemaining());
+            Http.json(ex, result.httpStatus(), M.writeValueAsString(err));
             return;
         }
+        AuthContext ctx = result.context().orElseThrow();
         String spaceKey = Http.spaceKey(ex);
-        var profile = auth.userProfile(ctx.get(), spaceKey, registry.pendingCount(spaceKey));
+        var profile = auth.userProfile(ctx, spaceKey, registry.pendingCount(spaceKey));
         profile.put("ok", true);
         Http.json(ex, 200, M.writeValueAsString(profile));
     }
@@ -123,6 +130,7 @@ public final class AdminHandler implements HttpHandler {
     private boolean authorize(HttpExchange ex, String globalRole, String spaceRole,
             String method, String path) throws IOException {
         if (path.equals("/me") && method.equals("GET")) return true;
+        if (path.equals("/me/password") && method.equals("POST")) return true;
         if (path.equals("/spaces") && method.equals("GET")) return true;
         if (path.startsWith("/spaces")) {
             if (path.equals("/spaces") && method.equals("POST")) {
@@ -216,6 +224,24 @@ public final class AdminHandler implements HttpHandler {
                 return;
             }
             Http.json(ex, 200, M.writeValueAsString(profile));
+            return;
+        }
+        if (path.equals("/me/password") && method.equals("POST")) {
+            String operator = auth.operator(ex);
+            if (operator == null) {
+                Http.unauthorizedJson(ex);
+                return;
+            }
+            Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+            String err = auth.changePassword(
+                    operator,
+                    str(body, "current_password"),
+                    str(body, "new_password"));
+            if (err != null) {
+                Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+                return;
+            }
+            Http.json(ex, 200, "{\"ok\":true,\"message\":\"密码已更新，请重新登录\"}");
             return;
         }
         if (path.startsWith("/spaces")) {
@@ -417,7 +443,19 @@ public final class AdminHandler implements HttpHandler {
             return;
         }
         if (path.startsWith("/users/")) {
-            String username = path.substring("/users/".length());
+            String rest = path.substring("/users/".length());
+            if (rest.endsWith("/unlock") && method.equals("POST")) {
+                String username = rest.substring(0, rest.length() - "/unlock".length());
+                if (username.isBlank()) {
+                    Http.empty(ex, 404);
+                    return;
+                }
+                String err = auth.unlockUser(username);
+                if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
+                else Http.json(ex, 200, "{\"ok\":true,\"message\":\"已解锁账号\"}");
+                return;
+            }
+            String username = rest;
             if (username.isBlank()) {
                 Http.empty(ex, 404);
                 return;

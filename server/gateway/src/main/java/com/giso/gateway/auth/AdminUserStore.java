@@ -19,4 +19,7 @@ public interface AdminUserStore {
 
     /** 禁用账号；返回 null 成功。 */
     String disableUser(String username) throws Exception;
+
+    /** 修改自己的密码；需校验当前密码。返回 null 成功，否则错误信息。 */
+    String changePassword(String username, String currentPassword, String newPassword) throws Exception;
 }

@@ -507,9 +507,4 @@ export function initRegistry() {
   $('#btn-visual-picker')?.addEventListener('click', () => {
     document.dispatchEvent(new CustomEvent('giso:navigate', { detail: { view: 'visual' } }));
   });
-  if (!canEditRegistry()) {
-    $('#btn-add')?.setAttribute('hidden', '');
-    $('#btn-reg-import')?.setAttribute('hidden', '');
-    $('#btn-reg-template')?.setAttribute('hidden', '');
-  }
 }

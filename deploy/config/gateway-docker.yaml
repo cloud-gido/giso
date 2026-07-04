@@ -34,6 +34,8 @@ auth:
     - username: editor1
       password: editor123
       role: editor
+  login_security:
+    enabled: false
 
 limits:
   max_body_bytes: 1048576

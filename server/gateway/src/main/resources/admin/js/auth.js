@@ -82,7 +82,13 @@ export async function signIn(username, password) {
     body: JSON.stringify({ username, password }),
   });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || '登录失败');
+  if (!r.ok) {
+    const err = new Error(data.error || '登录失败');
+    err.code = data.code;
+    err.retryAfterSec = data.retry_after_sec;
+    err.attemptsRemaining = data.attempts_remaining;
+    throw err;
+  }
   if (!isValidProfile(data)) throw new Error(data.error || '登录失败');
   cachedUser = data;
   return data;

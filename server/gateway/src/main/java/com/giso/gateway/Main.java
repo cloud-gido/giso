@@ -74,7 +74,8 @@ public final class Main {
                     "entries", registry.entryCount()));
             health.put("auth", Map.of(
                     "enabled", adminAuth.authEnabled(),
-                    "backend", pgStore != null ? "postgres" : "config"));
+                    "backend", pgStore != null ? "postgres" : "config",
+                    "login_security", adminAuth.loginSecurity().enabled()));
             health.put("sinks", sinkRegistry.activeNames());
             if (pgStore != null) {
                 try {

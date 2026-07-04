@@ -2,7 +2,7 @@
 import { $, $$ } from './util.js';
 import { api, logout, getSpace, setSpace } from './api.js';
 import { requireUser, setUser as cacheUser } from './auth.js';
-import { setMe } from './session.js';
+import { setMe, isSystemAdmin } from './session.js';
 import { initDebug, renderDebug } from './views/debug.js';
 import { initAssert } from './views/assert.js';
 import { initRegistry, renderRegistry, invalidateRegistryCache } from './views/registry.js';
@@ -13,6 +13,7 @@ import { initSpaceSwitcher, renderSpaces, refreshSpaceSwitcher } from './views/s
 import { initVisualPicker, renderVisualPicker } from './views/visual-picker.js';
 import { initCopilot, renderCopilot } from './views/copilot.js';
 import { initSettings, renderSettings } from './views/settings.js';
+import { initPasswordChange } from './password.js';
 import { t, setLocale, getLocale, applyI18n } from './i18n.js';
 
 const ROLE_LABEL = {
@@ -37,10 +38,23 @@ export function show(view) {
   if (!VIEWS[view]) return;
   $$('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   $$('.view').forEach((p) => p.classList.toggle('active', p.id === 'view-' + view));
-  $('#page-title').textContent = t(VIEWS[view].titleKey);
-  $('#page-desc').textContent = t(VIEWS[view].descKey);
+  let titleKey = VIEWS[view].titleKey;
+  let descKey = VIEWS[view].descKey;
+  if (view === 'spaces' && !isSystemAdmin()) {
+    titleKey = 'view.spaceSettings.title';
+    descKey = 'view.spaceSettings.desc';
+  }
+  $('#page-title').textContent = t(titleKey);
+  $('#page-desc').textContent = t(descKey);
   $$('.top-menu.open').forEach((m) => m.classList.remove('open'));
   VIEWS[view].onShow?.();
+}
+
+function setVisible(selector, visible) {
+  $$(selector).forEach((el) => {
+    if (visible) el.removeAttribute('hidden');
+    else el.setAttribute('hidden', '');
+  });
 }
 
 function initNavigation() {
@@ -113,25 +127,29 @@ function applyRole(me) {
     if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
     if (meta) meta.textContent = `全局 · ${global}  ·  本空间 · ${space || '—'}`;
     if (logoutBtn) logoutBtn.hidden = false;
+    if ($('#btn-change-password')) $('#btn-change-password').hidden = false;
   } else {
     if (menuName) menuName.textContent = '本地开发';
     if (menuRole) menuRole.textContent = '免登录';
     if (avatar) avatar.textContent = 'G';
     if (meta) meta.textContent = 'auth_enabled=false';
     if (logoutBtn) logoutBtn.hidden = true;
+    if ($('#btn-change-password')) $('#btn-change-password').hidden = true;
   }
 
-  if (me.space_role === 'viewer') {
-    $('#btn-clear')?.setAttribute('hidden', '');
-    $('#btn-add')?.setAttribute('hidden', '');
-  }
-  if (!['system_admin', 'admin', 'space_admin'].includes(me.space_role)
-      && !['system_admin', 'admin'].includes(me.role)) {
-    $$('.nav-admin-only').forEach((el) => el.setAttribute('hidden', ''));
-  }
-  if (!['system_admin', 'admin'].includes(me.role)) {
-    $$('.nav-platform-only').forEach((el) => el.setAttribute('hidden', ''));
-  }
+  const isPlatformAdmin = ['system_admin', 'admin'].includes(me.role);
+  const isSpaceManager = isPlatformAdmin || me.space_role === 'space_admin';
+  const canEdit = isSpaceManager || me.space_role === 'editor';
+
+  setVisible('.nav-platform-only', isPlatformAdmin);
+  setVisible('.nav-space-only', !isPlatformAdmin && isSpaceManager);
+  setVisible('.nav-admin-only', isSpaceManager);
+  setVisible('#btn-clear', isSpaceManager && me.space_role !== 'viewer');
+  setVisible('#btn-add', canEdit && me.space_role !== 'viewer');
+  setVisible('#btn-reg-import', isSpaceManager);
+  setVisible('#btn-reg-template', isSpaceManager);
+  setVisible('#btn-visual-picker', isSpaceManager);
+
   updatePendingBadge(me.pending_count || 0);
 }
 
@@ -147,6 +165,7 @@ initUsers();
 initVisualPicker();
 initCopilot();
 initSettings();
+initPasswordChange();
 applyI18n();
 document.documentElement.lang = getLocale() === 'en' ? 'en' : 'zh-CN';
 $('#btn-locale')?.addEventListener('click', () => {

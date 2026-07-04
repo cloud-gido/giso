@@ -21,21 +21,35 @@ public final class AdminAuth {
     private final AdminUserStore store;
     private final SpaceService spaces;
     private final AdminSessionManager sessions;
+    private final LoginSecurity loginSecurity;
 
     public AdminAuth(GatewayConfig config, PostgresRegistryStore registryStore, SpaceService spaces)
             throws Exception {
         AdminSessionStore sessionStore;
+        String dbSchema = config.dbSchema == null || config.dbSchema.isBlank()
+                ? "public" : config.dbSchema;
         if ("postgres".equalsIgnoreCase(config.registryBackend) && registryStore != null) {
             this.store = PostgresAdminUserStore.create(registryStore.dataSource(), config);
-            String schema = config.dbSchema == null || config.dbSchema.isBlank()
-                    ? "public" : config.dbSchema;
-            sessionStore = new PostgresAdminSessionStore(registryStore.dataSource(), schema);
+            sessionStore = new PostgresAdminSessionStore(registryStore.dataSource(), dbSchema);
         } else {
             this.store = new ConfigAdminUserStore(config);
             sessionStore = new InMemoryAdminSessionStore();
+            registryStore = null;
         }
         this.spaces = spaces;
         this.sessions = new AdminSessionManager(sessionStore);
+        this.loginSecurity = LoginSecurity.create(config.loginSecurity, registryStore, dbSchema);
+        syncSeedSpaceMemberships(config);
+    }
+
+    /** 为配置中的 viewer/editor 种子账号补齐各空间成员（仅缺失时插入）。 */
+    private void syncSeedSpaceMemberships(GatewayConfig config) {
+        if (spaces == null || !(store instanceof PostgresAdminUserStore)) return;
+        try {
+            spaces.syncSeedSpaceMembers(GatewayConfig.resolveAuthUsers(config));
+        } catch (Exception e) {
+            System.err.println("[giso] sync seed space members failed: " + e.getMessage());
+        }
     }
 
     /** 当前请求是否未登录（auth 开启且 Cookie 无效时为 true）。 */
@@ -79,14 +93,31 @@ public final class AdminAuth {
     }
 
     /**
-     * 登录：校验密码 → 建立服务端会话 → 返回用户上下文。
-     * 失败返回 empty（用户名/密码错误或 auth 未启用）。
+     * 登录：安全门禁 → 校验密码 → 建立服务端会话。
      */
+    public LoginResult attemptLogin(HttpExchange ex, String clientIp, String username, String password)
+            throws Exception {
+        if (!authEnabled()) {
+            return LoginResult.invalid("当前环境未启用登录", null, 0);
+        }
+        return loginSecurity.guardLogin(clientIp, ex, username, password, store::authenticate,
+                (e, u, r) -> sessions.establish(e, u, r));
+    }
+
+    /** @deprecated 请使用 {@link #attemptLogin}；保留供单测。 */
     public Optional<AuthContext> login(HttpExchange ex, String username, String password) throws Exception {
-        if (!authEnabled()) return Optional.empty();
-        String role = store.authenticate(username, password);
-        if (role == null) return Optional.empty();
-        return Optional.of(sessions.establish(ex, username, role));
+        LoginResult r = attemptLogin(ex, "127.0.0.1", username, password);
+        return r.success() ? r.context() : Optional.empty();
+    }
+
+    public LoginSecurity loginSecurity() {
+        return loginSecurity;
+    }
+
+    public String unlockUser(String username) throws Exception {
+        if (username == null || username.isBlank()) return "username 不能为空";
+        loginSecurity.unlockUser(username);
+        return null;
     }
 
     public void logout(HttpExchange ex) throws IOException {
@@ -107,6 +138,11 @@ public final class AdminAuth {
 
     public String disableUser(String username) throws Exception {
         return store.disableUser(username);
+    }
+
+    public String changePassword(String username, String currentPassword, String newPassword)
+            throws Exception {
+        return store.changePassword(username, currentPassword, newPassword);
     }
 
     public boolean authEnabled() {

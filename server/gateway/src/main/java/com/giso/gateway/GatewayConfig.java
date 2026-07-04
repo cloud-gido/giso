@@ -1,6 +1,7 @@
 package com.giso.gateway;
 
 import com.giso.gateway.auth.AdminUser;
+import com.giso.gateway.auth.LoginSecurityConfig;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
@@ -76,6 +77,8 @@ public final class GatewayConfig {
      * 生产 postgres 模式下仅作<strong>首次种子</strong>，落库后改 Doppler 不会自动覆盖已有用户。
      */
     public List<Map<String, String>> authUsers = List.of();
+    /** 管理台登录防暴力破解（生产建议开启，见 auth.login_security）。 */
+    public LoginSecurityConfig loginSecurity = new LoginSecurityConfig();
 
     // ── 防护 ──
     /** 单次请求 body 解压后字节上限 */
@@ -184,6 +187,19 @@ public final class GatewayConfig {
             }
             c.authUsers = parsed;
         }
+        if (auth.get("login_security") instanceof Map<?, ?> ls) {
+            Map<String, Object> m = new HashMap<>();
+            ls.forEach((k, v) -> m.put(String.valueOf(k), v));
+            LoginSecurityConfig sec = c.loginSecurity;
+            if (m.get("enabled") instanceof Boolean b) sec.enabled = b;
+            if (m.get("max_attempts_per_user") instanceof Number n) sec.maxAttemptsPerUser = n.intValue();
+            if (m.get("lockout_minutes") instanceof Number n) sec.lockoutMinutes = n.intValue();
+            if (m.get("attempt_window_minutes") instanceof Number n) sec.attemptWindowMinutes = n.intValue();
+            if (m.get("max_attempts_per_ip") instanceof Number n) sec.maxAttemptsPerIp = n.intValue();
+            if (m.get("ip_window_minutes") instanceof Number n) sec.ipWindowMinutes = n.intValue();
+            if (m.get("ip_block_minutes") instanceof Number n) sec.ipBlockMinutes = n.intValue();
+            if (m.get("delay_ms_per_failure") instanceof Number n) sec.delayMsPerFailure = n.intValue();
+        }
 
         Map<String, Object> limits = (Map<String, Object>) doc.getOrDefault("limits", Map.of());
         c.maxBodyBytes = ((Number) limits.getOrDefault("max_body_bytes", c.maxBodyBytes)).longValue();
@@ -261,6 +277,14 @@ public final class GatewayConfig {
         env("GISO_VIEWER_USER").ifPresent(v -> c.viewerUser = v);
         env("GISO_VIEWER_PASSWORD").ifPresent(v -> c.viewerPassword = v);
         env("GISO_ADMIN_USERS").ifPresent(v -> c.authUsers = parseAdminUsersEnv(v));
+        envBool("GISO_LOGIN_SECURITY_ENABLED").ifPresent(v -> c.loginSecurity.enabled = v);
+        envInt("GISO_LOGIN_MAX_ATTEMPTS_USER").ifPresent(v -> c.loginSecurity.maxAttemptsPerUser = v);
+        envInt("GISO_LOGIN_LOCKOUT_MINUTES").ifPresent(v -> c.loginSecurity.lockoutMinutes = v);
+        envInt("GISO_LOGIN_ATTEMPT_WINDOW_MINUTES").ifPresent(v -> c.loginSecurity.attemptWindowMinutes = v);
+        envInt("GISO_LOGIN_MAX_ATTEMPTS_IP").ifPresent(v -> c.loginSecurity.maxAttemptsPerIp = v);
+        envInt("GISO_LOGIN_IP_WINDOW_MINUTES").ifPresent(v -> c.loginSecurity.ipWindowMinutes = v);
+        envInt("GISO_LOGIN_IP_BLOCK_MINUTES").ifPresent(v -> c.loginSecurity.ipBlockMinutes = v);
+        envInt("GISO_LOGIN_DELAY_MS").ifPresent(v -> c.loginSecurity.delayMsPerFailure = v);
         envInt("GISO_RATE_LIMIT_RPS").ifPresent(v -> c.rateLimitRps = v);
         envInt("GISO_RATE_LIMIT_BURST").ifPresent(v -> c.rateLimitBurst = v);
         envLong("GISO_MAX_BODY_BYTES").ifPresent(v -> c.maxBodyBytes = v);

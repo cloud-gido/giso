@@ -186,7 +186,8 @@ export function initVisualPicker() {
 
 export function renderVisualPicker() {
   applyI18n();
-  if (!canEditRegistry()) {
-    $('#vp-submit')?.setAttribute('hidden', '');
-  }
+  const btn = $('#vp-submit');
+  if (!btn) return;
+  if (canEditRegistry()) btn.removeAttribute('hidden');
+  else btn.setAttribute('hidden', '');
 }

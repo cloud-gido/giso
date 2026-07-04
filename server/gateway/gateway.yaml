@@ -36,6 +36,16 @@ auth:
   admin_password: ""
   viewer_user: ""                       # 只读账号：可看联调/统计/注册表，不能改注册表/清缓冲
   viewer_password: ""
+  # 登录防暴力破解（生产 postgres 强烈建议开启）
+  login_security:
+    enabled: true
+    max_attempts_per_user: 5          # 同账号连续输错 5 次 → 锁定
+    lockout_minutes: 15                 # 账号锁 15 分钟
+    attempt_window_minutes: 15          # 失败计数窗口
+    max_attempts_per_ip: 30             # 单 IP 10 分钟内最多 30 次登录尝试
+    ip_window_minutes: 10
+    ip_block_minutes: 15                # IP 超限封 15 分钟
+    delay_ms_per_failure: 500           # 每次失败后累加等待（上限 3s）
 
 # ── 防护 ──
 limits:
