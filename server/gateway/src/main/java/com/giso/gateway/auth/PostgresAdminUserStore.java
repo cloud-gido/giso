@@ -31,6 +31,7 @@ public final class PostgresAdminUserStore implements AdminUserStore {
                 ds, config.dbSchema, GatewayConfig.resolveAuthUsers(config));
         store.bootstrapIfEmpty();
         store.ensureMissingSeedUsers();
+        store.ensureSeedPlatformAdminRoles();
         return store;
     }
 
@@ -101,6 +102,11 @@ public final class PostgresAdminUserStore implements AdminUserStore {
         if (AdminUser.ROLE_ADMIN.equals(role)) role = AdminUser.ROLE_SYSTEM_ADMIN;
         if (AdminUser.ROLE_EDITOR.equals(role) || AdminUser.ROLE_VIEWER.equals(role)) {
             role = AdminUser.ROLE_USER;
+        }
+        if (exists && AdminUser.ROLE_USER.equals(role) && AdminUser.isSystemAdmin(fetchRole(username))) {
+            if (countActiveSystemAdmins() <= 1) {
+                return "不能将最后一个平台管理员降级为平台用户";
+            }
         }
         String disp = displayName == null || displayName.isBlank() ? username : displayName;
         if (!exists && (password == null || password.length() < 6)) {
@@ -240,6 +246,40 @@ public final class PostgresAdminUserStore implements AdminUserStore {
                 ps.setString(4, u.username());
                 ps.executeUpdate();
                 System.out.println("[giso] ensured seed admin user: " + u.username());
+            }
+        }
+    }
+
+    /** 配置/Doppler 中的平台管理员种子（admin）须保持 system_admin，避免误降为 user 后失去「平台」菜单。 */
+    private void ensureSeedPlatformAdminRoles() throws SQLException {
+        for (AdminUser u : seedUsers) {
+            if (!AdminUser.isSystemAdmin(u.role())) continue;
+            String current = fetchRole(u.username());
+            if (current == null || AdminUser.ROLE_SYSTEM_ADMIN.equals(current)) continue;
+            String sql = """
+                    UPDATE %s.admin_users SET role = ?, updated_at = now()
+                    WHERE username = ? AND disabled_at IS NULL
+                    """.formatted(dbSchema);
+            try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+                ps.setString(1, AdminUser.ROLE_SYSTEM_ADMIN);
+                ps.setString(2, u.username());
+                if (ps.executeUpdate() > 0) {
+                    System.out.println("[giso] restored platform admin role for seed user: " + u.username());
+                }
+            }
+        }
+    }
+
+    private int countActiveSystemAdmins() throws SQLException {
+        String sql = """
+                SELECT COUNT(*) FROM %s.admin_users
+                WHERE role = ? AND disabled_at IS NULL
+                """.formatted(dbSchema);
+        try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, AdminUser.ROLE_SYSTEM_ADMIN);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
             }
         }
     }

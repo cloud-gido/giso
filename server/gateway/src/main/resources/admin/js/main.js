@@ -119,11 +119,12 @@ function applyRole(me) {
   if (userMenu) userMenu.hidden = false;
 
   if (me?.auth_enabled) {
+    const isPlatformAdmin = ['system_admin', 'admin'].includes(me.role);
     const global = ROLE_LABEL[me.role] || me.role;
     const space = ROLE_LABEL[me.space_role] || me.space_role || '';
     const name = me.username || 'user';
     if (menuName) menuName.textContent = name;
-    if (menuRole) menuRole.textContent = space || global;
+    if (menuRole) menuRole.textContent = isPlatformAdmin ? global : (space || global);
     if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
     if (meta) meta.textContent = `全局 · ${global}  ·  本空间 · ${space || '—'}`;
     if (logoutBtn) logoutBtn.hidden = false;
