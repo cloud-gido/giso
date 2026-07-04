@@ -106,7 +106,7 @@ button.ghost { background: none; border-color: transparent; color: var(--muted);
 .src-pill.server { background: #fbeefc; color: #a02fb5; }
 
 /* ── 表格 ── */
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; width: 100%; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
 tr:last-child td { border-bottom: none; }

@@ -142,8 +142,9 @@ a.nav-link:hover { color: var(--accent); background: var(--panel2); }
 .main-body {
   flex: 1;
   padding: 18px 28px 40px;
-  max-width: 1320px;
   width: 100%;
+  max-width: none;
+  box-sizing: border-box;
   background: var(--bg);
 }
 .topbar-left { min-width: 0; }
@@ -342,7 +343,7 @@ a.nav-link:hover { color: var(--accent); background: var(--panel2); }
 .user-menu-item--danger { color: var(--red); }
 .user-menu-item--danger:hover { background: var(--red-soft); }
 
-.view { display: none; }
+.view { display: none; width: 100%; }
 .view.active { display: block; animation: fadein .18s ease; }
 @keyframes fadein { from { opacity: 0; transform: translateY(4px); } }
 
@@ -351,6 +352,8 @@ a.nav-link:hover { color: var(--accent); background: var(--panel2); }
   background: var(--panel); border: 1px solid var(--border);
   border-radius: var(--r-lg); padding: 18px 20px;
   box-shadow: var(--shadow-md); margin-bottom: 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .card-flat { margin-bottom: 16px; }
 .card-title { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
