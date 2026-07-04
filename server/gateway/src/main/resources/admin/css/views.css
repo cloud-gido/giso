@@ -72,10 +72,20 @@
 
 /* ═ 注册表 ═ */
 .col-hint { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-#reg-table { width: 100%; }
-#reg-table table { width: 100%; table-layout: auto; }
+#reg-table { width: 100%; display: block; }
+#reg-table table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: fixed;
+}
 #reg-table th[data-col="desc"],
-#reg-table td:has(.desc-cell) { width: 28%; min-width: 200px; }
+#reg-table td[data-col="desc"] { width: auto; min-width: 180px; }
+#reg-table th[data-col="rule"],
+#reg-table td[data-col="rule"] { width: 14%; }
+#reg-table th[data-col="issue_link"],
+#reg-table td[data-col="issue_link"] { width: 10%; }
+#reg-table th.th-fixed,
+#reg-table td.row-actions { width: 220px; }
 .link-btn { background: none; border: none; color: var(--accent); padding: 0; font-size: 12px; cursor: pointer; }
 .link-btn:hover { text-decoration: underline; }
 th[data-col] { cursor: grab; user-select: none; white-space: nowrap; }

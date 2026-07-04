@@ -195,7 +195,7 @@ function renderTable() {
       const checked = selected.has(key);
       return `<tr data-key="${esc(key)}" class="${checked ? 'row-selected' : ''}">
       ${showCheck ? `<td class="reg-td-check"><input type="checkbox" class="reg-row-check" data-key="${esc(key)}" ${checked ? 'checked' : ''}></td>` : ''}
-      ${cols.map((c) => `<td>${cell(it, c, meta)}</td>`).join('')}
+      ${cols.map((c) => `<td data-col="${c}">${cell(it, c, meta)}</td>`).join('')}
       <td class="row-actions">
         ${canModifyRow(it) ? `<button data-act="edit" data-key="${esc(key)}">编辑</button>` : ''}
         ${actionBtns(it, meta)}
