@@ -65,6 +65,8 @@ public final class RedisConnections {
         }
         password = password == null ? "" : password.trim();
         username = username == null ? "" : username.trim();
+        password = percentDecode(password);
+        username = percentDecode(username);
         // 完整 rediss://:token@host 中的 token 是最贴近 Redis 实例的凭据；
         // 只有 URL 未带密码时才使用单独的 PASSWORD，避免 Secret 滞后覆盖正确 URL。
         if (!hasEmbeddedPassword && overridePassword != null && !overridePassword.isBlank()) {
@@ -122,6 +124,25 @@ public final class RedisConnections {
         if (value == null) return false;
         String lower = value.trim().toLowerCase();
         return lower.startsWith("redis://") || lower.startsWith("rediss://");
+    }
+
+    private static String percentDecode(String value) {
+        if (value == null || value.indexOf('%') < 0) return value;
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (ch == '%' && i + 2 < value.length()) {
+                int hi = Character.digit(value.charAt(i + 1), 16);
+                int lo = Character.digit(value.charAt(i + 2), 16);
+                if (hi >= 0 && lo >= 0) {
+                    out.append((char) ((hi << 4) + lo));
+                    i += 2;
+                    continue;
+                }
+            }
+            out.append(ch);
+        }
+        return out.toString();
     }
 
     private static void applyAuth(DefaultJedisClientConfig.Builder cfg, Info info) {

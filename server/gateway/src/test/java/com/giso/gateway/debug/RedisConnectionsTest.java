@@ -22,6 +22,15 @@ class RedisConnectionsTest {
     }
 
     @Test
+    void percentDecodesAuthPartOnly() {
+        var info = RedisConnections.parseUrl(
+                "rediss://:sTtN%3FYo5q-qaHGpP6%3DkEWJRT%21WOTFPI@master.gamelinelab-dev-sharedcache.cddsor.sae1.cache.amazonaws.com/0",
+                null, null, -1);
+        assertEquals("sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI", info.password());
+        assertEquals("master.gamelinelab-dev-sharedcache.cddsor.sae1.cache.amazonaws.com", info.host());
+    }
+
+    @Test
     void embeddedPasswordWinsOverOverride() {
         var info = RedisConnections.parseUrl(
                 "rediss://:wrong@master.cache.amazonaws.com:6379/0",
