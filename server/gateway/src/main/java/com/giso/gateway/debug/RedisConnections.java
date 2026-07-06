@@ -18,6 +18,14 @@ public final class RedisConnections {
             String user = username == null || username.isBlank() ? "" : username + "@";
             return scheme + "://" + user + host + ":" + port + "/" + db;
         }
+
+        /** 日志用认证模式，不暴露密码 */
+        public String authMode() {
+            boolean hasPass = password != null && !password.isBlank();
+            boolean hasUser = username != null && !username.isBlank();
+            if (!hasPass) return "none";
+            return hasUser ? "user-password" : "password-only";
+        }
     }
 
     private RedisConnections() { }
@@ -100,11 +108,11 @@ public final class RedisConnections {
         return normalizeForProvider(new Info(scheme, host, port, username, password, db));
     }
 
-    /** ElastiCache auth-token 模式：仅 db/0，且 AUTH 只传密码，不传 ACL username。 */
+    /** ElastiCache auth-token + TLS 模式：仅 db/0，且 AUTH 只传密码，不传 ACL username。 */
     static Info normalizeForProvider(Info info) {
         if (!isElastiCacheHost(info.host())) return info;
         int db = 0;
-        return new Info(info.scheme(), info.host(), info.port(), "", info.password(), db);
+        return new Info("rediss", info.host(), info.port(), "", info.password(), db);
     }
 
     static boolean isElastiCacheHost(String host) {
@@ -177,5 +185,15 @@ public final class RedisConnections {
         applyAuth(cfg, info);
         if (info.ssl()) cfg.ssl(true);
         return new Jedis(hap, cfg.build());
+    }
+
+    /** 连接探活，返回 null 表示成功。 */
+    public static String ping(Info info) {
+        try (Jedis jedis = createClient(info)) {
+            jedis.ping();
+            return null;
+        } catch (RuntimeException e) {
+            return e.getClass().getSimpleName() + ": " + e.getMessage();
+        }
     }
 }

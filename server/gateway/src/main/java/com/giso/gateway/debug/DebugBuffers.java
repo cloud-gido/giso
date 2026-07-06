@@ -31,7 +31,16 @@ public final class DebugBuffers {
             RedisSseRelay relay = new RedisSseRelay(
                     config.debugRedisInfo, config.debugRedisKeyPrefix, sse);
             relay.start();
-            System.out.println("  debug_buffer  : redis (" + config.debugRedisInfo.safeLabel() + ")");
+            System.out.println("  debug_buffer  : redis (" + config.debugRedisInfo.safeLabel()
+                    + ", auth=" + config.debugRedisInfo.authMode() + ")");
+            String pingErr = RedisConnections.ping(config.debugRedisInfo);
+            if (pingErr == null) {
+                System.out.println("  redis ping    : ok");
+            } else {
+                System.err.println("[redis-debug-buffer] initial ping failed for "
+                        + config.debugRedisInfo.safeLabel()
+                        + " (auth=" + config.debugRedisInfo.authMode() + "): " + pingErr);
+            }
             return new Handle(buffer, relay);
         }
         MemoryDebugBuffer buffer = new MemoryDebugBuffer(

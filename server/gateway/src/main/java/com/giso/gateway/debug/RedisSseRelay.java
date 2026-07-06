@@ -28,9 +28,10 @@ public final class RedisSseRelay implements AutoCloseable {
 
     private void run() {
         while (!Thread.currentThread().isInterrupted()) {
-            Jedis jedis = RedisConnections.createClient(redis);
-            subscriber = jedis;
+            Jedis jedis = null;
             try {
+                jedis = RedisConnections.createClient(redis);
+                subscriber = jedis;
                 jedis.psubscribe(new JedisPubSub() {
                     @Override
                     public void onPMessage(String pattern, String channel, String message) {
@@ -40,7 +41,9 @@ public final class RedisSseRelay implements AutoCloseable {
                 }, pubPattern);
             } catch (Exception e) {
                 if (!Thread.currentThread().isInterrupted()) {
-                    System.err.println("[redis-sse-relay] disconnected: " + e.getMessage() + "; reconnect in 2s");
+                    System.err.println("[redis-sse-relay] disconnected from " + redis.safeLabel()
+                            + " (auth=" + redis.authMode() + "): " + e.getMessage()
+                            + "; reconnect in 2s");
                     try {
                         Thread.sleep(2000);
                     } catch (InterruptedException ie) {
@@ -49,7 +52,7 @@ public final class RedisSseRelay implements AutoCloseable {
                 }
             } finally {
                 try {
-                    jedis.close();
+                    if (jedis != null) jedis.close();
                 } catch (Exception ignored) { }
                 subscriber = null;
             }

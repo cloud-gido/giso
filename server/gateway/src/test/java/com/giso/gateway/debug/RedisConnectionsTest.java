@@ -65,9 +65,22 @@ class RedisConnectionsTest {
         var info = RedisConnections.parseUrl(
                 "rediss://default:correct-secret@master.cache.amazonaws.com:6379/0",
                 null, null, -1);
+        assertEquals("rediss", info.scheme());
         assertEquals("correct-secret", info.password());
         assertEquals("", info.username());
         assertEquals(0, info.db());
+    }
+
+    @Test
+    void elasticacheHostPartsUseTlsAndPasswordOnly() {
+        var info = RedisConnections.fromParts(
+                "redis", "master.cache.amazonaws.com", "default", "correct-secret", 6379, 2);
+        assertEquals("rediss", info.scheme());
+        assertEquals("correct-secret", info.password());
+        assertEquals("", info.username());
+        assertEquals(0, info.db());
+        assertEquals("password-only", info.authMode());
+        assertTrue(info.ssl());
     }
 
     @Test
