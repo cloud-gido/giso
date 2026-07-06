@@ -1,5 +1,6 @@
 package com.giso.gateway;
 
+import com.giso.gateway.debug.RedisConnections;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,6 +36,19 @@ class GatewayConfigDebugRedisTest {
     }
 
     @Test
+    void elasticacheUrlWithoutEmbeddedPasswordUsesEnvPassword() {
+        GatewayConfig c = new GatewayConfig();
+        c.debugRedisHost = "rediss://master.gamelinelab-dev-sharedcache.cddsor.sae1.cache.amazonaws.com/0";
+        c.debugRedisPassword = "elasticache-auth-token";
+        c.debugRedisDb = 2;
+        GatewayConfig.resolveDebugRedisUrl(c);
+        assertEquals("rediss", c.debugRedisInfo.scheme());
+        assertEquals("elasticache-auth-token", c.debugRedisInfo.password());
+        assertEquals(RedisConnections.PASSWORD_SOURCE_ENV, c.debugRedisInfo.passwordSource());
+        assertEquals(0, c.debugRedisInfo.db());
+    }
+
+    @Test
     void fullRedissUrlWithSpecialPasswordAndNoPort() {
         GatewayConfig c = new GatewayConfig();
         c.debugRedisHost = "rediss://:sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI@master.cache.amazonaws.com/0";
@@ -45,6 +59,7 @@ class GatewayConfigDebugRedisTest {
         assertEquals("master.cache.amazonaws.com", c.debugRedisInfo.host());
         assertEquals(6379, c.debugRedisInfo.port());
         assertEquals("sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI", c.debugRedisInfo.password());
+        assertEquals(RedisConnections.PASSWORD_SOURCE_URL, c.debugRedisInfo.passwordSource());
         assertEquals("", c.debugRedisInfo.username());
         assertEquals(0, c.debugRedisInfo.db());
         assertTrue(c.debugRedisInfo.ssl());

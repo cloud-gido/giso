@@ -8,6 +8,7 @@ import com.giso.gateway.settings.PostgresSystemSettingsStore;
 import com.giso.gateway.settings.SystemSettingsService;
 import com.giso.gateway.settings.SystemSettingsStore;
 import com.giso.gateway.debug.DebugBuffers;
+import com.giso.gateway.debug.RedisConnections;
 import com.giso.gateway.sink.EventSink;
 import com.giso.gateway.sink.SinkRegistry;
 import com.giso.gateway.space.SpaceService;
@@ -73,6 +74,10 @@ public final class Main {
             health.put("status", "ok");
             health.put("instance_id", GatewayInstance.id());
             health.put("debug_buffer", store.debugBuffer().backendName());
+            if (config.debugRedisInfo != null && "redis".equalsIgnoreCase(store.debugBuffer().backendName())) {
+                String pingErr = RedisConnections.ping(config.debugRedisInfo);
+                health.put("debug_redis", config.debugRedisInfo.diagnostics(pingErr));
+            }
             health.put("registry", Map.of(
                     "backend", registry.backendName(),
                     "revision", registry.globalRevision(),

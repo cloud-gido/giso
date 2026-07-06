@@ -6,9 +6,24 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /** 解析 Redis 连接（支持 rediss + 密码特殊字符），不依赖 java.net.URI。 */
 public final class RedisConnections {
-    public record Info(String scheme, String host, int port, String username, String password, int db) {
+    public static final String PASSWORD_SOURCE_URL = "url-embedded";
+    public static final String PASSWORD_SOURCE_ENV = "env-password";
+
+    public record Info(String scheme, String host, int port, String username, String password, int db,
+            String passwordSource) {
+        public Info(String scheme, String host, int port, String username, String password, int db) {
+            this(scheme, host, port, username, password, db, "");
+        }
+
         public boolean ssl() {
             return "rediss".equalsIgnoreCase(scheme);
         }
@@ -25,6 +40,30 @@ public final class RedisConnections {
             boolean hasUser = username != null && !username.isBlank();
             if (!hasPass) return "none";
             return hasUser ? "user-password" : "password-only";
+        }
+
+        /** sha256 前 12 位，供运维比对 token 是否一致（不暴露明文）。 */
+        public String passwordFingerprint() {
+            if (password == null || password.isBlank()) return "";
+            try {
+                byte[] digest = MessageDigest.getInstance("SHA-256")
+                        .digest(password.getBytes(StandardCharsets.UTF_8));
+                return HexFormat.of().formatHex(digest, 0, 6);
+            } catch (NoSuchAlgorithmException e) {
+                return "";
+            }
+        }
+
+        public Map<String, Object> diagnostics(String pingError) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("target", safeLabel());
+            out.put("auth", authMode());
+            out.put("password_source", passwordSource == null || passwordSource.isBlank()
+                    ? "unknown" : passwordSource);
+            out.put("password_len", password == null ? 0 : password.length());
+            out.put("password_fp", passwordFingerprint());
+            out.put("ping", pingError == null ? "ok" : pingError);
+            return out;
         }
     }
 
@@ -75,10 +114,12 @@ public final class RedisConnections {
         username = username == null ? "" : username.trim();
         password = percentDecode(password);
         username = percentDecode(username);
+        String passwordSource = hasEmbeddedPassword ? PASSWORD_SOURCE_URL : "";
         // 完整 rediss://:token@host 中的 token 是最贴近 Redis 实例的凭据；
         // 只有 URL 未带密码时才使用单独的 PASSWORD，避免 Secret 滞后覆盖正确 URL。
         if (!hasEmbeddedPassword && overridePassword != null && !overridePassword.isBlank()) {
             password = overridePassword.trim();
+            passwordSource = PASSWORD_SOURCE_ENV;
         }
         if ((username == null || username.isBlank()) && overrideUsername != null && !overrideUsername.isBlank()) {
             username = overrideUsername.trim();
@@ -105,14 +146,14 @@ public final class RedisConnections {
         } else {
             host = hostPort;
         }
-        return normalizeForProvider(new Info(scheme, host, port, username, password, db));
+        return normalizeForProvider(new Info(scheme, host, port, username, password, db, passwordSource));
     }
 
     /** ElastiCache auth-token + TLS 模式：仅 db/0，且 AUTH 只传密码，不传 ACL username。 */
     static Info normalizeForProvider(Info info) {
         if (!isElastiCacheHost(info.host())) return info;
         int db = 0;
-        return new Info("rediss", info.host(), info.port(), "", info.password(), db);
+        return new Info("rediss", info.host(), info.port(), "", info.password(), db, info.passwordSource());
     }
 
     static boolean isElastiCacheHost(String host) {
@@ -125,7 +166,8 @@ public final class RedisConnections {
         if (db < 0) db = 0;
         String user = username == null ? "" : username.trim();
         String pass = password == null ? "" : password.trim();
-        return normalizeForProvider(new Info(sch, host.trim(), port, user, pass, db));
+        String passwordSource = pass.isBlank() ? "" : PASSWORD_SOURCE_ENV;
+        return normalizeForProvider(new Info(sch, host.trim(), port, user, pass, db, passwordSource));
     }
 
     public static boolean isRedisUri(String value) {

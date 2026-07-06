@@ -16,6 +16,7 @@ class RedisConnectionsTest {
         assertEquals("master.gamelinelab-dev-sharedcache.cddsor.sae1.cache.amazonaws.com", info.host());
         assertEquals(6379, info.port());
         assertEquals("sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI", info.password());
+        assertEquals(RedisConnections.PASSWORD_SOURCE_URL, info.passwordSource());
         assertEquals("", info.username());
         assertEquals(0, info.db());
         assertTrue(info.ssl());
@@ -36,6 +37,7 @@ class RedisConnectionsTest {
                 "rediss://:wrong@master.cache.amazonaws.com:6379/0",
                 null, "correct-secret", 2);
         assertEquals("wrong", info.password());
+        assertEquals(RedisConnections.PASSWORD_SOURCE_URL, info.passwordSource());
         assertEquals("", info.username());
         assertEquals(0, info.db());
     }
@@ -46,6 +48,7 @@ class RedisConnectionsTest {
                 "rediss://master.cache.amazonaws.com:6379/0",
                 null, "correct-secret", 2);
         assertEquals("correct-secret", info.password());
+        assertEquals(RedisConnections.PASSWORD_SOURCE_ENV, info.passwordSource());
         assertEquals("", info.username());
         assertEquals(0, info.db());
     }
@@ -56,6 +59,7 @@ class RedisConnectionsTest {
                 "rediss://:correct-secret@master.cache.amazonaws.com:6379/0",
                 "default", null, -1);
         assertEquals("correct-secret", info.password());
+        assertEquals(RedisConnections.PASSWORD_SOURCE_URL, info.passwordSource());
         assertEquals("", info.username());
         assertEquals(0, info.db());
     }
@@ -67,6 +71,7 @@ class RedisConnectionsTest {
                 null, null, -1);
         assertEquals("rediss", info.scheme());
         assertEquals("correct-secret", info.password());
+        assertEquals(RedisConnections.PASSWORD_SOURCE_URL, info.passwordSource());
         assertEquals("", info.username());
         assertEquals(0, info.db());
     }
@@ -77,6 +82,7 @@ class RedisConnectionsTest {
                 "redis", "master.cache.amazonaws.com", "default", "correct-secret", 6379, 2);
         assertEquals("rediss", info.scheme());
         assertEquals("correct-secret", info.password());
+        assertEquals(RedisConnections.PASSWORD_SOURCE_ENV, info.passwordSource());
         assertEquals("", info.username());
         assertEquals(0, info.db());
         assertEquals("password-only", info.authMode());

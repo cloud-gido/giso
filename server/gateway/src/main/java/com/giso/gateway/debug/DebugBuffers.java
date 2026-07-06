@@ -32,14 +32,17 @@ public final class DebugBuffers {
                     config.debugRedisInfo, config.debugRedisKeyPrefix, sse);
             relay.start();
             System.out.println("  debug_buffer  : redis (" + config.debugRedisInfo.safeLabel()
-                    + ", auth=" + config.debugRedisInfo.authMode() + ")");
+                    + ", auth=" + config.debugRedisInfo.authMode()
+                    + ", pass=" + config.debugRedisInfo.passwordSource() + ")");
             String pingErr = RedisConnections.ping(config.debugRedisInfo);
             if (pingErr == null) {
-                System.out.println("  redis ping    : ok");
+                System.out.println("  redis ping    : ok (fp=" + config.debugRedisInfo.passwordFingerprint() + ")");
             } else {
                 System.err.println("[redis-debug-buffer] initial ping failed for "
                         + config.debugRedisInfo.safeLabel()
-                        + " (auth=" + config.debugRedisInfo.authMode() + "): " + pingErr
+                        + " (auth=" + config.debugRedisInfo.authMode()
+                        + ", pass=" + config.debugRedisInfo.passwordSource()
+                        + ", fp=" + config.debugRedisInfo.passwordFingerprint() + "): " + pingErr
                         + "; check GISO_DEBUG_REDIS_URL/HOST/PASSWORD secret values");
             }
             return new Handle(buffer, relay);
