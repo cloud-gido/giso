@@ -5,7 +5,6 @@ import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.RedisProtocol;
 
 /** 解析 Redis 连接（支持 rediss + 密码特殊字符），不依赖 java.net.URI。 */
 public final class RedisConnections {
@@ -94,13 +93,11 @@ public final class RedisConnections {
         return normalizeForProvider(new Info(scheme, host, port, username, password, db));
     }
 
-    /** ElastiCache：仅 db/0，ACL 默认用户 default；internal-redis 仍可用 db/2。 */
+    /** ElastiCache：仅 db/0；AUTH 使用 URL/环境中的密码，不强行注入 ACL 用户名。 */
     static Info normalizeForProvider(Info info) {
         if (!isElastiCacheHost(info.host())) return info;
-        String user = info.username();
-        if (user == null || user.isBlank()) user = "default";
         int db = 0;
-        return new Info(info.scheme(), info.host(), info.port(), user, info.password(), db);
+        return new Info(info.scheme(), info.host(), info.port(), info.username(), info.password(), db);
     }
 
     static boolean isElastiCacheHost(String host) {
@@ -123,7 +120,9 @@ public final class RedisConnections {
     }
 
     private static void applyAuth(DefaultJedisClientConfig.Builder cfg, Info info) {
-        cfg.protocol(RedisProtocol.RESP2);
+        // Keep protocol unset so Jedis uses legacy AUTH and does not send HELLO AUTH.
+        // ElastiCache auth-token endpoints accept AUTH <password> for the default user.
+        cfg.protocol(null);
         String user = info.username();
         String pass = info.password();
         if (user != null && !user.isBlank()) {

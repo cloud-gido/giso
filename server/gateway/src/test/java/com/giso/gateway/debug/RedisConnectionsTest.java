@@ -16,7 +16,7 @@ class RedisConnectionsTest {
         assertEquals("master.gamelinelab-dev-sharedcache.cddsor.sae1.cache.amazonaws.com", info.host());
         assertEquals(6379, info.port());
         assertEquals("sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI", info.password());
-        assertEquals("default", info.username());
+        assertEquals("", info.username());
         assertEquals(0, info.db());
         assertTrue(info.ssl());
     }
@@ -27,7 +27,7 @@ class RedisConnectionsTest {
                 "rediss://:wrong@master.cache.amazonaws.com:6379/0",
                 null, "correct-secret", 2);
         assertEquals("correct-secret", info.password());
-        assertEquals("default", info.username());
+        assertEquals("", info.username());
         assertEquals(0, info.db());
     }
 
