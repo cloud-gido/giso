@@ -40,4 +40,26 @@ class GatewayConfigDebugRedisTest {
         assertTrue(c.debugRedisUrl.startsWith("redis://:"));
         assertTrue(c.debugRedisUrl.contains("redis.example.com:6379/2"));
     }
+
+    @Test
+    void fullRedissUrlInHostOnlyChangesDb() {
+        GatewayConfig c = new GatewayConfig();
+        c.debugRedisHost = "rediss://:sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI@master.cache.amazonaws.com:6379/0";
+        c.debugRedisPassword = "sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI";
+        c.debugRedisDb = 2;
+        GatewayConfig.resolveDebugRedisUrl(c);
+        assertEquals(
+                "rediss://:sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI@master.cache.amazonaws.com:6379/2",
+                c.debugRedisUrl);
+    }
+
+    @Test
+    void fullRedissUrlWithoutDbAppendsDb() {
+        GatewayConfig c = new GatewayConfig();
+        c.debugRedisHost = "rediss://:secret@master.cache.amazonaws.com:6379";
+        c.debugRedisPassword = "secret";
+        c.debugRedisDb = 2;
+        GatewayConfig.resolveDebugRedisUrl(c);
+        assertEquals("rediss://:secret@master.cache.amazonaws.com:6379/2", c.debugRedisUrl);
+    }
 }
