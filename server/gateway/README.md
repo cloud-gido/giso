@@ -137,7 +137,14 @@ cd bench && java -jar ../target/giso-gateway.jar --config gateway-bench.yaml
 | 模式 | 配置 | 场景 |
 |------|------|------|
 | `memory` | 默认 | 本地 / 单副本 |
-| `redis` | `GISO_DEBUG_BUFFER_BACKEND=redis` + `GISO_DEBUG_REDIS_URL` | 多副本，联调/SSE/断言跨 Pod 一致 |
+| `redis` | `GISO_DEBUG_BUFFER_BACKEND=redis` + URL 或 host/password | 多副本，联调/SSE/断言跨 Pod 一致 |
+
+**Redis URL 二选一**（环境变量，优先级：整 URL > 分项拼装）：
+
+| 方式 | 变量 |
+|------|------|
+| 整 URL | `GISO_DEBUG_REDIS_URL` |
+| 分项（测试复用 Archery） | `GISO_DEBUG_REDIS_HOST` + `GISO_DEBUG_REDIS_PASSWORD`；可选 `GISO_DEBUG_REDIS_DB`（默认 2）、`GISO_DEBUG_REDIS_SEARCH_NAMESPACE`（短主机名扩 FQDN） |
 
 `GET /health` → `debug_buffer`、`instance_id`。
 

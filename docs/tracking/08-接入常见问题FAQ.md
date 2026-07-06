@@ -432,10 +432,12 @@ debug_buffer:
   ttl_sec: 3600
 ```
 
-测试环境 Doppler 示例（复用 `internal-redis`，**db/2**，与 Archery db/0 隔离）：
+测试环境 Doppler：**复用已有** `INFRA_ARCHERY_REDIS_HOST` + `INFRA_ARCHERY_REDIS_PASSWORD`（与 Archery 同 `internal-redis` 实例）。GISO Deployment 设 `GISO_DEBUG_REDIS_DB=2`、`GISO_DEBUG_REDIS_SEARCH_NAMESPACE=business-platform`（Archery 用 db/0；GISO 在 `bigdata` 命名空间，短主机名自动扩成集群 DNS）。
+
+也可直接配整 URL（生产 ElastiCache 等）：
 
 ```
-INFRA_GISO_DEBUG_REDIS_URL=redis://:<password>@internal-redis.business-platform.svc.cluster.local:6379/2
+GISO_DEBUG_REDIS_URL=redis://:<password>@your-redis:6379/2
 ```
 
 `GET /health` 返回 `debug_buffer: redis` 与 `instance_id`（当前 Pod 名），便于排障。

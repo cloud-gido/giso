@@ -65,6 +65,12 @@ public final class GatewayConfig {
     /** 联调缓冲：memory（单副本）| redis（多副本共享） */
     public String debugBufferBackend = "memory";
     public String debugRedisUrl = "";
+    public String debugRedisHost = "";
+    public String debugRedisPassword = "";
+    public int debugRedisPort = 6379;
+    public int debugRedisDb = 2;
+    /** 短主机名（如 internal-redis）扩成 K8s 集群 DNS 的命名空间后缀 */
+    public String debugRedisSearchNamespace = "";
     public String debugRedisKeyPrefix = "giso:debug";
     public int debugBufferTtlSec = 3600;
     /** 注册表预览图存储目录（默认 {file.dir}/screenshots） */
@@ -177,6 +183,12 @@ public final class GatewayConfig {
         Map<String, Object> debugBuf = (Map<String, Object>) doc.getOrDefault("debug_buffer", Map.of());
         c.debugBufferBackend = (String) debugBuf.getOrDefault("backend", c.debugBufferBackend);
         c.debugRedisUrl = (String) debugBuf.getOrDefault("redis_url", c.debugRedisUrl);
+        c.debugRedisHost = (String) debugBuf.getOrDefault("redis_host", c.debugRedisHost);
+        c.debugRedisPassword = (String) debugBuf.getOrDefault("redis_password", c.debugRedisPassword);
+        if (debugBuf.get("redis_port") instanceof Number n) c.debugRedisPort = n.intValue();
+        if (debugBuf.get("redis_db") instanceof Number n) c.debugRedisDb = n.intValue();
+        c.debugRedisSearchNamespace = (String) debugBuf.getOrDefault(
+                "redis_search_namespace", c.debugRedisSearchNamespace);
         c.debugRedisKeyPrefix = (String) debugBuf.getOrDefault("key_prefix", c.debugRedisKeyPrefix);
         if (debugBuf.get("recent_max") instanceof Number n) c.adminRecentBuffer = n.intValue();
         if (debugBuf.get("ttl_sec") instanceof Number n) c.debugBufferTtlSec = n.intValue();
@@ -331,9 +343,49 @@ public final class GatewayConfig {
         envInt("GISO_REGISTRY_POLL_SEC").ifPresent(v -> c.registryPollIntervalSec = v);
         env("GISO_DEBUG_BUFFER_BACKEND").ifPresent(v -> c.debugBufferBackend = v);
         env("GISO_DEBUG_REDIS_URL").ifPresent(v -> c.debugRedisUrl = v);
+        env("GISO_DEBUG_REDIS_HOST").ifPresent(v -> c.debugRedisHost = v);
+        env("GISO_DEBUG_REDIS_PASSWORD").ifPresent(v -> c.debugRedisPassword = v);
+        envInt("GISO_DEBUG_REDIS_PORT").ifPresent(v -> c.debugRedisPort = v);
+        envInt("GISO_DEBUG_REDIS_DB").ifPresent(v -> c.debugRedisDb = v);
+        env("GISO_DEBUG_REDIS_SEARCH_NAMESPACE").ifPresent(v -> c.debugRedisSearchNamespace = v);
         env("GISO_DEBUG_REDIS_KEY_PREFIX").ifPresent(v -> c.debugRedisKeyPrefix = v);
         envInt("GISO_DEBUG_BUFFER_TTL_SEC").ifPresent(v -> c.debugBufferTtlSec = v);
+        resolveDebugRedisUrl(c);
         applyKafkaSaslFromEnv(c);
+    }
+
+    /**
+     * 未配置 redis_url 时，由 host + password + port + db 拼装（复用平台 INFRA_ARCHERY_REDIS_* 等）。
+     */
+    static void resolveDebugRedisUrl(GatewayConfig c) {
+        if (c.debugRedisUrl != null && !c.debugRedisUrl.isBlank()) return;
+        if (c.debugRedisHost == null || c.debugRedisHost.isBlank()) return;
+        if (c.debugRedisPassword == null || c.debugRedisPassword.isBlank()) return;
+        String host = normalizeRedisHost(c.debugRedisHost.trim(), c.debugRedisSearchNamespace);
+        int port = c.debugRedisPort > 0 ? c.debugRedisPort : 6379;
+        int db = c.debugRedisDb >= 0 ? c.debugRedisDb : 2;
+        int colon = host.lastIndexOf(':');
+        if (colon > 0 && host.indexOf(']') < 0) {
+            try {
+                port = Integer.parseInt(host.substring(colon + 1));
+                host = host.substring(0, colon);
+            } catch (NumberFormatException ignored) { }
+        }
+        c.debugRedisUrl = buildRedisUrl(host, c.debugRedisPassword, port, db);
+    }
+
+    static String normalizeRedisHost(String host, String searchNamespace) {
+        if (host.contains(".") || host.contains("svc.cluster.local")) return host;
+        if (searchNamespace != null && !searchNamespace.isBlank()) {
+            return host + "." + searchNamespace.trim() + ".svc.cluster.local";
+        }
+        return host;
+    }
+
+    static String buildRedisUrl(String host, String password, int port, int db) {
+        String enc = java.net.URLEncoder.encode(password, java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        return "redis://:" + enc + "@" + host + ":" + port + "/" + db;
     }
 
     /** MSK SASL/SCRAM：用户名密码走环境变量，组装 sasl.jaas.config（勿写入镜像/ConfigMap）。 */
