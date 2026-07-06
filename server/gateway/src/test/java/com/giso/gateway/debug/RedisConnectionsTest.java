@@ -11,22 +11,31 @@ class RedisConnectionsTest {
     void parsesRedissUrlWithSpecialCharsAndMissingPort() {
         var info = RedisConnections.parseUrl(
                 "rediss://:sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI@master.gamelinelab-dev-sharedcache.cddsor.sae1.cache.amazonaws.com/2",
-                null, "wrong-override", -1);
+                null, "sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI", -1);
         assertEquals("rediss", info.scheme());
         assertEquals("master.gamelinelab-dev-sharedcache.cddsor.sae1.cache.amazonaws.com", info.host());
         assertEquals(6379, info.port());
         assertEquals("sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI", info.password());
-        assertEquals(2, info.db());
+        assertEquals("default", info.username());
+        assertEquals(0, info.db());
         assertTrue(info.ssl());
     }
 
     @Test
-    void usesEnvPasswordWhenUrlHasNoAuth() {
+    void envPasswordOverridesEmbedded() {
         var info = RedisConnections.parseUrl(
-                "rediss://master.example.com:6379/0",
-                "default", "secret", 2);
+                "rediss://:wrong@master.cache.amazonaws.com:6379/0",
+                null, "correct-secret", 2);
+        assertEquals("correct-secret", info.password());
         assertEquals("default", info.username());
-        assertEquals("secret", info.password());
+        assertEquals(0, info.db());
+    }
+
+    @Test
+    void internalRedisKeepsDb2() {
+        var info = RedisConnections.fromParts(
+                "redis", "internal-redis.business-platform.svc.cluster.local", "", "secret", 6379, 2);
+        assertEquals("", info.username());
         assertEquals(2, info.db());
     }
 
@@ -38,14 +47,5 @@ class RedisConnectionsTest {
         assertEquals("default", info.username());
         assertEquals("secret", info.password());
         assertEquals(2, info.db());
-    }
-
-    @Test
-    void overrideDbFromConfig() {
-        var info = RedisConnections.parseUrl(
-                "rediss://:pw@host.example.com:6379/0",
-                null, null, 2);
-        assertEquals(2, info.db());
-        assertEquals(6379, info.port());
     }
 }

@@ -5,6 +5,7 @@ import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.RedisProtocol;
 
 /** 解析 Redis 连接（支持 rediss + 密码特殊字符），不依赖 java.net.URI。 */
 public final class RedisConnections {
@@ -59,8 +60,10 @@ public final class RedisConnections {
                 }
             }
         }
-        // URL 内已有密码时优先用 URL（避免 Doppler 重复字段不一致导致 WRONGPASS）
-        if (password.isBlank() && overridePassword != null && !overridePassword.isBlank()) {
+        password = password == null ? "" : password.trim();
+        username = username == null ? "" : username.trim();
+        // PASSWORD 环境变量为运维主数据源（与 Doppler 截图一致时优先于 URL 内嵌）
+        if (overridePassword != null && !overridePassword.isBlank()) {
             password = overridePassword.trim();
         }
         if ((username == null || username.isBlank()) && overrideUsername != null && !overrideUsername.isBlank()) {
@@ -88,12 +91,20 @@ public final class RedisConnections {
         } else {
             host = hostPort;
         }
-        return new Info(scheme, host, port, username, password, db);
+        return normalizeForProvider(new Info(scheme, host, port, username, password, db));
     }
 
-    /** @deprecated use {@link #parseUrl(String, String, String, int)} */
-    public static Info parseUrl(String url, String overridePassword, int overrideDb) {
-        return parseUrl(url, null, overridePassword, overrideDb);
+    /** ElastiCache：仅 db/0，ACL 默认用户 default；internal-redis 仍可用 db/2。 */
+    static Info normalizeForProvider(Info info) {
+        if (!isElastiCacheHost(info.host())) return info;
+        String user = info.username();
+        if (user == null || user.isBlank()) user = "default";
+        int db = 0;
+        return new Info(info.scheme(), info.host(), info.port(), user, info.password(), db);
+    }
+
+    static boolean isElastiCacheHost(String host) {
+        return host != null && host.contains(".amazonaws.com");
     }
 
     public static Info fromParts(String scheme, String host, String username, String password, int port, int db) {
@@ -102,7 +113,7 @@ public final class RedisConnections {
         if (db < 0) db = 0;
         String user = username == null ? "" : username.trim();
         String pass = password == null ? "" : password.trim();
-        return new Info(sch, host.trim(), port, user, pass, db);
+        return normalizeForProvider(new Info(sch, host.trim(), port, user, pass, db));
     }
 
     public static boolean isRedisUri(String value) {
@@ -112,6 +123,7 @@ public final class RedisConnections {
     }
 
     private static void applyAuth(DefaultJedisClientConfig.Builder cfg, Info info) {
+        cfg.protocol(RedisProtocol.RESP2);
         String user = info.username();
         String pass = info.password();
         if (user != null && !user.isBlank()) {

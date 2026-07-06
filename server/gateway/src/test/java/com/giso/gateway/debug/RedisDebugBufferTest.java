@@ -20,7 +20,7 @@ class RedisDebugBufferTest {
 
     @BeforeEach
     void setUp() {
-        var info = RedisConnections.parseUrl(URL, null, -1);
+        var info = RedisConnections.parseUrl(URL, null, null, -1);
         buffer = new RedisDebugBuffer(info, PREFIX, 100, 120);
         buffer.clearRecent(null);
     }
@@ -36,7 +36,7 @@ class RedisDebugBufferTest {
         buffer.append(wrap("default", "did-1", "page_enter"), "default");
 
         try (RedisDebugBuffer reader = new RedisDebugBuffer(
-                RedisConnections.parseUrl(URL, null, -1), PREFIX, 100, 120)) {
+                RedisConnections.parseUrl(URL, null, null, -1), PREFIX, 100, 120)) {
             var recent = reader.recent(10, "default", "did-1", "", "");
             assertEquals(1, recent.size());
             assertEquals("page_enter", recent.get(0).path("data").path("event").asText());
@@ -50,7 +50,7 @@ class RedisDebugBufferTest {
         buffer.clearRecent("default");
 
         try (RedisDebugBuffer reader = new RedisDebugBuffer(
-                RedisConnections.parseUrl(URL, null, -1), PREFIX, 100, 120)) {
+                RedisConnections.parseUrl(URL, null, null, -1), PREFIX, 100, 120)) {
             assertEquals(0, reader.recent(10, "default", "", "", "").size());
             assertEquals(1, reader.recent(10, "longvideo", "", "", "").size());
         }

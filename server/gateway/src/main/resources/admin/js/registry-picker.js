@@ -1,5 +1,5 @@
 /* 注册表编辑：从参数池 / 元素池 / 业务域搜索选取，避免手填重复与漏登 */
-import { $, esc } from '../util.js';
+import { $, esc } from './util.js';
 
 const RESUME_KEY = 'giso_registry_editor_resume';
 const KNOWN_DOMAINS = ['common', 'video', 'bet', 'pm', 'news', 'data'];

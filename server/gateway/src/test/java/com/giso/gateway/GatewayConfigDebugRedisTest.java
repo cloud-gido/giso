@@ -45,7 +45,8 @@ class GatewayConfigDebugRedisTest {
         assertEquals("master.cache.amazonaws.com", c.debugRedisInfo.host());
         assertEquals(6379, c.debugRedisInfo.port());
         assertEquals("sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI", c.debugRedisInfo.password());
-        assertEquals(2, c.debugRedisInfo.db());
+        assertEquals("default", c.debugRedisInfo.username());
+        assertEquals(0, c.debugRedisInfo.db());
         assertTrue(c.debugRedisInfo.ssl());
     }
 }
