@@ -46,23 +46,28 @@ public final class RedisConnections {
         }
         String username = "";
         String password = "";
+        boolean hasEmbeddedPassword = false;
         if (!auth.isEmpty()) {
             if (auth.startsWith(":")) {
                 password = auth.substring(1);
+                hasEmbeddedPassword = !password.isBlank();
             } else {
                 int colon = auth.indexOf(':');
                 if (colon > 0) {
                     username = auth.substring(0, colon);
                     password = auth.substring(colon + 1);
+                    hasEmbeddedPassword = !password.isBlank();
                 } else {
                     password = auth;
+                    hasEmbeddedPassword = !password.isBlank();
                 }
             }
         }
         password = password == null ? "" : password.trim();
         username = username == null ? "" : username.trim();
-        // PASSWORD 环境变量为运维主数据源（与 Doppler 截图一致时优先于 URL 内嵌）
-        if (overridePassword != null && !overridePassword.isBlank()) {
+        // 完整 rediss://:token@host 中的 token 是最贴近 Redis 实例的凭据；
+        // 只有 URL 未带密码时才使用单独的 PASSWORD，避免 Secret 滞后覆盖正确 URL。
+        if (!hasEmbeddedPassword && overridePassword != null && !overridePassword.isBlank()) {
             password = overridePassword.trim();
         }
         if ((username == null || username.isBlank()) && overrideUsername != null && !overrideUsername.isBlank()) {

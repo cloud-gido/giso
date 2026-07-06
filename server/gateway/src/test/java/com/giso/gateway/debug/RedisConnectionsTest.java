@@ -22,9 +22,19 @@ class RedisConnectionsTest {
     }
 
     @Test
-    void envPasswordOverridesEmbedded() {
+    void embeddedPasswordWinsOverOverride() {
         var info = RedisConnections.parseUrl(
                 "rediss://:wrong@master.cache.amazonaws.com:6379/0",
+                null, "correct-secret", 2);
+        assertEquals("wrong", info.password());
+        assertEquals("", info.username());
+        assertEquals(0, info.db());
+    }
+
+    @Test
+    void separatePasswordUsedWhenUrlHasNoPassword() {
+        var info = RedisConnections.parseUrl(
+                "rediss://master.cache.amazonaws.com:6379/0",
                 null, "correct-secret", 2);
         assertEquals("correct-secret", info.password());
         assertEquals("", info.username());

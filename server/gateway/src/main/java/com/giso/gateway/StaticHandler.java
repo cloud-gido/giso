@@ -49,6 +49,8 @@ public final class StaticHandler implements HttpHandler {
         }
         String rel = path.substring("/admin/".length());
         if (rel.isEmpty()) rel = "index.html";
+        // registry-picker.js 曾用 ../util.js，浏览器会请求 /admin/util.js
+        if (rel.equals("util.js")) rel = "js/util.js";
         if (!isPublic(rel) && auth.unauthorized(ex)) {
             Http.redirect(ex, "/admin/login.html");
             return;
