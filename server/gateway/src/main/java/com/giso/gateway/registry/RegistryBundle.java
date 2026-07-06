@@ -5,15 +5,20 @@ import com.giso.gateway.space.SpaceService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-/** 注册表整包导出/导入（测试 → 生产晋升，默认仅 live）。 */
+/** 注册表整包导出/导入（测试 → 生产晋升，live 条目 + 其依赖闭包）。 */
 public final class RegistryBundle {
     public static final String FORMAT = "giso-registry-bundle";
     public static final int VERSION = 1;
     public static final String STATUS_LIVE = "live";
+    /** 导出 JSON 内各池排列顺序（可读性）。 */
     public static final List<String> KIND_ORDER = List.of("params", "pages", "elements", "events");
+    /** 导入写入顺序：元素须在页面之前，否则页面 elements 引用校验失败。 */
+    public static final List<String> IMPORT_KIND_ORDER = List.of("params", "elements", "pages", "events");
 
     private RegistryBundle() { }
 
@@ -29,22 +34,101 @@ public final class RegistryBundle {
         bundle.put("exported_at", Instant.now().toString());
         bundle.put("exported_by", operator == null ? "" : operator);
         bundle.put("status_filter", STATUS_LIVE);
+        bundle.put("includes_dependency_closure", true);
         bundle.put("source_revision", revision);
+
+        Map<String, Map<String, Map<String, Object>>> byId = indexAll(allInSpace);
+        Map<String, Map<String, Map<String, Object>>> selected = RegistryKinds.emptyTables();
+
+        int liveTotal = 0;
+        for (String kind : KIND_ORDER) {
+            for (Map<String, Object> item : allInSpace.getOrDefault(kind, List.of())) {
+                if (!STATUS_LIVE.equals(statusOf(item))) continue;
+                String id = idOf(kind, item);
+                if (id.isEmpty()) continue;
+                selected.get(kind).put(id, copyItem(item));
+                liveTotal++;
+            }
+        }
+
+        expandDependencyClosure(selected, byId);
+
         Map<String, List<Map<String, Object>>> registry = new LinkedHashMap<>();
         int total = 0;
         for (String kind : KIND_ORDER) {
-            List<Map<String, Object>> rows = new ArrayList<>();
-            for (Map<String, Object> item : allInSpace.getOrDefault(kind, List.of())) {
-                if (!STATUS_LIVE.equals(statusOf(item))) continue;
-                rows.add(copyItem(item));
-            }
+            List<Map<String, Object>> rows = new ArrayList<>(selected.get(kind).values());
             registry.put(kind, rows);
             total += rows.size();
         }
         bundle.put("registry", registry);
         bundle.put("counts", countSummary(registry));
+        bundle.put("live_total", liveTotal);
+        bundle.put("dependency_total", Math.max(0, total - liveTotal));
         bundle.put("total", total);
         return bundle;
+    }
+
+    /** live 页面/元素/事件引用的 params、elements（含子元素）一并纳入，保证可导入。 */
+    static void expandDependencyClosure(
+            Map<String, Map<String, Map<String, Object>>> selected,
+            Map<String, Map<String, Map<String, Object>>> byId) {
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            Set<String> needParams = new LinkedHashSet<>();
+            Set<String> needElements = new LinkedHashSet<>();
+            collectParamRefs(selected, needParams);
+            collectElementRefs(selected, needElements);
+            for (String key : needParams) {
+                if (selected.get("params").containsKey(key)) continue;
+                Map<String, Object> item = byId.get("params").get(key);
+                if (item == null) continue;
+                selected.get("params").put(key, copyItem(item));
+                changed = true;
+            }
+            for (String eid : needElements) {
+                if (selected.get("elements").containsKey(eid)) continue;
+                Map<String, Object> item = byId.get("elements").get(eid);
+                if (item == null) continue;
+                selected.get("elements").put(eid, copyItem(item));
+                changed = true;
+            }
+        }
+    }
+
+    static void collectParamRefs(
+            Map<String, Map<String, Map<String, Object>>> selected, Set<String> out) {
+        for (Map<String, Object> page : selected.get("pages").values()) {
+            stringList(page.get("params")).forEach(out::add);
+        }
+        for (Map<String, Object> el : selected.get("elements").values()) {
+            stringList(el.get("params")).forEach(out::add);
+        }
+        for (Map<String, Object> ev : selected.get("events").values()) {
+            stringList(ev.get("params")).forEach(out::add);
+        }
+    }
+
+    static void collectElementRefs(
+            Map<String, Map<String, Map<String, Object>>> selected, Set<String> out) {
+        for (Map<String, Object> page : selected.get("pages").values()) {
+            stringList(page.get("elements")).forEach(out::add);
+        }
+        for (Map<String, Object> el : selected.get("elements").values()) {
+            stringList(el.get("children")).forEach(out::add);
+        }
+    }
+
+    static Map<String, Map<String, Map<String, Object>>> indexAll(
+            Map<String, List<Map<String, Object>>> allInSpace) {
+        Map<String, Map<String, Map<String, Object>>> byId = RegistryKinds.emptyTables();
+        for (String kind : KIND_ORDER) {
+            for (Map<String, Object> item : allInSpace.getOrDefault(kind, List.of())) {
+                String id = idOf(kind, item);
+                if (!id.isEmpty()) byId.get(kind).put(id, item);
+            }
+        }
+        return byId;
     }
 
     @SuppressWarnings("unchecked")
@@ -96,6 +180,24 @@ public final class RegistryBundle {
     private static String statusOf(Map<String, Object> item) {
         Object st = item.get("status");
         return st == null || String.valueOf(st).isBlank() ? STATUS_LIVE : String.valueOf(st);
+    }
+
+    private static String idOf(String kind, Map<String, Object> item) {
+        return str(item.get(RegistryKinds.idField(kind)));
+    }
+
+    private static List<String> stringList(Object raw) {
+        if (!(raw instanceof List<?> list)) return List.of();
+        List<String> out = new ArrayList<>();
+        for (Object o : list) {
+            String s = str(o);
+            if (!s.isEmpty()) out.add(s);
+        }
+        return out;
+    }
+
+    private static String str(Object v) {
+        return v == null ? "" : String.valueOf(v).trim();
     }
 
     private static Map<String, Object> copyItem(Map<String, Object> item) {

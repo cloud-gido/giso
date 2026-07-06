@@ -313,17 +313,6 @@ th.reg-th-check, td.reg-td-check { width: 36px; text-align: center; }
 #reg-bundle-preview { font-size: 12px; margin: 8px 0; max-height: 120px; overflow: auto; white-space: pre-wrap; }
 
 /* 编辑弹窗 · 池化选取 */
-.editor-resume-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px 20px;
-  background: linear-gradient(90deg, #ede9fe, #e8f0fe);
-  border-bottom: 1px solid #c7d2fe;
-  font-size: 13px;
-}
-.editor-resume-msg { flex: 1; min-width: 200px; font-weight: 600; color: var(--accent-deep); }
 .pool-picker { display: flex; flex-direction: column; gap: 8px; }
 .pool-chips {
   display: flex; flex-wrap: wrap; gap: 6px; min-height: 32px;

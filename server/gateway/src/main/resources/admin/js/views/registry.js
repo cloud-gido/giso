@@ -9,9 +9,10 @@ import {
   bindEditorPickers,
   validatePoolRefs,
   dedupeListFields,
-  saveEditorResume,
-  peekEditorResume,
-  clearEditorResume,
+  stripInvalidPoolRefs,
+  saveEditorDraft,
+  peekEditorDraft,
+  clearEditorDraft,
   readEditorFormState,
   refreshEditorPickers,
   updateRefHintsPanel,
@@ -367,7 +368,6 @@ function renderTable() {
 export async function renderRegistry(force = false) {
   await fetchRegistry(force);
   renderTable();
-  updateResumeBar();
 }
 
 export function invalidateRegistryCache() {
@@ -529,11 +529,53 @@ async function loadRefHints(meta) {
   }
 }
 
+function persistEditorDraft(kind, entryKey) {
+  const meta = KIND_META[kind];
+  const draft = readEditorFormState(meta, LIST_COLS);
+  const key = entryKey || draft[meta.id] || null;
+  saveEditorDraft(getSpace(), kind, key, draft);
+  return key;
+}
+
+/** 跳转去其他池补登记前，先把当前条目以 draft 写入注册表（去掉未登记引用） */
+async function saveRegistryDraft(out, kind, sessionDraft) {
+  const meta = KIND_META[kind];
+  const key = out[meta.id];
+  if (!key) {
+    toast('请先填写主键 ID', 'error');
+    return false;
+  }
+  const payload = stripInvalidPoolRefs({ ...out }, registry);
+  dedupeListFields(payload);
+  if (!payload.status) payload.status = isEditor() ? 'pending' : 'draft';
+  const r = await api('/registry/' + kind, { method: 'POST', body: JSON.stringify(payload) });
+  if (r.error) {
+    toast(r.error, 'error');
+    return false;
+  }
+  clearEditorDraft(getSpace(), kind, null);
+  saveEditorDraft(getSpace(), kind, key, sessionDraft || out);
+  await renderRegistry(true);
+  if (isEditor()) document.dispatchEvent(new CustomEvent('giso:pending-changed'));
+  return true;
+}
+
+async function saveEntryDraftBeforePoolJump() {
+  const meta = KIND_META[curKind];
+  const draft = readEditorFormState(meta, LIST_COLS);
+  return saveRegistryDraft(draft, curKind, draft);
+}
+
 function openEditor(key, draftOverride) {
   const meta = KIND_META[curKind];
-  const item = draftOverride || (key ? registry[curKind].find((it) => it[meta.id] === key) : {});
-  const editingKey = key || draftOverride?.[meta.id] || null;
+  const storedDraft = draftOverride || peekEditorDraft(getSpace(), curKind, key);
+  const serverItem = key ? registry[curKind].find((it) => it[meta.id] === key) : {};
+  const item = storedDraft ? { ...serverItem, ...storedDraft } : serverItem;
+  const editingKey = key || storedDraft?.[meta.id] || null;
   $('#editor-title').textContent = `${editingKey ? '编辑' : '新增'} · ${meta.name}`;
+  if (storedDraft && !draftOverride) {
+    toast('已恢复未保存的草稿', 'warn');
+  }
   $('#editor-fields').innerHTML = meta.cols.map((c) => editorField(c, meta, item, editingKey)).join('');
   bindEditorPickers($('#editor-fields'), registry);
   scheduleRefHints(meta);
@@ -577,7 +619,12 @@ function openEditor(key, draftOverride) {
     dedupeListFields(out);
     const { errors, warn } = validatePoolRefs(out, registry);
     if (errors.length) {
-      toast(errors.join('；') + '。可点击「去参数池/元素池配置」登记后再选。', 'error');
+      if (out[meta.id]) {
+        await saveRegistryDraft(out, curKind, out);
+      } else {
+        persistEditorDraft(curKind, editingKey);
+      }
+      toast(errors.join('；') + '。条目已保存为草稿，请切换到对应池添加后重新打开继续编辑。', 'error');
       e.preventDefault();
       return;
     }
@@ -585,8 +632,7 @@ function openEditor(key, draftOverride) {
     const r = await api('/registry/' + curKind, { method: 'POST', body: JSON.stringify(out) });
     if (r.error) { toast(r.error, 'error'); e.preventDefault(); }
     else {
-      clearEditorResume();
-      updateResumeBar();
+      clearEditorDraft(getSpace(), curKind, out[meta.id] || editingKey);
       const hintMsg = summarizeHintsToast(r.hints);
       toast(hintMsg
         ? `${isEditor() ? '已提交待审批' : '已保存'}。${hintMsg}`
@@ -596,34 +642,6 @@ function openEditor(key, draftOverride) {
       if (isEditor()) document.dispatchEvent(new CustomEvent('giso:pending-changed'));
     }
   };
-}
-
-function updateResumeBar() {
-  const bar = $('#editor-resume-bar');
-  const resume = peekEditorResume();
-  if (!bar) return;
-  if (!resume) {
-    bar.hidden = true;
-    return;
-  }
-  bar.hidden = false;
-  const msg = $('#editor-resume-msg');
-  if (msg) {
-    msg.textContent = `正在为「${resume.label || resume.editorKey || '条目'}」配置${resume.gotoKind === 'params' ? '参数' : '元素'} · 完成后返回继续编辑`;
-  }
-}
-
-async function resumeEditor() {
-  const resume = peekEditorResume();
-  if (!resume) return;
-  await fetchRegistry(true);
-  curKind = resume.editorKind || 'pages';
-  $$('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.kind === curKind));
-  renderTable();
-  openEditor(resume.editorKey, resume.draft);
-  refreshEditorPickers($('#editor-fields'), registry);
-  scheduleRefHints(KIND_META[curKind]);
-  toast('已恢复编辑草稿，请核对引用后保存');
 }
 
 let bundlePayload = null;
@@ -652,7 +670,7 @@ async function exportRegistryBundle() {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast('已导出当前空间 live 登记（JSON 空间包）');
+  toast('已导出 live 条目及引用依赖（JSON 空间包）');
 }
 
 function openBundleImportDialog() {
@@ -677,10 +695,15 @@ async function readBundleFile() {
 
 function formatBundlePreview(r, bundle) {
   const counts = bundle?.counts || {};
+  const dep = bundle?.dependency_total;
+  const live = bundle?.live_total;
+  const countLine = dep != null && live != null
+    ? `包内：live ${live} + 依赖 ${dep} · params ${counts.params ?? '?'} · pages ${counts.pages ?? '?'} · elements ${counts.elements ?? '?'} · events ${counts.events ?? '?'}`
+    : `包内：params ${counts.params ?? '?'} · pages ${counts.pages ?? '?'} · elements ${counts.elements ?? '?'} · events ${counts.events ?? '?'}`;
   const lines = [
     r.warning ? `⚠ ${r.warning}` : null,
     `校验：成功 ${r.ok}，失败 ${r.failed}（新建 ${r.created}，更新 ${r.updated}）`,
-    `包内：params ${counts.params ?? '?'} · pages ${counts.pages ?? '?'} · elements ${counts.elements ?? '?'} · events ${counts.events ?? '?'}`,
+    countLine,
   ].filter(Boolean);
   if (r.failed > 0) {
     lines.push('');
@@ -772,27 +795,18 @@ async function runImport() {
 }
 
 export function initRegistry() {
-  $('#editor-fields')?.addEventListener('pool-goto', (e) => {
-    const poolKind = e.detail?.poolKind;
-    if (!poolKind) return;
+  $('#editor-fields')?.addEventListener('pool-need-register', async (e) => {
+    const poolLabel = e.detail?.poolLabel || '目标池';
     const meta = KIND_META[curKind];
     const draft = readEditorFormState(meta, LIST_COLS);
-    const idVal = draft[meta.id] || '';
-    if (!idVal && !confirm('尚未填写主键 ID，跳转后草稿可能不完整，继续？')) return;
-    saveEditorResume({
-      editorKind: curKind,
-      editorKey: idVal || null,
-      draft,
-      gotoKind: poolKind,
-      label: `${meta.name}${idVal ? ` · ${idVal}` : ''}`,
-    });
+    const key = draft[meta.id];
+    if (!key) {
+      toast('请先填写主键 ID 再添加引用', 'error');
+      return;
+    }
+    if (!(await saveEntryDraftBeforePoolJump())) return;
+    toast(`「${key}」已保存为草稿；请切换到${poolLabel}添加缺失项，完成后重新打开继续编辑`);
     $('#editor').close();
-    curKind = poolKind;
-    $$('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.kind === poolKind));
-    renderTable();
-    updateResumeBar();
-    const poolLabel = poolKind === 'params' ? '参数池' : (poolKind === 'elements' ? '元素池' : poolKind);
-    toast(`已切换到${poolLabel}，配置完成后点顶部「返回继续编辑」`);
   });
   $('#editor-fields')?.addEventListener('pool-changed', () => {
     scheduleRefHints(KIND_META[curKind]);
@@ -862,10 +876,5 @@ export function initRegistry() {
     localStorage.removeItem(colWidthsKey());
     renderTable();
     toast('已恢复默认列顺序与列宽');
-  });
-  $('#editor-resume-btn')?.addEventListener('click', () => resumeEditor());
-  $('#editor-resume-dismiss')?.addEventListener('click', () => {
-    clearEditorResume();
-    updateResumeBar();
   });
 }

@@ -213,11 +213,6 @@ biz_event code=video_play_start</textarea>
   <section id="view-registry" class="view registry-density-normal">
     <div class="card registry-shell">
       <div class="registry-sticky">
-        <div class="editor-resume-bar" id="editor-resume-bar" hidden>
-          <span class="editor-resume-msg" id="editor-resume-msg"></span>
-          <button type="button" class="primary" id="editor-resume-btn" data-i18n="reg.resumeEdit">返回继续编辑</button>
-          <button type="button" class="ghost" id="editor-resume-dismiss" data-i18n="reg.resumeDismiss">取消</button>
-        </div>
         <div class="registry-head">
           <div class="registry-tabs seg" id="reg-kinds">
             <button class="seg-btn active" data-kind="params">参数池</button>
@@ -510,7 +505,7 @@ biz_event code=video_play_start</textarea>
 <dialog id="reg-bundle-import-dialog">
   <form method="dialog" id="reg-bundle-import-form">
     <h3>导入空间包（JSON）</h3>
-    <p class="hint">用于<strong>测试 → 生产</strong>整包晋升：上传测试环境「导出空间包」得到的 <code>.json</code> 文件。导入后条目直接为 <b>live</b>（跳过审批）。<strong>不要</strong>上传 CSV 模板文件。建议先「预览校验」再确认写入。</p>
+    <p class="hint">用于<strong>测试 → 生产</strong>整包晋升：上传测试环境「导出空间包」得到的 <code>.json</code> 文件。导出包含所有 <b>live</b> 条目及其引用的参数/元素（含 draft 依赖）。导入后条目直接为 <b>live</b>（跳过审批）。<strong>不要</strong>上传 CSV 模板文件。建议先「预览校验」再确认写入。</p>
     <div class="field">
       <label>JSON 包文件</label>
       <input type="file" id="reg-bundle-file" accept=".json,application/json">
@@ -526,6 +521,6 @@ biz_event code=video_play_start</textarea>
 
 <div id="toasts"></div>
 
-<script type="module" src="js/main.js?v=10"></script>
+<script type="module" src="js/main.js?v=13"></script>
 </body>
 </html>

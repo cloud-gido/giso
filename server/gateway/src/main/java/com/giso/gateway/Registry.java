@@ -16,10 +16,12 @@ import com.giso.gateway.registry.WriteResult;
 import com.giso.gateway.space.SpaceService;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -286,7 +288,7 @@ public final class Registry {
     }
 
     /**
-     * 导入整包：强制 status=live，按 params → pages → elements → events 顺序写入。
+     * 导入整包：强制 status=live，按 params → elements → pages → events 顺序写入。
      * {@code dryRun=true} 时仅校验，不落库。
      */
     public synchronized Map<String, Object> importBundle(String spaceKey, Map<String, Object> bundle,
@@ -311,33 +313,53 @@ public final class Registry {
         }
         List<Map<String, String>> errors = new ArrayList<>();
         List<Map<String, Object>> detail = new ArrayList<>();
-        int created = 0;
-        int updated = 0;
-        int ok = 0;
         boolean changed = false;
-        for (String kind : RegistryBundle.KIND_ORDER) {
-            for (Map<String, Object> item : RegistryBundle.itemsOf(bundle, kind)) {
-                String idField = RegistryKinds.idField(kind);
-                String key = String.valueOf(item.getOrDefault(idField, "?"));
-                Map<String, Object> existing = tablesFor(spaceKey).get(kind).get(key);
-                String action = existing == null ? "create" : "update";
-                String err = applyBundleUpsert(spaceKey, kind, item, operator, dryRun);
-                if (err == null) {
-                    ok++;
-                    if ("create".equals(action)) created++;
-                    else updated++;
-                    if (!dryRun) changed = true;
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    row.put("kind", kind);
-                    row.put("key", key);
-                    row.put("action", action);
-                    row.put("status", RegistryBundle.STATUS_LIVE);
-                    detail.add(row);
-                } else {
-                    errors.add(Map.of("kind", kind, "key", key, "error", err));
+        Map<String, Map<String, Map<String, Object>>> importTables = copyTables(tablesFor(spaceKey));
+        for (String kind : RegistryBundle.IMPORT_KIND_ORDER) {
+            List<Map<String, Object>> items = RegistryBundle.itemsOf(bundle, kind);
+            if ("elements".equals(kind)) {
+                Set<String> bundleEids = new HashSet<>();
+                for (Map<String, Object> item : items) {
+                    Object eid = item.get("eid");
+                    if (eid != null && !String.valueOf(eid).isBlank()) {
+                        bundleEids.add(String.valueOf(eid));
+                    }
+                }
+                List<Map<String, Object>> pending = new ArrayList<>(items);
+                while (!pending.isEmpty()) {
+                    int sizeBefore = pending.size();
+                    Iterator<Map<String, Object>> it = pending.iterator();
+                    while (it.hasNext()) {
+                        Map<String, Object> item = it.next();
+                        if (!elementChildrenReady(item, bundleEids, importTables)) continue;
+                        if (recordBundleUpsert(spaceKey, kind, item, operator, dryRun, importTables,
+                                errors, detail)) {
+                            changed = true;
+                        }
+                        it.remove();
+                    }
+                    if (pending.size() == sizeBefore) {
+                        for (Map<String, Object> item : pending) {
+                            if (recordBundleUpsert(spaceKey, kind, item, operator, dryRun, importTables,
+                                    errors, detail)) {
+                                changed = true;
+                            }
+                        }
+                        break;
+                    }
+                }
+                continue;
+            }
+            for (Map<String, Object> item : items) {
+                if (recordBundleUpsert(spaceKey, kind, item, operator, dryRun, importTables,
+                        errors, detail)) {
+                    changed = true;
                 }
             }
         }
+        int ok = detail.size();
+        int created = (int) detail.stream().filter(r -> "create".equals(r.get("action"))).count();
+        int updated = ok - created;
         if (changed) reload();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("dry_run", dryRun);
@@ -351,8 +373,44 @@ public final class Registry {
         return out;
     }
 
+    private boolean recordBundleUpsert(String spaceKey, String kind, Map<String, Object> item,
+            String operator, boolean dryRun,
+            Map<String, Map<String, Map<String, Object>>> importTables,
+            List<Map<String, String>> errors, List<Map<String, Object>> detail) throws Exception {
+        String idField = RegistryKinds.idField(kind);
+        String key = String.valueOf(item.getOrDefault(idField, "?"));
+        Map<String, Object> existing = importTables.get(kind).get(key);
+        String action = existing == null ? "create" : "update";
+        String err = applyBundleUpsert(spaceKey, kind, item, operator, dryRun, importTables);
+        if (err == null) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("kind", kind);
+            row.put("key", key);
+            row.put("action", action);
+            row.put("status", RegistryBundle.STATUS_LIVE);
+            detail.add(row);
+            return !dryRun;
+        }
+        errors.add(Map.of("kind", kind, "key", key, "error", err));
+        return false;
+    }
+
+    private static boolean elementChildrenReady(Map<String, Object> item, Set<String> bundleEids,
+            Map<String, Map<String, Map<String, Object>>> importTables) {
+        Object ch = item.get("children");
+        if (!(ch instanceof List<?> list)) return true;
+        Map<String, Map<String, Object>> elements = importTables.get("elements");
+        for (Object c : list) {
+            String cid = String.valueOf(c).trim();
+            if (cid.isEmpty() || "null".equals(cid)) continue;
+            if (bundleEids.contains(cid) && !elements.containsKey(cid)) return false;
+        }
+        return true;
+    }
+
     private synchronized String applyBundleUpsert(String spaceKey, String kind, Map<String, Object> item,
-            String operator, boolean dryRun) throws Exception {
+            String operator, boolean dryRun,
+            Map<String, Map<String, Map<String, Object>>> importTables) throws Exception {
         String idField = RegistryKinds.idField(kind);
         Object idVal = item.get(idField);
         if (idVal == null || String.valueOf(idVal).isBlank()) {
@@ -361,12 +419,25 @@ public final class Registry {
         item = new LinkedHashMap<>(item);
         RegistryRefs.normalizeLists(item);
         item.put("status", RegistryBundle.STATUS_LIVE);
-        String err = validateUpsert(spaceKey, kind, item);
+        String err = RegistryRefs.validate(importTables, kind, item);
         if (err != null) return err;
-        if (dryRun) return null;
-        WriteResult wr = store.upsert(spaceKey, kind, item, operator);
-        if (wr.error() != null) return wr.error();
+        if (!dryRun) {
+            WriteResult wr = store.upsert(spaceKey, kind, item, operator);
+            if (wr.error() != null) return wr.error();
+        }
+        importTables.get(kind).put(String.valueOf(idVal), new LinkedHashMap<>(item));
         return null;
+    }
+
+    private static Map<String, Map<String, Map<String, Object>>> copyTables(
+            Map<String, Map<String, Map<String, Object>>> src) {
+        Map<String, Map<String, Map<String, Object>>> out = RegistryKinds.emptyTables();
+        src.forEach((kind, map) -> {
+            Map<String, Map<String, Object>> kindMap = new LinkedHashMap<>();
+            map.forEach((k, v) -> kindMap.put(k, new LinkedHashMap<>(v)));
+            out.put(kind, kindMap);
+        });
+        return out;
     }
 
     private String applySubmit(String spaceKey, String kind, String key, String operator, String spaceRole)
