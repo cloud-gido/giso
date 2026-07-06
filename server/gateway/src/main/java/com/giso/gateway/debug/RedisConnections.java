@@ -8,42 +8,63 @@ import redis.clients.jedis.JedisPoolConfig;
 
 /** 解析 Redis 连接（支持 rediss + 密码特殊字符），不依赖 java.net.URI。 */
 public final class RedisConnections {
-    public record Info(String scheme, String host, int port, String password, int db) {
+    public record Info(String scheme, String host, int port, String username, String password, int db) {
         public boolean ssl() {
             return "rediss".equalsIgnoreCase(scheme);
         }
 
         /** 日志用，密码打码 */
         public String safeLabel() {
-            return scheme + "://" + host + ":" + port + "/" + db;
+            String user = username == null || username.isBlank() ? "" : username + "@";
+            return scheme + "://" + user + host + ":" + port + "/" + db;
         }
     }
 
     private RedisConnections() { }
 
-    public static Info parseUrl(String url, String overridePassword, int overrideDb) {
+    public static Info parseUrl(String url, String overrideUsername, String overridePassword, int overrideDb) {
         String trimmed = url == null ? "" : url.trim();
         if (!isRedisUri(trimmed)) {
             throw new IllegalArgumentException("invalid redis url: " + trimmed);
         }
         int at = trimmed.lastIndexOf('@');
+        String head;
+        String tail;
+        String auth;
+        String scheme;
         if (at < 0) {
-            throw new IllegalArgumentException("redis url missing @ host: " + trimmed);
+            scheme = trimmed.toLowerCase().startsWith("rediss://") ? "rediss" : "redis";
+            int schemeEnd = trimmed.indexOf("://") + 3;
+            tail = trimmed.substring(schemeEnd);
+            auth = "";
+        } else {
+            head = trimmed.substring(0, at);
+            tail = trimmed.substring(at + 1);
+            scheme = head.toLowerCase().startsWith("rediss://") ? "rediss" : "redis";
+            int schemeEnd = head.indexOf("://") + 3;
+            auth = head.substring(schemeEnd);
         }
-        String head = trimmed.substring(0, at);
-        String tail = trimmed.substring(at + 1);
-
-        String scheme = head.toLowerCase().startsWith("rediss://") ? "rediss" : "redis";
-        int schemeEnd = head.indexOf("://") + 3;
-        String auth = head.substring(schemeEnd);
+        String username = "";
         String password = "";
-        if (auth.startsWith(":")) password = auth.substring(1);
-        else if (auth.contains(":")) {
-            int colon = auth.indexOf(':');
-            password = auth.substring(colon + 1);
+        if (!auth.isEmpty()) {
+            if (auth.startsWith(":")) {
+                password = auth.substring(1);
+            } else {
+                int colon = auth.indexOf(':');
+                if (colon > 0) {
+                    username = auth.substring(0, colon);
+                    password = auth.substring(colon + 1);
+                } else {
+                    password = auth;
+                }
+            }
         }
-        if (overridePassword != null && !overridePassword.isBlank()) {
-            password = overridePassword;
+        // URL 内已有密码时优先用 URL（避免 Doppler 重复字段不一致导致 WRONGPASS）
+        if (password.isBlank() && overridePassword != null && !overridePassword.isBlank()) {
+            password = overridePassword.trim();
+        }
+        if ((username == null || username.isBlank()) && overrideUsername != null && !overrideUsername.isBlank()) {
+            username = overrideUsername.trim();
         }
 
         String hostPort;
@@ -67,14 +88,21 @@ public final class RedisConnections {
         } else {
             host = hostPort;
         }
-        return new Info(scheme, host, port, password, db);
+        return new Info(scheme, host, port, username, password, db);
     }
 
-    public static Info fromParts(String scheme, String host, String password, int port, int db) {
+    /** @deprecated use {@link #parseUrl(String, String, String, int)} */
+    public static Info parseUrl(String url, String overridePassword, int overrideDb) {
+        return parseUrl(url, null, overridePassword, overrideDb);
+    }
+
+    public static Info fromParts(String scheme, String host, String username, String password, int port, int db) {
         String sch = scheme == null || scheme.isBlank() ? "redis" : scheme.trim();
         if (port <= 0) port = 6379;
         if (db < 0) db = 0;
-        return new Info(sch, host.trim(), port, password, db);
+        String user = username == null ? "" : username.trim();
+        String pass = password == null ? "" : password.trim();
+        return new Info(sch, host.trim(), port, user, pass, db);
     }
 
     public static boolean isRedisUri(String value) {
@@ -83,13 +111,22 @@ public final class RedisConnections {
         return lower.startsWith("redis://") || lower.startsWith("rediss://");
     }
 
+    private static void applyAuth(DefaultJedisClientConfig.Builder cfg, Info info) {
+        String user = info.username();
+        String pass = info.password();
+        if (user != null && !user.isBlank()) {
+            cfg.user(user);
+        }
+        if (pass != null && !pass.isBlank()) {
+            cfg.password(pass);
+        }
+    }
+
     public static JedisPool createPool(Info info) {
         HostAndPort hap = new HostAndPort(info.host(), info.port());
         DefaultJedisClientConfig.Builder cfg = DefaultJedisClientConfig.builder()
                 .database(info.db());
-        if (info.password() != null && !info.password().isBlank()) {
-            cfg.password(info.password());
-        }
+        applyAuth(cfg, info);
         if (info.ssl()) cfg.ssl(true);
         JedisPoolConfig poolCfg = new JedisPoolConfig();
         poolCfg.setMaxTotal(16);
@@ -100,9 +137,7 @@ public final class RedisConnections {
         HostAndPort hap = new HostAndPort(info.host(), info.port());
         DefaultJedisClientConfig.Builder cfg = DefaultJedisClientConfig.builder()
                 .database(info.db());
-        if (info.password() != null && !info.password().isBlank()) {
-            cfg.password(info.password());
-        }
+        applyAuth(cfg, info);
         if (info.ssl()) cfg.ssl(true);
         return new Jedis(hap, cfg.build());
     }

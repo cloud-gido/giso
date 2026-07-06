@@ -70,6 +70,7 @@ public final class GatewayConfig {
     public RedisConnections.Info debugRedisInfo;
     public String debugRedisHost = "";
     public String debugRedisPassword = "";
+    public String debugRedisUsername = "";
     public int debugRedisPort = 6379;
     public int debugRedisDb = 2;
     /** 短主机名（如 internal-redis）扩成 K8s 集群 DNS 的命名空间后缀 */
@@ -347,6 +348,7 @@ public final class GatewayConfig {
         env("GISO_DEBUG_BUFFER_BACKEND").ifPresent(v -> c.debugBufferBackend = v);
         env("GISO_DEBUG_REDIS_URL").ifPresent(v -> c.debugRedisUrl = v);
         env("GISO_DEBUG_REDIS_HOST").ifPresent(v -> c.debugRedisHost = v);
+        env("GISO_DEBUG_REDIS_USERNAME").ifPresent(v -> c.debugRedisUsername = v);
         env("GISO_DEBUG_REDIS_PASSWORD").ifPresent(v -> c.debugRedisPassword = v);
         envInt("GISO_DEBUG_REDIS_PORT").ifPresent(v -> c.debugRedisPort = v);
         envInt("GISO_DEBUG_REDIS_DB").ifPresent(v -> c.debugRedisDb = v);
@@ -367,7 +369,8 @@ public final class GatewayConfig {
         int db = c.debugRedisDb >= 0 ? c.debugRedisDb : 2;
 
         if (c.debugRedisUrl != null && !c.debugRedisUrl.isBlank()) {
-            c.debugRedisInfo = RedisConnections.parseUrl(c.debugRedisUrl, null, -1);
+            c.debugRedisInfo = RedisConnections.parseUrl(
+                    c.debugRedisUrl, c.debugRedisUsername, c.debugRedisPassword, -1);
             return;
         }
 
@@ -375,7 +378,8 @@ public final class GatewayConfig {
         String hostRaw = c.debugRedisHost.trim();
 
         if (RedisConnections.isRedisUri(hostRaw)) {
-            c.debugRedisInfo = RedisConnections.parseUrl(hostRaw, c.debugRedisPassword, db);
+            c.debugRedisInfo = RedisConnections.parseUrl(
+                    hostRaw, c.debugRedisUsername, c.debugRedisPassword, db);
             return;
         }
 
@@ -389,7 +393,8 @@ public final class GatewayConfig {
                 host = host.substring(0, colon);
             } catch (NumberFormatException ignored) { }
         }
-        c.debugRedisInfo = RedisConnections.fromParts("redis", host, c.debugRedisPassword, port, db);
+        c.debugRedisInfo = RedisConnections.fromParts(
+                "redis", host, c.debugRedisUsername, c.debugRedisPassword, port, db);
     }
 
     static String normalizeRedisHost(String host, String searchNamespace) {
