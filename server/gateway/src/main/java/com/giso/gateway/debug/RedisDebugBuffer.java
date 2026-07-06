@@ -7,7 +7,6 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,11 +19,11 @@ public final class RedisDebugBuffer implements DebugBuffer {
     private final int recentMax;
     private final int ttlSec;
 
-    public RedisDebugBuffer(String redisUrl, String keyPrefix, int recentMax, int ttlSec) {
-        if (redisUrl == null || redisUrl.isBlank()) {
-            throw new IllegalArgumentException("debug_buffer.redis_url required when backend=redis");
+    public RedisDebugBuffer(RedisConnections.Info redis, String keyPrefix, int recentMax, int ttlSec) {
+        if (redis == null) {
+            throw new IllegalArgumentException("debug_buffer redis connection required when backend=redis");
         }
-        this.pool = new JedisPool(URI.create(redisUrl.trim()));
+        this.pool = RedisConnections.createPool(redis);
         this.keys = new DebugBufferKeys(keyPrefix);
         this.recentMax = Math.max(1, recentMax);
         this.ttlSec = Math.max(60, ttlSec);

@@ -20,15 +20,18 @@ public final class DebugBuffers {
     public static Handle create(GatewayConfig config, SseHub sse) {
         String backend = config.debugBufferBackend == null ? "memory" : config.debugBufferBackend.trim();
         if ("redis".equalsIgnoreCase(backend)) {
+            if (config.debugRedisInfo == null) {
+                throw new IllegalStateException("debug_buffer.backend=redis but redis connection is not configured");
+            }
             RedisDebugBuffer buffer = new RedisDebugBuffer(
-                    config.debugRedisUrl,
+                    config.debugRedisInfo,
                     config.debugRedisKeyPrefix,
                     config.adminRecentBuffer,
                     config.debugBufferTtlSec);
             RedisSseRelay relay = new RedisSseRelay(
-                    config.debugRedisUrl, config.debugRedisKeyPrefix, sse);
+                    config.debugRedisInfo, config.debugRedisKeyPrefix, sse);
             relay.start();
-            System.out.println("  debug_buffer  : redis (" + config.debugRedisUrl.replaceAll("://:[^@]+@", "://:***@") + ")");
+            System.out.println("  debug_buffer  : redis (" + config.debugRedisInfo.safeLabel() + ")");
             return new Handle(buffer, relay);
         }
         MemoryDebugBuffer buffer = new MemoryDebugBuffer(

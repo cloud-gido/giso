@@ -4,19 +4,17 @@ import com.giso.gateway.SseHub;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
 
-import java.net.URI;
-
 /** 订阅 Redis Pub/Sub，将联调事件 fan-out 到本 Pod 的 SSE 连接。 */
 public final class RedisSseRelay implements AutoCloseable {
-    private final String redisUrl;
+    private final RedisConnections.Info redis;
     private final String pubPattern;
     private final String keyPrefix;
     private final SseHub sse;
     private volatile Thread thread;
     private volatile Jedis subscriber;
 
-    public RedisSseRelay(String redisUrl, String keyPrefix, SseHub sse) {
-        this.redisUrl = redisUrl;
+    public RedisSseRelay(RedisConnections.Info redis, String keyPrefix, SseHub sse) {
+        this.redis = redis;
         this.keyPrefix = keyPrefix;
         this.pubPattern = new DebugBufferKeys(keyPrefix).pubPattern();
         this.sse = sse;
@@ -30,7 +28,7 @@ public final class RedisSseRelay implements AutoCloseable {
 
     private void run() {
         while (!Thread.currentThread().isInterrupted()) {
-            Jedis jedis = new Jedis(URI.create(redisUrl.trim()));
+            Jedis jedis = RedisConnections.createClient(redis);
             subscriber = jedis;
             try {
                 jedis.psubscribe(new JedisPubSub() {

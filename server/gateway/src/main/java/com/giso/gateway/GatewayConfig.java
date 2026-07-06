@@ -1,6 +1,7 @@
 package com.giso.gateway;
 
 import com.giso.gateway.auth.AdminUser;
+import com.giso.gateway.debug.RedisConnections;
 import com.giso.gateway.auth.LoginSecurityConfig;
 import org.yaml.snakeyaml.Yaml;
 
@@ -65,6 +66,8 @@ public final class GatewayConfig {
     /** 联调缓冲：memory（单副本）| redis（多副本共享） */
     public String debugBufferBackend = "memory";
     public String debugRedisUrl = "";
+    /** 解析后的 Redis 连接（避免 URI 对密码特殊字符解析失败） */
+    public RedisConnections.Info debugRedisInfo;
     public String debugRedisHost = "";
     public String debugRedisPassword = "";
     public int debugRedisPort = 6379;
@@ -356,17 +359,23 @@ public final class GatewayConfig {
 
     /**
      * 未配置 redis_url 时，由 host + password + port + db 拼装（复用平台 INFRA_ARCHERY_REDIS_* 等）。
-     * host 若已是 redis:// / rediss:// 整 URL，则只改 logical db，避免重复拼接。
+     * host 若已是 redis:// / rediss:// 整 URL，则解析后只改 logical db。
      */
     static void resolveDebugRedisUrl(GatewayConfig c) {
-        if (c.debugRedisUrl != null && !c.debugRedisUrl.isBlank()) return;
-        if (c.debugRedisHost == null || c.debugRedisHost.isBlank()) return;
+        if (c.debugRedisInfo != null) return;
 
-        String hostRaw = c.debugRedisHost.trim();
         int db = c.debugRedisDb >= 0 ? c.debugRedisDb : 2;
 
-        if (isRedisUri(hostRaw)) {
-            c.debugRedisUrl = withRedisDb(hostRaw, db);
+        if (c.debugRedisUrl != null && !c.debugRedisUrl.isBlank()) {
+            c.debugRedisInfo = RedisConnections.parseUrl(c.debugRedisUrl, null, -1);
+            return;
+        }
+
+        if (c.debugRedisHost == null || c.debugRedisHost.isBlank()) return;
+        String hostRaw = c.debugRedisHost.trim();
+
+        if (RedisConnections.isRedisUri(hostRaw)) {
+            c.debugRedisInfo = RedisConnections.parseUrl(hostRaw, c.debugRedisPassword, db);
             return;
         }
 
@@ -380,35 +389,17 @@ public final class GatewayConfig {
                 host = host.substring(0, colon);
             } catch (NumberFormatException ignored) { }
         }
-        c.debugRedisUrl = buildRedisUrl("redis", host, c.debugRedisPassword, port, db);
-    }
-
-    static boolean isRedisUri(String value) {
-        String lower = value.toLowerCase();
-        return lower.startsWith("redis://") || lower.startsWith("rediss://");
-    }
-
-    /** 保留原 scheme / 鉴权 / 主机，仅覆盖 path 中的 logical db。 */
-    static String withRedisDb(String redisUri, int db) {
-        String trimmed = redisUri.trim();
-        if (trimmed.matches("(?i).*/\\d+$")) {
-            return trimmed.replaceFirst("/\\d+$", "/" + db);
-        }
-        return trimmed.endsWith("/") ? trimmed + db : trimmed + "/" + db;
+        c.debugRedisInfo = RedisConnections.fromParts("redis", host, c.debugRedisPassword, port, db);
     }
 
     static String normalizeRedisHost(String host, String searchNamespace) {
-        if (isRedisUri(host) || host.contains(".") || host.contains("svc.cluster.local")) return host;
+        if (RedisConnections.isRedisUri(host) || host.contains(".") || host.contains("svc.cluster.local")) {
+            return host;
+        }
         if (searchNamespace != null && !searchNamespace.isBlank()) {
             return host + "." + searchNamespace.trim() + ".svc.cluster.local";
         }
         return host;
-    }
-
-    static String buildRedisUrl(String scheme, String host, String password, int port, int db) {
-        String enc = java.net.URLEncoder.encode(password, java.nio.charset.StandardCharsets.UTF_8)
-                .replace("+", "%20");
-        return scheme + "://:" + enc + "@" + host + ":" + port + "/" + db;
     }
 
     /** MSK SASL/SCRAM：用户名密码走环境变量，组装 sasl.jaas.config（勿写入镜像/ConfigMap）。 */
