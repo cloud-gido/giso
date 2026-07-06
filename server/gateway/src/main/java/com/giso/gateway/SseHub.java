@@ -9,12 +9,12 @@ import java.util.Iterator;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /** SSE 推送：按空间隔离，管理页面实时联调用。 */
-final class SseHub {
+public final class SseHub {
     private record Client(OutputStream os, String space) { }
 
     private final CopyOnWriteArrayList<Client> clients = new CopyOnWriteArrayList<>();
 
-    void subscribe(HttpExchange ex, String spaceKey) throws IOException {
+    public void subscribe(HttpExchange ex, String spaceKey) throws IOException {
         String space = spaceKey == null || spaceKey.isBlank()
                 ? com.giso.gateway.space.SpaceService.DEFAULT_SPACE : spaceKey;
         Http.cors(ex);
@@ -27,7 +27,7 @@ final class SseHub {
         clients.add(new Client(os, space));
     }
 
-    void broadcast(String json, String spaceKey) {
+    public void broadcast(String json, String spaceKey) {
         String space = spaceKey == null || spaceKey.isBlank()
                 ? com.giso.gateway.space.SpaceService.DEFAULT_SPACE : spaceKey;
         byte[] frame = ("data: " + json + "\n\n").getBytes(StandardCharsets.UTF_8);

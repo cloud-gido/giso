@@ -110,7 +110,7 @@ ArgoCD 自动滚动 `giso-gateway` Deployment。
 
 | 项 | 当前测试配置 |
 |----|--------------|
-| 副本数 | `replicas: 1`（`apps/bigdata/giso/giso.yaml`） |
+| 副本数 | `replicas: 1`（`apps/bigdata/giso/giso.yaml`）；**性能上 10 万 DAU 单副本足够，生产为 HA 建议 ≥2**，见 [08-FAQ Q7a](../docs/tracking/08-接入常见问题FAQ.md) |
 | 注册表 | PostgreSQL `giso` 库，`registry.postgres.schema: public` |
 | Doppler 映射 | `apps/system/doppler/giso-secret.yaml` |
 | 空间路由 | `video-*` → `longvideo`；见 [10-空间与多租户](../docs/tracking/10-空间与多租户.md) |

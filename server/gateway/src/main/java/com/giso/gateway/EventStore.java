@@ -3,13 +3,11 @@ package com.giso.gateway;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.giso.gateway.debug.DebugBuffer;
 import com.giso.gateway.sink.EventSink;
 import com.giso.gateway.sink.SinkRegistry;
 import com.giso.gateway.space.SpaceService;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,13 +16,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 事件处理中枢（按空间隔离统计与覆盖率累计）。
+ * 联调近期缓冲委托 {@link DebugBuffer}（memory 或 redis）。
  */
 public final class EventStore {
     private static final ObjectMapper M = new ObjectMapper();
 
     private final SinkRegistry sinkRegistry;
-    private final int recentMax;
-    private final Deque<ObjectNode> recent = new ArrayDeque<>();
+    private final DebugBuffer debugBuffer;
 
     public static final class Counter {
         public long total, missing, error;
@@ -40,9 +38,13 @@ public final class EventStore {
     private final Set<String> seenEids = ConcurrentHashMap.newKeySet();
     private final Set<String> seenBizCodes = ConcurrentHashMap.newKeySet();
 
-    public EventStore(SinkRegistry sinkRegistry, int recentMax) {
+    public EventStore(SinkRegistry sinkRegistry, DebugBuffer debugBuffer) {
         this.sinkRegistry = sinkRegistry;
-        this.recentMax = recentMax;
+        this.debugBuffer = debugBuffer;
+    }
+
+    public DebugBuffer debugBuffer() {
+        return debugBuffer;
     }
 
     private static String sk(String spaceKey) {
@@ -73,8 +75,7 @@ public final class EventStore {
             sink.accept(out, quarantine);
         }
 
-        recent.addFirst(wrapped);
-        if (recent.size() > recentMax) recent.removeLast();
+        debugBuffer.append(wrapped, spaceKey);
         recordSeen(ev, space);
         updateStats(ev, result, space);
         Metrics.inc("giso_events_total{status=\"" + result.status() + "\"}");
@@ -165,19 +166,8 @@ public final class EventStore {
         }
     }
 
-    public synchronized List<ObjectNode> recent(int limit, String spaceKey, String did, String event, String status) {
-        List<ObjectNode> out = new ArrayList<>();
-        String space = spaceKey == null || spaceKey.isBlank() ? null : spaceKey;
-        for (ObjectNode n : recent) {
-            if (out.size() >= limit) break;
-            if (space != null && !space.equals(n.path("space").asText(""))) continue;
-            JsonNode data = n.get("data");
-            if (!did.isEmpty() && !data.path("common").path("did").asText().contains(did)) continue;
-            if (!event.isEmpty() && !data.path("event").asText().equals(event)) continue;
-            if (!status.isEmpty() && !n.path("status").asText().equals(status)) continue;
-            out.add(n);
-        }
-        return out;
+    public List<ObjectNode> recent(int limit, String spaceKey, String did, String event, String status) {
+        return debugBuffer.recent(limit, spaceKey, did, event, status);
     }
 
     public synchronized ObjectNode stats(String spaceKey) {
@@ -212,13 +202,8 @@ public final class EventStore {
         return o;
     }
 
-    public synchronized List<ObjectNode> recentByDid(String did) {
-        List<ObjectNode> out = new ArrayList<>();
-        for (ObjectNode n : recent) {
-            if (n.path("data").path("common").path("did").asText().equals(did)) out.add(n);
-        }
-        java.util.Collections.reverse(out);
-        return out;
+    public List<ObjectNode> recentByDid(String did) {
+        return debugBuffer.recentByDid(did);
     }
 
     public synchronized ObjectNode hourly(String spaceKey) {
@@ -239,8 +224,8 @@ public final class EventStore {
     }
 
     public synchronized void clearRecent(String spaceKey) {
+        debugBuffer.clearRecent(spaceKey);
         if (spaceKey == null || spaceKey.isBlank()) {
-            recent.clear();
             eventStats.clear();
             paramStats.clear();
             versionStats.clear();
@@ -252,7 +237,6 @@ public final class EventStore {
         }
         String space = sk(spaceKey);
         String prefix = space + "|";
-        recent.removeIf(n -> space.equals(n.path("space").asText("")));
         eventStats.keySet().removeIf(k -> k.startsWith(prefix));
         paramStats.keySet().removeIf(k -> k.startsWith(prefix));
         versionStats.keySet().removeIf(k -> k.startsWith(prefix));

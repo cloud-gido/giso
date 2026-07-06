@@ -1,6 +1,7 @@
 package com.giso.gateway;
 
 import com.giso.gateway.auth.AdminAuth;
+import com.giso.gateway.debug.DebugBuffers;
 import com.giso.gateway.registry.RegistryWatcher;
 import com.giso.gateway.settings.SystemSettingsService;
 import com.giso.gateway.sink.SinkFactory;
@@ -56,10 +57,11 @@ class GatewayIntegrationTest {
         SinkRegistry sinkRegistry = new SinkRegistry();
         sinkRegistry.reload(config);
         SystemSettingsService systemSettings = SystemSettingsService.create(config, null, sinkRegistry);
-        store = new EventStore(sinkRegistry, config.adminRecentBuffer);
         SseHub sse = new SseHub();
-        track = new TrackHandler(registry, store, sse, config, null);
-        admin = new AdminHandler(registry, store, sse, auth, config, null, systemSettings);
+        store = new EventStore(sinkRegistry, DebugBuffers.create(config, sse).buffer());
+        track = new TrackHandler(registry, store, config, null);
+        admin = new AdminHandler(registry, store, sse, auth, config, null, systemSettings,
+                ScreenshotStore.create(config));
     }
 
     @AfterAll

@@ -1,7 +1,7 @@
 /* 系统设置 — Copilot LLM + 出口管道勾选（对齐 GIDO 系统设置） */
 import { $, $$, esc, toast } from '../util.js';
 import { api } from '../api.js';
-import { t } from '../i18n.js';
+import { t, getLocale, setLocale, applyI18n } from '../i18n.js';
 
 let settings = null;
 
@@ -37,12 +37,17 @@ function fillAssistantForm() {
   $('#set-gido-proxy') && ($('#set-gido-proxy').value = a.gido_proxy_url || '');
   const ro = !settings?.writable;
   $$('#view-settings input, #view-settings select, #view-settings button.save').forEach((el) => {
-    if (el.id === 'settings-refresh') return;
+    if (el.id === 'settings-refresh' || el.id === 'set-locale') return;
     if (ro) el.setAttribute('disabled', '');
     else el.removeAttribute('disabled');
   });
   if ($('#settings-readonly-note')) {
     $('#settings-readonly-note').hidden = !ro;
+  }
+  const loc = $('#set-locale');
+  if (loc) {
+    loc.value = getLocale();
+    loc.removeAttribute('disabled');
   }
 }
 
@@ -60,7 +65,13 @@ export async function renderSettings() {
   }
 }
 
-export function initSettings() {
+export function initSettings(onViewRefresh) {
+  $('#set-locale')?.addEventListener('change', (e) => {
+    setLocale(e.target.value);
+    applyI18n();
+    const active = document.querySelector('.nav-item.active')?.dataset?.view;
+    if (active && onViewRefresh) onViewRefresh(active);
+  });
   $('#settings-refresh')?.addEventListener('click', () => renderSettings());
   $('#settings-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();

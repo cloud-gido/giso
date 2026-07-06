@@ -16,6 +16,14 @@ kafka:
 
 admin:
   recent_buffer: 2000
+  screenshots_dir: /data/screenshots
+
+# 多副本联调共享缓冲（本地默认 memory；启用 compose profile redis 后改为 redis）
+debug_buffer:
+  backend: memory
+  redis_url: ""
+  key_prefix: giso:debug
+  ttl_sec: 3600
 
 registry:
   backend: postgres

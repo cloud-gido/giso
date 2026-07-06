@@ -20,16 +20,14 @@ public final class TrackHandler implements HttpHandler {
 
     private final Registry registry;
     private final EventStore store;
-    private final SseHub sse;
     private final GatewayConfig config;
     private final RateLimiter rateLimiter;
     private final SpaceService spaces;
 
-    public TrackHandler(Registry registry, EventStore store, SseHub sse, GatewayConfig config,
+    public TrackHandler(Registry registry, EventStore store, GatewayConfig config,
                         SpaceService spaces) {
         this.registry = registry;
         this.store = store;
-        this.sse = sse;
         this.config = config;
         this.spaces = spaces;
         this.rateLimiter = new RateLimiter(config.rateLimitRps, config.rateLimitBurst);
@@ -86,7 +84,6 @@ public final class TrackHandler implements HttpHandler {
             ObjectNode enriched = enrichSpace(ev, spaceKey);
             Registry.Result result = registry.validate(enriched, spaceKey);
             ObjectNode wrapped = store.accept(enriched, result, spaceKey);
-            sse.broadcast(wrapped.toString(), spaceKey);
         }
         Metrics.inc("giso_track_responses_total{code=\"204\"}");
         Http.empty(ex, 204);

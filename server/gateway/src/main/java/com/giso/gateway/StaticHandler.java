@@ -14,12 +14,19 @@ public final class StaticHandler implements HttpHandler {
             "html", "text/html; charset=utf-8",
             "js", "application/javascript; charset=utf-8",
             "css", "text/css; charset=utf-8",
-            "svg", "image/svg+xml");
+            "svg", "image/svg+xml",
+            "png", "image/png",
+            "jpg", "image/jpeg",
+            "jpeg", "image/jpeg",
+            "webp", "image/webp",
+            "gif", "image/gif");
 
     private final AdminAuth auth;
+    private final ScreenshotStore screenshots;
 
-    public StaticHandler(AdminAuth auth) {
+    public StaticHandler(AdminAuth auth, ScreenshotStore screenshots) {
         this.auth = auth;
+        this.screenshots = screenshots;
     }
 
     private static boolean isPublic(String rel) {
@@ -46,6 +53,10 @@ public final class StaticHandler implements HttpHandler {
             Http.redirect(ex, "/admin/login.html");
             return;
         }
+        if (rel.startsWith("screenshots/") && screenshots != null) {
+            serveScreenshot(ex, rel.substring("screenshots/".length()));
+            return;
+        }
         try (InputStream in = getClass().getResourceAsStream("/admin/" + rel)) {
             if (in == null) {
                 Http.empty(ex, 404);
@@ -61,5 +72,18 @@ public final class StaticHandler implements HttpHandler {
             ex.getResponseBody().write(bytes);
             ex.close();
         }
+    }
+
+    private void serveScreenshot(HttpExchange ex, String rel) throws IOException {
+        ScreenshotStore.Loaded loaded = screenshots.loadRelative(rel);
+        if (loaded == null) {
+            Http.empty(ex, 404);
+            return;
+        }
+        ex.getResponseHeaders().set("Content-Type", loaded.contentType());
+        ex.getResponseHeaders().set("Cache-Control", "private, max-age=86400");
+        ex.sendResponseHeaders(200, loaded.bytes().length);
+        ex.getResponseBody().write(loaded.bytes());
+        ex.close();
     }
 }

@@ -143,6 +143,57 @@ Gateway 是 **薄接入层**，不做数仓计算，职责是：
 4. 监控 QPS、429 率、`giso_kafka_spilled_total`（持续增长 = Kafka 故障）  
 5. 部署回滚：镜像标签 `ghcr.io/.../giso-gateway:0.1` 或 `main-<sha>`
 
+### Q7a. 大约 10 万 DAU，单副本 Gateway 够吗？
+
+**性能上够，高可用上仍建议 ≥2 副本。**
+
+DAU 不能直接换算成 QPS。在 SDK **默认攒批**（`batch_size: 20`、`flush_interval_ms: 15000`）且生产 **关闭 `debug`** 的前提下，10 万 DAU 的典型峰值 HTTP 量级如下：
+
+| 估算方式 | 假设 | 峰值 HTTP QPS（约） |
+|----------|------|---------------------|
+| 在线用户 | 峰值 5% 同时在线（5000 人），约每 15s 打 1 次包 | **~330** |
+| 在线用户 | 峰值 10% 同时在线（1 万人） | **~670** |
+| 在线用户 | 峰值 15% 同时在线（1.5 万人） | **~1000** |
+| 日均事件 | 每人每天 150 条事件，集中在 4 小时晚高峰 | 平均 ~10，高峰 **~60–120** |
+
+换算成事件吞吐：1000 req/s × 20 条/批 ≈ **2 万 events/s**（已是偏激进的晚高峰假设）。
+
+**压测参考**（源码仓 `server/gateway/bench/`，每请求 20 条事件的批量 body）：
+
+| 场景 | 并发 | 吞吐 | 说明 |
+|------|------|------|------|
+| file sink | 50–200 | **~6600 req/s** | 测网关 CPU 上限 |
+| Docker + Kafka | 50，3 万请求 | **~7000 req/s**，p99 **15ms** | 更接近生产链路 |
+
+单副本实测约 **3000–7000 req/s**（视 CPU、Kafka、注册表规模而定），相对 10 万 DAU 常见高峰 **~300–1000 req/s** 仍有数倍余量。
+
+**结论**：
+
+| 维度 | 建议 |
+|------|------|
+| **容量** | 10 万 DAU + 正常攒批 → **单副本性能足够** |
+| **高可用** | 发布滚动、节点故障 → 生产仍建议 **≥2 副本**（为 HA，不为 QPS） |
+| **联调** | 多副本时配置 `debug_buffer.backend: redis`，见 Q21h |
+
+**会打破「单副本够用」的情况**：
+
+- 生产长期 `debug: true`（不攒批，QPS 可涨一个数量级）
+- `batch_size` 很小或 `flush_interval_ms` 很短
+- 注册表极大导致校验 CPU 上升
+- Kafka 变慢（看 `giso_kafka_spilled_total` 持续增长）
+
+**10 万 DAU 量级推荐**：Gateway **2 副本**（HA）+ Pod **2C4G** 起步；Kafka 分区 ≥6；监控 QPS、p99、429 率、Kafka lag。持续 **>1500 req/s** 或 p99 **>100ms** 再考虑加副本。
+
+复现压测：
+
+```bash
+cd server/gateway && mvn package -DskipTests
+cd bench && java -jar ../target/giso-gateway.jar --config gateway-bench.yaml
+# 另开终端
+ab -n 30000 -c 50 -p payload-20.json -T application/json \
+  -H "X-App-Key: bench-key" http://127.0.0.1:18123/v1/track
+```
+
 ### Q8. 和「Spring 微服务」比，这套架构的取舍？
 
 | | GISO 单体 Gateway | Spring 微服务 |
@@ -365,6 +416,29 @@ TrackerConfig.builder("video-android-beta", version, endpoint)
 | 用途 | 埋点入库 | 联调页实时看校验结果 |
 
 App **不需要**对 Gateway 建 WebSocket/SSE。
+
+### Q21h. Gateway 多副本时，实时联调看不到 App 上报怎么办？
+
+**原因**：旧版联调缓冲在**各 Pod 进程内存**，App 打到 Pod B、浏览器 SSE 连在 Pod A 时会漏事件。
+
+**解法**（Gateway 新版本）：配置 **`debug_buffer.backend: redis`**，近期事件写入 Redis List + Pub/Sub，各 Pod 订阅后推本地 SSE。与副本数、Ingress 类型无关。
+
+```yaml
+debug_buffer:
+  backend: redis          # 单副本 / 本地可省略，默认 memory
+  redis_url: ""           # 生产用 GISO_DEBUG_REDIS_URL 环境变量注入
+  key_prefix: giso:debug
+  recent_max: 5000
+  ttl_sec: 3600
+```
+
+测试环境 Doppler 示例（复用 `internal-redis`，**db/2**，与 Archery db/0 隔离）：
+
+```
+INFRA_GISO_DEBUG_REDIS_URL=redis://:<password>@internal-redis.business-platform.svc.cluster.local:6379/2
+```
+
+`GET /health` 返回 `debug_buffer: redis` 与 `instance_id`（当前 Pod 名），便于排障。
 
 ### Q21e. 切换管理台空间后，联调事件要不要手动刷新？
 

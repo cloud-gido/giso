@@ -1,15 +1,32 @@
 /* 注册表配置：参数池/页面池/元素池/业务事件 CRUD + 批量操作 + CSV 导入 */
 import { $, $$, esc, toast } from '../util.js';
-import { api } from '../api.js';
+import {
+  POOL_FIELD,
+  renderPoolPicker,
+  renderDomainPicker,
+  renderOwnerPicker,
+  bindEditorPickers,
+  validatePoolRefs,
+  dedupeListFields,
+  saveEditorResume,
+  peekEditorResume,
+  clearEditorResume,
+  readEditorFormState,
+  refreshEditorPickers,
+  updateRefHintsPanel,
+  summarizeHintsToast,
+} from '../registry-picker.js';
 import {
   isSpaceAdmin, isEditor, canEditRegistry, canApprove,
 } from '../session.js';
 
 let registry = { params: [], pages: [], elements: [], events: [] };
 let regMeta = {};
+let pageShotByElement = new Map();
 let registryLoaded = false;
 let registryLoading = null;
 let searchTimer = null;
+let refHintsTimer = null;
 let curKind = 'params';
 const selected = new Set();
 
@@ -19,13 +36,13 @@ const KIND_META = {
     labels: { key: '参数 key', type: '类型', desc: '说明', rule: '取值规则', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
   pages: { id: 'pgid', name: '页面',
     cols: ['pgid', 'screenshot', 'desc', 'domain', 'params', 'elements', 'owner', 'since', 'issue_link', 'status'],
-    labels: { pgid: '页面 pgid', screenshot: '页面截图', desc: '页面说明', domain: '业务域', params: '页面参数', elements: '绑定元素（结构体）', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
+    labels: { pgid: '页面 pgid', screenshot: '预览图', desc: '页面说明', domain: '业务域', params: '页面参数', elements: '绑定元素（结构体）', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
   elements: { id: 'eid', name: '元素',
-    cols: ['eid', 'desc', 'domain', 'params', 'children', 'owner', 'since', 'issue_link', 'status'],
-    labels: { eid: '元素 eid', desc: '说明', domain: '业务域', params: '必携参数', children: '子元素', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
+    cols: ['eid', 'screenshot', 'desc', 'domain', 'params', 'children', 'owner', 'since', 'issue_link', 'status'],
+    labels: { eid: '元素 eid', screenshot: '预览图', desc: '说明', domain: '业务域', params: '必携参数', children: '子元素', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
   events: { id: 'code', name: '业务事件',
-    cols: ['code', 'desc', 'domain', 'source', 'params', 'owner', 'since', 'issue_link', 'status'],
-    labels: { code: '事件 code', desc: '说明', domain: '业务域', source: '事实源', params: '事件参数', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
+    cols: ['code', 'screenshot', 'desc', 'domain', 'source', 'params', 'owner', 'since', 'issue_link', 'status'],
+    labels: { code: '事件 code', screenshot: '预览图', desc: '说明', domain: '业务域', source: '事实源', params: '事件参数', owner: '负责人', since: '起始版本', issue_link: '需求单', status: '状态' } },
 };
 const LIST_COLS = ['params', 'children', 'elements'];
 const TEXTAREA_COLS = ['desc'];
@@ -39,7 +56,16 @@ const BULK_LABELS = {
   publish: '发布', deprecate: '废弃', delete: '删除',
 };
 
+const DEFAULT_COL_WIDTHS = {
+  key: 132, pgid: 128, eid: 128, code: 128,
+  type: 72, screenshot: 96, desc: 200, rule: 180,
+  domain: 88, params: 140, elements: 140, children: 120,
+  source: 96, owner: 100, since: 72, issue_link: 88, status: 80,
+};
+const ACTIONS_COL_WIDTH = 200;
+
 function colKey() { return `reg-cols-${curKind}`; }
+function colWidthsKey() { return `reg-col-widths-${curKind}`; }
 function rowKey(it, meta) { return it[meta.id]; }
 
 function getCols(meta) {
@@ -54,6 +80,70 @@ function getCols(meta) {
 }
 
 function saveCols(cols) { localStorage.setItem(colKey(), JSON.stringify(cols)); }
+
+function defaultColWidth(c) {
+  if (c === 'screenshot') {
+    return (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--reg-shot-w'), 10) || 72) + 24;
+  }
+  return DEFAULT_COL_WIDTHS[c] || 120;
+}
+
+function getColWidths(meta, cols) {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(colWidthsKey()) || '{}'); } catch { /* ignore */ }
+  const out = {};
+  cols.forEach((c) => { out[c] = Math.max(48, saved[c] || defaultColWidth(c)); });
+  return out;
+}
+
+function saveColWidths(widths) {
+  localStorage.setItem(colWidthsKey(), JSON.stringify(widths));
+}
+
+function colWidthStyle(w) {
+  return `width:${w}px;min-width:${w}px;max-width:${w}px`;
+}
+
+function applyColWidth(table, col, w) {
+  table.querySelectorAll(`[data-col="${col}"]`).forEach((el) => {
+    el.style.width = `${w}px`;
+    el.style.minWidth = `${w}px`;
+    el.style.maxWidth = `${w}px`;
+  });
+}
+
+function rebuildPageShotIndex() {
+  pageShotByElement = new Map();
+  for (const p of registry.pages || []) {
+    const shot = p.screenshot;
+    if (!shot) continue;
+    const els = Array.isArray(p.elements) ? p.elements : [];
+    for (const eid of els) {
+      if (eid && !pageShotByElement.has(eid)) pageShotByElement.set(eid, shot);
+    }
+  }
+}
+
+function previewUrl(it, meta) {
+  if (it.screenshot) return String(it.screenshot);
+  if (curKind === 'elements') {
+    const inherited = pageShotByElement.get(it[meta.id]);
+    if (inherited) return inherited;
+  }
+  return null;
+}
+
+function renderPreviewCell(it, meta) {
+  const url = previewUrl(it, meta);
+  if (!url) return '<span class="muted">—</span>';
+  const src = esc(url);
+  const inherited = !it.screenshot && curKind === 'elements';
+  const tip = inherited ? '继承自所属页面截图' : '点击查看大图';
+  return `<a href="${src}" target="_blank" class="shot-link" title="${tip}">
+    <img class="shot-thumb" src="${src}" alt="" loading="lazy"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">
+    <span class="shot-fallback" style="display:none">图</span></a>`;
+}
 
 function filteredRows() {
   const meta = KIND_META[curKind];
@@ -91,14 +181,7 @@ function updateBulkBar() {
 
 function cell(it, c, meta) {
   const v = it[c];
-  if (c === 'screenshot') {
-    if (!v) return '<span class="muted">—</span>';
-    const src = esc(String(v));
-    return `<a href="${src}" target="_blank" class="shot-link" title="查看截图">
-      <img class="shot-thumb" src="${src}" alt="" loading="lazy"
-           onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">
-      <span class="shot-fallback" style="display:none">${src}</span></a>`;
-  }
+  if (c === 'screenshot') return renderPreviewCell(it, meta);
   if (c === 'status') {
     const s = v || 'live';
     return `<span class="status-pill ${esc(s)}">${STATUS_LABEL[s] || esc(s)}</span>`;
@@ -111,7 +194,7 @@ function cell(it, c, meta) {
     return v.map((x) => `<span class="pill">${esc(x)}</span>`).join('') || '<span class="muted">—</span>';
   }
   if (c === meta.id) return `<span class="key">${esc(v)}</span>`;
-  if (c === 'desc' && curKind === 'pages') {
+  if (c === 'desc' && (curKind === 'pages' || curKind === 'elements')) {
     return `<span class="desc-cell" title="${esc(v)}">${esc(v)}</span>`;
   }
   return esc(v);
@@ -121,13 +204,16 @@ function bindColDrag(table, meta) {
   const ths = table.querySelectorAll('th[data-col]');
   let dragCol = null;
   ths.forEach((th) => {
-    th.draggable = true;
-    th.addEventListener('dragstart', (e) => {
+    const grip = th.querySelector('.th-grip');
+    if (!grip) return;
+    grip.draggable = true;
+    grip.addEventListener('dragstart', (e) => {
       dragCol = th.dataset.col;
       th.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
+      e.stopPropagation();
     });
-    th.addEventListener('dragend', () => th.classList.remove('dragging'));
+    grip.addEventListener('dragend', () => th.classList.remove('dragging'));
     th.addEventListener('dragover', (e) => { e.preventDefault(); th.classList.add('drag-over'); });
     th.addEventListener('dragleave', () => th.classList.remove('drag-over'));
     th.addEventListener('drop', (e) => {
@@ -148,6 +234,36 @@ function bindColDrag(table, meta) {
   });
 }
 
+function bindColResize(table, cols, widths) {
+  table.querySelectorAll('th[data-col]').forEach((th) => {
+    const col = th.dataset.col;
+    const handle = document.createElement('span');
+    handle.className = 'col-resize-handle';
+    handle.title = '拖拽调整列宽';
+    th.appendChild(handle);
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startW = th.offsetWidth;
+      const onMove = (ev) => {
+        const w = Math.max(48, Math.min(640, startW + ev.clientX - startX));
+        widths[col] = w;
+        applyColWidth(table, col, w);
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.classList.remove('col-resizing');
+        saveColWidths(widths);
+      };
+      document.body.classList.add('col-resizing');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+}
+
 function canModifyRow(it) {
   if (!canEditRegistry()) return false;
   if (isSpaceAdmin()) return true;
@@ -164,6 +280,7 @@ async function fetchRegistry(force = false) {
   ]).then(([meta, data]) => {
     regMeta = meta || {};
     registry = data || { params: [], pages: [], elements: [], events: [] };
+    rebuildPageShotIndex();
     registryLoaded = true;
     registryLoading = null;
   }).catch((e) => {
@@ -180,23 +297,24 @@ function renderTable() {
   }
   const meta = KIND_META[curKind];
   const cols = getCols(meta);
+  const widths = getColWidths(meta, cols);
   const rows = filteredRows();
   const showCheck = canEditRegistry() || canApprove();
+  const w = (c) => colWidthStyle(widths[c]);
   $('#reg-count').textContent = `${rows.length} 条`;
-  $('#reg-table').innerHTML = `<div class="col-hint">拖拽表头可调整列顺序 · 勾选多行可批量操作 · <button type="button" class="link-btn" id="btn-reset-cols">恢复默认</button></div>
-    <table>
+  $('#reg-table').innerHTML = `<table>
     <thead><tr>
-      ${showCheck ? '<th class="reg-th-check"><input type="checkbox" id="reg-head-check" title="全选本页"></th>' : ''}
+      ${showCheck ? `<th class="reg-th-check" style="${colWidthStyle(36)}"><input type="checkbox" id="reg-head-check" title="全选本页"></th>` : ''}
       ${cols.map((c) =>
-      `<th data-col="${c}" title="拖拽调整列顺序"><span class="th-grip">⠿</span>${meta.labels[c]}</th>`).join('')}
-      <th class="th-fixed">操作</th></tr></thead>
+      `<th data-col="${c}" style="${w(c)}" title="拖拽 ⠿ 调整顺序，拖拽右边缘调整列宽"><span class="th-grip" draggable="true">⠿</span><span class="th-label">${meta.labels[c]}</span></th>`).join('')}
+      <th class="th-fixed" style="${colWidthStyle(ACTIONS_COL_WIDTH)}">操作</th></tr></thead>
     <tbody>${rows.map((it) => {
       const key = rowKey(it, meta);
       const checked = selected.has(key);
       return `<tr data-key="${esc(key)}" class="${checked ? 'row-selected' : ''}">
-      ${showCheck ? `<td class="reg-td-check"><input type="checkbox" class="reg-row-check" data-key="${esc(key)}" ${checked ? 'checked' : ''}></td>` : ''}
-      ${cols.map((c) => `<td data-col="${c}">${cell(it, c, meta)}</td>`).join('')}
-      <td class="row-actions">
+      ${showCheck ? `<td class="reg-td-check" style="${colWidthStyle(36)}"><input type="checkbox" class="reg-row-check" data-key="${esc(key)}" ${checked ? 'checked' : ''}></td>` : ''}
+      ${cols.map((c) => `<td data-col="${c}" style="${w(c)}">${cell(it, c, meta)}</td>`).join('')}
+      <td class="row-actions" style="${colWidthStyle(ACTIONS_COL_WIDTH)}">
         ${canModifyRow(it) ? `<button data-act="edit" data-key="${esc(key)}">编辑</button>` : ''}
         ${actionBtns(it, meta)}
         <button data-act="audit" data-key="${esc(key)}">审计</button>
@@ -239,18 +357,16 @@ function renderTable() {
     renderTable();
   });
 
-  $('#btn-reset-cols')?.addEventListener('click', () => {
-    localStorage.removeItem(colKey());
-    renderTable();
-    toast('已恢复默认列顺序');
-  });
-  bindColDrag($('#reg-table').querySelector('table'), meta);
+  const table = $('#reg-table').querySelector('table');
+  bindColDrag(table, meta);
+  bindColResize(table, cols, widths);
   updateBulkBar();
 }
 
 export async function renderRegistry(force = false) {
   await fetchRegistry(force);
   renderTable();
+  updateResumeBar();
 }
 
 export function invalidateRegistryCache() {
@@ -365,30 +481,84 @@ function editorField(c, meta, item, key) {
       .map((t) => `<option value="${t}" ${t === (v || '') ? 'selected' : ''}>${t ? `${t} · ${STATUS_LABEL[t]}` : '（缺省 = live 线上）'}</option>`).join('')}</select>`);
   }
   if (c === 'screenshot') {
+    const inherited = key && curKind === 'elements' && !val && pageShotByElement.get(item[meta.id]);
+    const hint = inherited
+      ? `<span class="hint-inline">未填时列表展示所属页面截图（${esc(inherited)}）</span>`
+      : '';
     return field(meta.labels[c], `
-      <input name="screenshot" value="${esc(val)}" placeholder="截图 URL，如 /admin/screenshots/home.png 或 CDN 地址">
-      <div class="shot-preview" id="shot-preview">${val ? `<img src="${esc(val)}" alt="">` : '<span class="muted">填写 URL 后预览</span>'}</div>`);
+      <div class="shot-upload-row">
+        <input name="screenshot" value="${esc(val)}" placeholder="截图 URL，或点击下方本地上传">
+        <label class="btn ghost shot-pick">本地上传<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden class="shot-file"></label>
+      </div>
+      <div class="shot-preview" id="shot-preview">${val ? `<img src="${esc(val)}" alt="">` : '<span class="muted">填写 URL 或上传后预览</span>'}</div>${hint}`);
   }
-  if (TEXTAREA_COLS.includes(c) && curKind === 'pages') {
+  if (TEXTAREA_COLS.includes(c) && (curKind === 'pages' || curKind === 'elements')) {
     return field(meta.labels[c], `<textarea name="${c}" rows="3" placeholder="页面用途、入口、关键交互说明…">${esc(val)}</textarea>`);
+  }
+  if (c === 'domain' && (curKind === 'pages' || curKind === 'elements' || curKind === 'events')) {
+    return field(meta.labels[c], renderDomainPicker(val, registry));
+  }
+  if (POOL_FIELD[c]) {
+    return field(meta.labels[c], renderPoolPicker(c, item[c], registry, meta.labels[c]));
+  }
+  if (c === 'owner') {
+    return field(meta.labels[c], renderOwnerPicker(val, registry));
   }
   const ph = LIST_COLS.includes(c) ? '逗号分隔，如: vid, pos' : '';
   const ro = c === meta.id && key ? 'readonly' : '';
   return field(meta.labels[c], `<input name="${c}" value="${esc(val)}" placeholder="${ph}" ${ro}>`);
 }
 
-function openEditor(key) {
+function scheduleRefHints(meta) {
+  clearTimeout(refHintsTimer);
+  refHintsTimer = setTimeout(() => loadRefHints(meta), 280);
+}
+
+async function loadRefHints(meta) {
+  try {
+    const item = readEditorFormState(meta, LIST_COLS);
+    const hints = await api('/registry/ref-hints', {
+      method: 'POST',
+      body: JSON.stringify({ kind: curKind, item }),
+    });
+    if (item[meta.id]) hints._pgid = item[meta.id];
+    updateRefHintsPanel(hints, curKind, registry);
+  } catch {
+    document.getElementById('editor-ref-hints')?.setAttribute('hidden', '');
+  }
+}
+
+function openEditor(key, draftOverride) {
   const meta = KIND_META[curKind];
-  const item = key ? registry[curKind].find((it) => it[meta.id] === key) : {};
-  $('#editor-title').textContent = `${key ? '编辑' : '新增'} · ${meta.name}`;
-  $('#editor-fields').innerHTML = meta.cols.map((c) => editorField(c, meta, item, key)).join('');
+  const item = draftOverride || (key ? registry[curKind].find((it) => it[meta.id] === key) : {});
+  const editingKey = key || draftOverride?.[meta.id] || null;
+  $('#editor-title').textContent = `${editingKey ? '编辑' : '新增'} · ${meta.name}`;
+  $('#editor-fields').innerHTML = meta.cols.map((c) => editorField(c, meta, item, editingKey)).join('');
+  bindEditorPickers($('#editor-fields'), registry);
+  scheduleRefHints(meta);
   const shotInput = $('#editor-fields').querySelector('input[name="screenshot"]');
   if (shotInput) {
-    shotInput.addEventListener('input', () => {
+    const preview = () => {
       const url = shotInput.value.trim();
       $('#shot-preview').innerHTML = url
         ? `<img src="${esc(url)}" alt="" onerror="this.outerHTML='<span class=muted>无法加载预览</span>'">`
-        : '<span class="muted">填写 URL 后预览</span>';
+        : '<span class="muted">填写 URL 或上传后预览</span>';
+    };
+    shotInput.addEventListener('input', preview);
+    const fileInput = $('#editor-fields').querySelector('.shot-file');
+    fileInput?.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      fileInput.value = '';
+      if (!file) return;
+      try {
+        toast('上传中…');
+        const url = await uploadScreenshot(file);
+        shotInput.value = url;
+        preview();
+        toast('上传成功');
+      } catch (e) {
+        toast(e.message || '上传失败', 'error');
+      }
     });
   }
   $('#editor').showModal();
@@ -403,14 +573,56 @@ function openEditor(key) {
         if (arr.length || c === 'params') out[c] = arr;
       } else if (v) out[c] = v;
     });
+    dedupeListFields(out);
+    const { errors, warn } = validatePoolRefs(out, registry);
+    if (errors.length) {
+      toast(errors.join('；') + '。可点击「去参数池/元素池配置」登记后再选。', 'error');
+      e.preventDefault();
+      return;
+    }
+    if (warn.length) toast(warn.join('；'), 'warn');
     const r = await api('/registry/' + curKind, { method: 'POST', body: JSON.stringify(out) });
     if (r.error) { toast(r.error, 'error'); e.preventDefault(); }
     else {
-      toast(isEditor() ? '已提交待审批' : '已保存');
+      clearEditorResume();
+      updateResumeBar();
+      const hintMsg = summarizeHintsToast(r.hints);
+      toast(hintMsg
+        ? `${isEditor() ? '已提交待审批' : '已保存'}。${hintMsg}`
+        : (isEditor() ? '已提交待审批' : '已保存'));
+      if (r.hints) updateRefHintsPanel(r.hints, curKind, registry);
       renderRegistry(true);
       if (isEditor()) document.dispatchEvent(new CustomEvent('giso:pending-changed'));
     }
   };
+}
+
+function updateResumeBar() {
+  const bar = $('#editor-resume-bar');
+  const resume = peekEditorResume();
+  if (!bar) return;
+  if (!resume) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  const msg = $('#editor-resume-msg');
+  if (msg) {
+    msg.textContent = `正在为「${resume.label || resume.editorKey || '条目'}」配置${resume.gotoKind === 'params' ? '参数' : '元素'} · 完成后返回继续编辑`;
+  }
+}
+
+async function resumeEditor() {
+  const resume = peekEditorResume();
+  if (!resume) return;
+  await fetchRegistry(true);
+  curKind = resume.editorKind || 'pages';
+  $$('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.kind === curKind));
+  renderTable();
+  openEditor(resume.editorKey, resume.draft);
+  refreshEditorPickers($('#editor-fields'), registry);
+  scheduleRefHints(KIND_META[curKind]);
+  toast('已恢复编辑草稿，请核对引用后保存');
 }
 
 async function downloadTemplate() {
@@ -466,6 +678,36 @@ async function runImport() {
 }
 
 export function initRegistry() {
+  $('#editor-fields')?.addEventListener('pool-goto', (e) => {
+    const poolKind = e.detail?.poolKind;
+    if (!poolKind) return;
+    const meta = KIND_META[curKind];
+    const draft = readEditorFormState(meta, LIST_COLS);
+    const idVal = draft[meta.id] || '';
+    if (!idVal && !confirm('尚未填写主键 ID，跳转后草稿可能不完整，继续？')) return;
+    saveEditorResume({
+      editorKind: curKind,
+      editorKey: idVal || null,
+      draft,
+      gotoKind: poolKind,
+      label: `${meta.name}${idVal ? ` · ${idVal}` : ''}`,
+    });
+    $('#editor').close();
+    curKind = poolKind;
+    $$('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.kind === poolKind));
+    renderTable();
+    updateResumeBar();
+    const poolLabel = poolKind === 'params' ? '参数池' : (poolKind === 'elements' ? '元素池' : poolKind);
+    toast(`已切换到${poolLabel}，配置完成后点顶部「返回继续编辑」`);
+  });
+  $('#editor-fields')?.addEventListener('pool-changed', () => {
+    scheduleRefHints(KIND_META[curKind]);
+  });
+  $('#editor-fields')?.addEventListener('input', (e) => {
+    if (e.target.matches('[name="domain"], .owner-input, .domain-input')) {
+      scheduleRefHints(KIND_META[curKind]);
+    }
+  });
   $$('.seg-btn').forEach((btn) => {
     btn.onclick = () => {
       curKind = btn.dataset.kind;
@@ -506,5 +748,16 @@ export function initRegistry() {
   $('#reg-bulk-delete')?.addEventListener('click', () => runBatch('delete'));
   $('#btn-visual-picker')?.addEventListener('click', () => {
     document.dispatchEvent(new CustomEvent('giso:navigate', { detail: { view: 'visual' } }));
+  });
+  $('#btn-reset-cols')?.addEventListener('click', () => {
+    localStorage.removeItem(colKey());
+    localStorage.removeItem(colWidthsKey());
+    renderTable();
+    toast('已恢复默认列顺序与列宽');
+  });
+  $('#editor-resume-btn')?.addEventListener('click', () => resumeEditor());
+  $('#editor-resume-dismiss')?.addEventListener('click', () => {
+    clearEditorResume();
+    updateResumeBar();
   });
 }

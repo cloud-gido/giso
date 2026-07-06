@@ -141,6 +141,9 @@ services:
       GISO_DB_NAME: giso
       GISO_DB_USER: giso_app
       GISO_DB_PASSWORD: giso_local
+      # 多副本联调：docker compose --profile redis up -d 后取消下面两行注释
+      # GISO_DEBUG_BUFFER_BACKEND: redis
+      # GISO_DEBUG_REDIS_URL: redis://redis:6379/2
     volumes:
       - gateway-data:/data
       - ../schema:/app/schema:ro
@@ -158,6 +161,20 @@ services:
       timeout: 5s
       retries: 6
       start_period: 40s
+    restart: unless-stopped
+
+  redis:
+    profiles: [redis]
+    image: redis:7.0-alpine
+    container_name: qy-redis
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   prometheus:

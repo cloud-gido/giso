@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GISO 玑源 · 管理控制台</title>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/base.css?v=2">
-<link rel="stylesheet" href="css/layout.css?v=2">
-<link rel="stylesheet" href="css/views.css?v=2">
-<link rel="stylesheet" href="css/brand.css?v=2">
+<link rel="stylesheet" href="css/base.css?v=8">
+<link rel="stylesheet" href="css/layout.css?v=8">
+<link rel="stylesheet" href="css/views.css?v=8">
+<link rel="stylesheet" href="css/brand.css?v=8">
 </head>
 <body>
 
@@ -137,11 +137,11 @@
           <button type="button" class="user-menu-item user-menu-item--danger" id="btn-logout" hidden data-i18n="top.logout">退出登录</button>
         </div>
       </div>
-      <button type="button" class="top-icon-btn" id="btn-locale" title="Switch language" data-i18n="locale">English</button>
     </div>
   </header>
 
-  <div class="main-body">
+  <div class="main-body" id="main-body">
+  <div class="page-content" id="page-content">
   <!-- 实时联调 -->
   <section id="view-debug" class="view active">
     <div class="stat-row">
@@ -210,37 +210,60 @@ biz_event code=video_play_start</textarea>
   </section>
 
   <!-- 注册表 -->
-  <section id="view-registry" class="view">
-    <div class="card">
-      <div class="toolbar">
-        <div class="seg" id="reg-kinds">
-          <button class="seg-btn active" data-kind="params">参数池</button>
-          <button class="seg-btn" data-kind="pages">页面池</button>
-          <button class="seg-btn" data-kind="elements">元素池</button>
-          <button class="seg-btn" data-kind="events">业务事件</button>
+  <section id="view-registry" class="view registry-density-normal">
+    <div class="card registry-shell">
+      <div class="registry-sticky">
+        <div class="editor-resume-bar" id="editor-resume-bar" hidden>
+          <span class="editor-resume-msg" id="editor-resume-msg"></span>
+          <button type="button" class="primary" id="editor-resume-btn" data-i18n="reg.resumeEdit">返回继续编辑</button>
+          <button type="button" class="ghost" id="editor-resume-dismiss" data-i18n="reg.resumeDismiss">取消</button>
         </div>
-        <input id="reg-search" placeholder="搜索条目…">
-        <span class="muted" id="reg-count"></span>
-        <span class="muted" id="reg-meta"></span>
-        <span class="spacer"></span>
-        <button type="button" id="btn-reg-template" class="ghost nav-admin-only">下载导入模板</button>
-        <button type="button" id="btn-reg-import" class="ghost nav-admin-only">批量导入</button>
-        <button type="button" id="btn-visual-picker" class="ghost nav-admin-only" data-i18n="nav.visual">可视化圈选</button>
-        <button id="btn-add" class="primary">＋ 新增</button>
+        <div class="registry-head">
+          <div class="registry-tabs seg" id="reg-kinds">
+            <button class="seg-btn active" data-kind="params">参数池</button>
+            <button class="seg-btn" data-kind="pages">页面池</button>
+            <button class="seg-btn" data-kind="elements">元素池</button>
+            <button class="seg-btn" data-kind="events">业务事件</button>
+          </div>
+          <div class="registry-actions">
+            <input id="reg-search" placeholder="搜索条目…" type="search">
+            <span class="registry-meta muted" id="reg-count"></span>
+            <span class="registry-meta muted" id="reg-meta"></span>
+            <div class="density-ctrl" id="reg-density" title="表格显示密度（⌘/Ctrl + +/−）">
+              <span class="density-label" data-i18n="reg.density">密度</span>
+              <button type="button" class="density-btn" data-density="compact" data-i18n="reg.densityCompact">紧凑</button>
+              <button type="button" class="density-btn active" data-density="normal" data-i18n="reg.densityNormal">标准</button>
+              <button type="button" class="density-btn" data-density="comfort" data-i18n="reg.densityComfort">宽松</button>
+            </div>
+            <span class="spacer"></span>
+            <button type="button" id="btn-reg-template" class="ghost nav-admin-only">下载导入模板</button>
+            <button type="button" id="btn-reg-import" class="ghost nav-admin-only">批量导入</button>
+            <button type="button" id="btn-visual-picker" class="ghost nav-admin-only" data-i18n="nav.visual">可视化圈选</button>
+            <button type="button" id="btn-add" class="primary">＋ 新增</button>
+          </div>
+        </div>
+        <div class="reg-bulk-bar" id="reg-bulk-bar" hidden>
+          <label class="reg-bulk-check"><input type="checkbox" id="reg-select-all"> 全选本页</label>
+          <span class="reg-bulk-count" id="reg-bulk-count">已选 0 条</span>
+          <span class="spacer"></span>
+          <button type="button" class="ghost" id="reg-bulk-clear">取消选择</button>
+          <button type="button" class="primary" id="reg-bulk-submit" hidden>批量提交审批</button>
+          <button type="button" class="primary" id="reg-bulk-approve" hidden>批量批准</button>
+          <button type="button" id="reg-bulk-reject" hidden>批量驳回</button>
+          <button type="button" class="primary" id="reg-bulk-publish" hidden>批量发布</button>
+          <button type="button" id="reg-bulk-deprecate" hidden>批量废弃</button>
+          <button type="button" class="danger" id="reg-bulk-delete" hidden>批量删除</button>
+        </div>
+        <div class="registry-table-bar">
+          <p class="col-hint">
+            <span data-i18n="reg.tableHint">拖拽列右边缘调整列宽 · 拖拽 ⠿ 调整列顺序 · 勾选多行可批量操作</span>
+            · <button type="button" class="link-btn" id="btn-reset-cols" data-i18n="reg.resetCols">恢复默认</button>
+          </p>
+        </div>
       </div>
-      <div class="reg-bulk-bar" id="reg-bulk-bar" hidden>
-        <label class="reg-bulk-check"><input type="checkbox" id="reg-select-all"> 全选本页</label>
-        <span class="reg-bulk-count" id="reg-bulk-count">已选 0 条</span>
-        <span class="spacer"></span>
-        <button type="button" class="ghost" id="reg-bulk-clear">取消选择</button>
-        <button type="button" class="primary" id="reg-bulk-submit" hidden>批量提交审批</button>
-        <button type="button" class="primary" id="reg-bulk-approve" hidden>批量批准</button>
-        <button type="button" id="reg-bulk-reject" hidden>批量驳回</button>
-        <button type="button" class="primary" id="reg-bulk-publish" hidden>批量发布</button>
-        <button type="button" id="reg-bulk-deprecate" hidden>批量废弃</button>
-        <button type="button" class="danger" id="reg-bulk-delete" hidden>批量删除</button>
+      <div class="registry-scroll">
+        <div id="reg-table" class="table-wrap"></div>
       </div>
-      <div id="reg-table" class="table-wrap"></div>
     </div>
   </section>
 
@@ -250,6 +273,7 @@ biz_event code=video_play_start</textarea>
       <div class="toolbar vp-toolbar">
         <input id="vp-pgid" data-i18n-placeholder="vp.pgidPh" pattern="[a-z][a-z0-9_]{0,31}">
         <input id="vp-screenshot" data-i18n-placeholder="vp.screenshotPh" style="flex:1;min-width:200px">
+        <label class="btn ghost shot-pick" id="vp-upload-label">本地上传<input type="file" id="vp-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>
         <button type="button" id="vp-load-img" data-i18n="vp.load">加载截图</button>
         <button type="button" id="vp-reset" class="ghost" data-i18n="vp.reset">清空框选</button>
         <button type="button" id="vp-submit" class="primary" data-i18n="vp.save">保存草稿</button>
@@ -288,6 +312,19 @@ biz_event code=video_play_start</textarea>
   <section id="view-settings" class="view">
     <p id="settings-readonly-note" class="hint" hidden>当前为 yaml 模式，设置只读；生产请使用 PostgreSQL + 平台管理员账号。</p>
     <form id="settings-form">
+      <div class="card">
+        <div class="card-title" data-i18n="settings.prefsTitle">界面偏好</div>
+        <div class="settings-grid">
+          <label>
+            <span data-i18n="settings.language">界面语言</span>
+            <select id="set-locale">
+              <option value="zh">简体中文</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint muted" data-i18n="settings.displayHint">注册表可在页面内调整表格密度；整页缩放请使用浏览器 ⌘/Ctrl + +/−。</p>
+      </div>
       <div class="card">
         <div class="card-title" data-i18n="settings.assistantTitle">接入助手（LLM）</div>
         <div class="settings-grid">
@@ -382,8 +419,9 @@ biz_event code=video_play_start</textarea>
       <div id="users-table" class="table-wrap"></div>
     </div>
   </section>
-  </div>
-</div>
+  </div><!-- .page-content -->
+  </div><!-- .main-body -->
+</div><!-- .main -->
 
 <div id="space-transition" class="space-transition" hidden aria-hidden="true">
   <div class="space-transition-card">
@@ -423,6 +461,10 @@ biz_event code=video_play_start</textarea>
   <form method="dialog" id="editor-form">
     <h3 id="editor-title">编辑</h3>
     <div id="editor-fields"></div>
+    <div class="ref-hints-panel" id="editor-ref-hints" hidden>
+      <div class="ref-hints-title" data-i18n="reg.refGovernance">引用治理</div>
+      <ul class="ref-hints-list" id="editor-ref-hints-list"></ul>
+    </div>
     <div class="dialog-actions">
       <button value="cancel" class="ghost">取消</button>
       <button value="ok" class="primary" id="editor-save">保存</button>
@@ -460,6 +502,6 @@ biz_event code=video_play_start</textarea>
 
 <div id="toasts"></div>
 
-<script type="module" src="js/main.js?v=2"></script>
+<script type="module" src="js/main.js?v=8"></script>
 </body>
 </html>

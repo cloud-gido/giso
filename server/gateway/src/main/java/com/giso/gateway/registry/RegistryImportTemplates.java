@@ -10,8 +10,8 @@ public final class RegistryImportTemplates {
     private static final Map<String, List<String>> COLUMNS = Map.of(
             "params", List.of("key", "type", "desc", "rule", "owner", "since", "issue_link", "status"),
             "pages", List.of("pgid", "screenshot", "desc", "domain", "params", "elements", "owner", "since", "issue_link", "status"),
-            "elements", List.of("eid", "desc", "domain", "params", "children", "owner", "since", "issue_link", "status"),
-            "events", List.of("code", "desc", "domain", "source", "params", "owner", "since", "issue_link", "status"));
+            "elements", List.of("eid", "screenshot", "desc", "domain", "params", "children", "owner", "since", "issue_link", "status"),
+            "events", List.of("code", "screenshot", "desc", "domain", "source", "params", "owner", "since", "issue_link", "status"));
 
     private static final List<String> LIST_FIELDS = List.of("params", "elements", "children");
 

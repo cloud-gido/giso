@@ -1,6 +1,6 @@
 /* 可视化圈选 v2：在页面截图上框选元素，生成 registry draft */
 import { $, $$, esc, toast } from '../util.js';
-import { api } from '../api.js';
+import { api, uploadScreenshot } from '../api.js';
 import { canEditRegistry } from '../session.js';
 import { t, applyI18n } from '../i18n.js';
 
@@ -170,6 +170,25 @@ function importViewTree() {
 }
 
 export function initVisualPicker() {
+  $('#vp-file')?.addEventListener('change', async () => {
+    const input = $('#vp-file');
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    if (!canEditRegistry()) return toast('无权上传');
+    try {
+      toast('上传中…');
+      const url = await uploadScreenshot(file);
+      $('#vp-screenshot').value = url;
+      const img = $('#vp-image');
+      img.onload = drawImage;
+      img.hidden = false;
+      img.src = url;
+      toast('上传成功');
+    } catch (e) {
+      toast(e.message || '上传失败');
+    }
+  });
   $('#vp-load-img')?.addEventListener('click', () => {
     const url = $('#vp-screenshot')?.value?.trim();
     if (!url) return toast(t('vp.needScreenshot'));

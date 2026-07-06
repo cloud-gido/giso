@@ -1,0 +1,14 @@
+port: 18123
+schema_dir: ../../../schema
+sinks: [file]
+file:
+  dir: ./bench/data
+auth:
+  app_keys: [bench-key]
+limits:
+  rate_limit_rps: 0
+admin:
+  recent_buffer: 2000
+sdk_config:
+  batch_size: 20
+  flush_interval_ms: 15000

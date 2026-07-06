@@ -123,6 +123,24 @@ limits:
   - `giso_gateway_uptime_seconds`
 - **优雅停机**：SIGTERM 后停收新请求 → 最多等 3s 在途请求处理完 → flush 并关闭 sink（Kafka 缓冲不丢），适配 k8s/systemd 滚动重启
 
+### 容量与压测
+
+10 万 DAU + 默认攒批下，单副本 Gateway **性能足够**；生产 **≥2 副本** 主要为高可用。多副本联调需 **Redis 共享缓冲**，见 [08-FAQ Q21h](../../docs/tracking/08-接入常见问题FAQ.md)。
+
+```bash
+mvn package -DskipTests
+cd bench && java -jar ../target/giso-gateway.jar --config gateway-bench.yaml
+```
+
+### 联调缓冲（debug_buffer）
+
+| 模式 | 配置 | 场景 |
+|------|------|------|
+| `memory` | 默认 | 本地 / 单副本 |
+| `redis` | `GISO_DEBUG_BUFFER_BACKEND=redis` + `GISO_DEBUG_REDIS_URL` | 多副本，联调/SSE/断言跨 Pod 一致 |
+
+`GET /health` → `debug_buffer`、`instance_id`。
+
 ## 构建与运行
 
 ```bash

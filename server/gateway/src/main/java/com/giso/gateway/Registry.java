@@ -7,6 +7,7 @@ import com.giso.gateway.auth.AdminPermissions;
 import com.giso.gateway.auth.AdminUser;
 import com.giso.gateway.registry.PostgresRegistryStore;
 import com.giso.gateway.registry.RegistryKinds;
+import com.giso.gateway.registry.RegistryRefs;
 import com.giso.gateway.registry.RegistrySnapshot;
 import com.giso.gateway.registry.RegistryStore;
 import com.giso.gateway.registry.RegistryStores;
@@ -97,6 +98,7 @@ public final class Registry {
         String key = String.valueOf(item.get(idField));
         Map<String, Object> existing = tablesFor(spaceKey).get(kind).get(key);
         item = new LinkedHashMap<>(item);
+        RegistryRefs.normalizeLists(item);
 
         if (AdminUser.ROLE_EDITOR.equals(spaceRole)) {
             if (existing != null) {
@@ -314,39 +316,13 @@ public final class Registry {
     }
 
     private String validateUpsert(String spaceKey, String kind, Map<String, Object> item) {
-        var tables = tablesFor(spaceKey);
-        String idField = RegistryKinds.idField(kind);
-        String key = String.valueOf(item.get(idField));
-        if (key == null || key.equals("null") || !SNAKE.matcher(key).matches()) {
-            return "命名违规（小写 snake_case，≤32 字符）: " + key;
-        }
-        if (kind.equals("params") && !java.util.Set.of("string", "int", "float", "bool", "object")
-                .contains(String.valueOf(item.get("type")))) {
-            return "参数类型非法: " + item.get("type");
-        }
-        if (!kind.equals("params")) {
-            Object ps = item.get("params");
-            if (ps instanceof List<?> list) {
-                for (Object p : list) {
-                    if (!tables.get("params").containsKey(String.valueOf(p))) {
-                        return "引用了未登记参数: " + p + "（请先在参数池登记）";
-                    }
-                }
-            }
-        }
-        if (kind.equals("pages") && item.get("elements") instanceof List<?> els) {
-            for (Object e : els) {
-                if (!tables.get("elements").containsKey(String.valueOf(e))) {
-                    return "elements 绑定引用未登记元素: " + e + "（请先在元素池登记）";
-                }
-            }
-        }
-        Object st = item.get("status");
-        if (st != null && !java.util.Set.of("draft", "dev", "testing", "pending", "live", "deprecated")
-                .contains(String.valueOf(st))) {
-            return "status 非法: " + st + "（draft/dev/testing/pending/live/deprecated）";
-        }
-        return null;
+        return RegistryRefs.validate(tablesFor(spaceKey), kind, item);
+    }
+
+    public synchronized Map<String, Object> refHints(String spaceKey, String kind, Map<String, Object> item) {
+        Map<String, Object> draft = item == null ? Map.of() : new LinkedHashMap<>(item);
+        RegistryRefs.normalizeLists(draft);
+        return RegistryRefs.hints(tablesFor(spaceKey), kind, draft);
     }
 
     // ── 事件校验 ───────────────────────────────────────────────

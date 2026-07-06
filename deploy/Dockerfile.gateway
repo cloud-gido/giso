@@ -27,9 +27,13 @@ RUN cd /src/server/gateway && \
 FROM ${JRE_IMAGE}
 WORKDIR /app
 
-RUN addgroup -S giso && adduser -S giso -G giso \
-    && mkdir -p /app/config /app/schema /data/events /data/spill \
+RUN apk add --no-cache su-exec \
+    && addgroup -S giso && adduser -S giso -G giso \
+    && mkdir -p /app/config /app/schema /data/events /data/spill /data/screenshots \
     && chown -R giso:giso /app /data
+
+COPY deploy/gateway-entrypoint.sh /gateway-entrypoint.sh
+RUN chmod +x /gateway-entrypoint.sh
 
 COPY --from=build /src/server/gateway/target/giso-gateway.jar /app/gateway.jar
 COPY --from=build /src/schema /app/schema
@@ -39,10 +43,9 @@ ENV GISO_GATEWAY_CONFIG=/app/config/gateway.yaml
 ENV GISO_SCHEMA_DIR=/app/schema
 
 EXPOSE 8123
-USER giso
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -q -O- http://127.0.0.1:8123/health || exit 1
 
-ENTRYPOINT ["java", "-jar", "/app/gateway.jar"]
+ENTRYPOINT ["/gateway-entrypoint.sh"]
 CMD ["--config", "/app/config/gateway.yaml", "--schema", "/app/schema"]

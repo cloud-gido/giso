@@ -7,6 +7,7 @@ import com.giso.gateway.registry.RegistryWatcher;
 import com.giso.gateway.settings.PostgresSystemSettingsStore;
 import com.giso.gateway.settings.SystemSettingsService;
 import com.giso.gateway.settings.SystemSettingsStore;
+import com.giso.gateway.debug.DebugBuffers;
 import com.giso.gateway.sink.EventSink;
 import com.giso.gateway.sink.SinkRegistry;
 import com.giso.gateway.space.SpaceService;
@@ -50,14 +51,16 @@ public final class Main {
                 ? new PostgresSystemSettingsStore(pgStore.dataSource(), config.dbSchema) : null;
         SystemSettingsService systemSettings = SystemSettingsService.create(config, settingsStore, sinkRegistry);
 
-        EventStore store = new EventStore(sinkRegistry, config.adminRecentBuffer);
         SseHub sse = new SseHub();
+        DebugBuffers.Handle debugBuffers = DebugBuffers.create(config, sse);
+        EventStore store = new EventStore(sinkRegistry, debugBuffers.buffer());
+        ScreenshotStore screenshots = ScreenshotStore.create(config);
 
         String sdkConfigJson = new ObjectMapper().writeValueAsString(config.sdkConfig);
 
         HttpServer server = HttpServer.create(new InetSocketAddress(config.port), 0);
         server.setExecutor(Executors.newFixedThreadPool(8));
-        server.createContext("/v1/track", new TrackHandler(registry, store, sse, config, spaces));
+        server.createContext("/v1/track", new TrackHandler(registry, store, config, spaces));
         server.createContext("/v1/config", ex -> {
             if (!Http.handlePreflight(ex)) Http.json(ex, 200, sdkConfigJson);
         });
@@ -68,6 +71,8 @@ public final class Main {
             }
             var health = new java.util.LinkedHashMap<String, Object>();
             health.put("status", "ok");
+            health.put("instance_id", GatewayInstance.id());
+            health.put("debug_buffer", store.debugBuffer().backendName());
             health.put("registry", Map.of(
                     "backend", registry.backendName(),
                     "revision", registry.globalRevision(),
@@ -111,8 +116,8 @@ public final class Main {
             ex.close();
         });
         server.createContext("/admin/api",
-                new AdminHandler(registry, store, sse, adminAuth, config, spaces, systemSettings));
-        server.createContext("/admin", new StaticHandler(adminAuth));
+                new AdminHandler(registry, store, sse, adminAuth, config, spaces, systemSettings, screenshots));
+        server.createContext("/admin", new StaticHandler(adminAuth, screenshots));
         server.createContext("/", new HubHandler());
         server.start();
 
@@ -121,6 +126,7 @@ public final class Main {
             registryWatcher.close();
             server.stop(3);
             sinkRegistry.close();
+            debugBuffers.close();
             System.out.println("shutdown complete");
         }, "graceful-shutdown"));
 

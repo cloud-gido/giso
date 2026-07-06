@@ -20,6 +20,7 @@ import com.sun.net.httpserver.HttpHandler;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,10 +44,11 @@ public final class AdminHandler implements HttpHandler {
     private final SpaceService spaces;
     private final AssistantService assistant;
     private final SystemSettingsService systemSettings;
+    private final ScreenshotStore screenshots;
 
     public AdminHandler(Registry registry, EventStore store, SseHub sse, AdminAuth auth,
                         GatewayConfig config, SpaceService spaces,
-                        SystemSettingsService systemSettings) throws Exception {
+                        SystemSettingsService systemSettings, ScreenshotStore screenshots) throws Exception {
         this.registry = registry;
         this.store = store;
         this.sse = sse;
@@ -54,6 +56,7 @@ public final class AdminHandler implements HttpHandler {
         this.spaces = spaces;
         this.clickhouse = new ClickHouseCoverage(config.clickhouseUrl);
         this.systemSettings = systemSettings;
+        this.screenshots = screenshots;
         this.assistant = new AssistantService(systemSettings, registry);
     }
 
@@ -204,6 +207,10 @@ public final class AdminHandler implements HttpHandler {
             return require(ex, globalRole, spaceRole,
                     AdminPermissions.canEditRegistry(globalRole, spaceRole), "无权导入注册表");
         }
+        if (path.equals("/screenshots") && method.equals("POST")) {
+            return require(ex, globalRole, spaceRole,
+                    AdminPermissions.canEditRegistry(globalRole, spaceRole), "无权上传预览图");
+        }
         if (path.startsWith("/assistant/")) return true;
         if (path.startsWith("/settings")) {
             if (method.equals("GET")) return true;
@@ -313,6 +320,10 @@ public final class AdminHandler implements HttpHandler {
             routeAssistantChat(ex, spaceKey);
             return;
         }
+        if (path.equals("/screenshots") && method.equals("POST")) {
+            routeScreenshotUpload(ex, spaceKey);
+            return;
+        }
         if (path.equals("/registry/meta") && method.equals("GET")) {
             Http.json(ex, 200, M.writeValueAsString(registry.meta()));
 
@@ -340,6 +351,9 @@ public final class AdminHandler implements HttpHandler {
 
         } else if (path.equals("/registry/batch") && method.equals("POST")) {
             routeBatch(ex, spaceKey, globalRole, spaceRole);
+
+        } else if (path.equals("/registry/ref-hints")) {
+            routeRefHints(ex, method, spaceKey);
 
         } else if (path.startsWith("/registry/")) {
             routeRegistry(ex, method, path, spaceKey, spaceRole);
@@ -642,6 +656,31 @@ public final class AdminHandler implements HttpHandler {
                 "errors", errors)));
     }
 
+    private void routeScreenshotUpload(HttpExchange ex, String spaceKey) throws Exception {
+        String ct = ex.getRequestHeaders().getFirst("Content-Type");
+        if (ct == null || !ct.toLowerCase().startsWith("multipart/form-data")) {
+            Http.json(ex, 400, "{\"error\":\"请使用 multipart 上传图片\"}");
+            return;
+        }
+        byte[] body = Http.readBody(ex, ScreenshotStore.MAX_BYTES + 65536);
+        if (body == null) {
+            Http.json(ex, 413, "{\"error\":\"文件过大\"}");
+            return;
+        }
+        var parts = MultipartForm.parse(body, ct);
+        MultipartForm.Part file = parts.get("file");
+        if (file == null || file.data() == null || file.data().length == 0) {
+            Http.json(ex, 400, "{\"error\":\"缺少 file 字段\"}");
+            return;
+        }
+        try {
+            String url = screenshots.save(spaceKey, file.filename(), file.data());
+            Http.json(ex, 200, M.writeValueAsString(Map.of("ok", true, "url", url)));
+        } catch (IllegalArgumentException e) {
+            Http.json(ex, 400, M.writeValueAsString(Map.of("error", e.getMessage())));
+        }
+    }
+
     private void routeImportTemplate(HttpExchange ex) throws IOException {
         String kind = Http.query(ex).getOrDefault("kind", "");
         if (!RegistryImportTemplates.supports(kind)) {
@@ -728,6 +767,44 @@ public final class AdminHandler implements HttpHandler {
                 registry.batch(spaceKey, kind, keys, action, operator, spaceRole)));
     }
 
+    private void routeRefHints(HttpExchange ex, String method, String spaceKey) throws Exception {
+        if (method.equals("GET")) {
+            var q = Http.query(ex);
+            String kind = q.getOrDefault("kind", "");
+            String key = q.getOrDefault("key", "");
+            if (!RegistryKinds.isKnown(kind)) {
+                Http.json(ex, 400, "{\"error\":\"unknown kind\"}");
+                return;
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            if (!key.isBlank()) {
+                String idField = RegistryKinds.idField(kind);
+                for (Map<String, Object> row : registry.all(spaceKey).getOrDefault(kind, List.of())) {
+                    if (key.equals(String.valueOf(row.get(idField)))) {
+                        item = new LinkedHashMap<>(row);
+                        break;
+                    }
+                }
+            }
+            Http.json(ex, 200, M.writeValueAsString(registry.refHints(spaceKey, kind, item)));
+            return;
+        }
+        if (method.equals("POST")) {
+            Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+            String kind = str(body, "kind");
+            if (!RegistryKinds.isKnown(kind)) {
+                Http.json(ex, 400, "{\"error\":\"unknown kind\"}");
+                return;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> item = body.get("item") instanceof Map<?, ?> m
+                    ? new LinkedHashMap<>((Map<String, Object>) m) : Map.of();
+            Http.json(ex, 200, M.writeValueAsString(registry.refHints(spaceKey, kind, item)));
+            return;
+        }
+        Http.empty(ex, 405);
+    }
+
     private void routeRegistry(HttpExchange ex, String method, String path,
             String spaceKey, String spaceRole) throws Exception {
         String rest = path.substring("/registry/".length());
@@ -772,7 +849,12 @@ public final class AdminHandler implements HttpHandler {
             Map<String, Object> item = M.readValue(Http.readBody(ex), new TypeReference<>() { });
             String err = registry.upsert(spaceKey, kind, item, operator, spaceRole);
             if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
-            else Http.json(ex, 200, "{\"ok\":true}");
+            else {
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("ok", true);
+                resp.put("hints", registry.refHints(spaceKey, kind, item));
+                Http.json(ex, 200, M.writeValueAsString(resp));
+            }
         } else if (method.equals("DELETE")) {
             String err = registry.delete(spaceKey, kind, key, operator, spaceRole);
             if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));

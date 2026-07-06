@@ -14,6 +14,7 @@ import { initVisualPicker, renderVisualPicker } from './views/visual-picker.js';
 import { initCopilot, renderCopilot } from './views/copilot.js';
 import { initSettings, renderSettings } from './views/settings.js';
 import { initPasswordChange } from './password.js';
+import { initRegistryDensity } from './registry-density.js';
 import { t, setLocale, getLocale, applyI18n } from './i18n.js';
 
 const ROLE_LABEL = {
@@ -38,6 +39,9 @@ export function show(view) {
   if (!VIEWS[view]) return;
   $$('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   $$('.view').forEach((p) => p.classList.toggle('active', p.id === 'view-' + view));
+  const isRegistry = view === 'registry';
+  $('#main-body')?.classList.toggle('is-registry', isRegistry);
+  $('#page-content')?.classList.toggle('is-registry', isRegistry);
   let titleKey = VIEWS[view].titleKey;
   let descKey = VIEWS[view].descKey;
   if (view === 'spaces' && !isSystemAdmin()) {
@@ -165,16 +169,11 @@ initStats();
 initUsers();
 initVisualPicker();
 initCopilot();
-initSettings();
+initSettings(show);
 initPasswordChange();
+initRegistryDensity();
 applyI18n();
 document.documentElement.lang = getLocale() === 'en' ? 'en' : 'zh-CN';
-$('#btn-locale')?.addEventListener('click', () => {
-  setLocale(getLocale() === 'en' ? 'zh' : 'en');
-  applyI18n();
-  const active = $$('[data-view].active')[0]?.dataset?.view;
-  if (active) show(active);
-});
 
 async function boot() {
   try {

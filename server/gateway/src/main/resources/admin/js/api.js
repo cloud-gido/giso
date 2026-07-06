@@ -11,6 +11,25 @@ export function setSpace(spaceKey) {
   localStorage.setItem(SPACE_KEY, currentSpace);
 }
 
+/** 上传注册表预览图（multipart），返回 { url } */
+export async function uploadScreenshot(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await fetch('/admin/api/screenshots', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'X-GISO-Space': currentSpace },
+    body: fd,
+  });
+  if (r.status === 401) {
+    requireLoginRedirect();
+    throw new Error('unauthorized');
+  }
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || '上传失败');
+  return data.url;
+}
+
 export async function api(p, opt = {}) {
   const headers = { 'X-GISO-Space': currentSpace, ...(opt.headers || {}) };
   if (opt.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';

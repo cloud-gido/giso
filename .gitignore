@@ -37,6 +37,7 @@ sdk/flutter/**/build/
 
 ### Gateway runtime data ###
 server/gateway/data/
+server/gateway/bench/data/
 
 ### Eclipse ###
 .apt_generated

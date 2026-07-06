@@ -62,6 +62,13 @@ public final class GatewayConfig {
 
     /** 管理页环形缓冲条数 */
     public int adminRecentBuffer = 2000;
+    /** 联调缓冲：memory（单副本）| redis（多副本共享） */
+    public String debugBufferBackend = "memory";
+    public String debugRedisUrl = "";
+    public String debugRedisKeyPrefix = "giso:debug";
+    public int debugBufferTtlSec = 3600;
+    /** 注册表预览图存储目录（默认 {file.dir}/screenshots） */
+    public String screenshotsDir = "";
 
     // ── 安全 ──
     /** 上报鉴权：X-App-Key 白名单；空列表 = 不校验（仅限本地开发） */
@@ -165,6 +172,14 @@ public final class GatewayConfig {
 
         Map<String, Object> admin = (Map<String, Object>) doc.getOrDefault("admin", Map.of());
         c.adminRecentBuffer = (int) admin.getOrDefault("recent_buffer", c.adminRecentBuffer);
+        c.screenshotsDir = (String) admin.getOrDefault("screenshots_dir", c.screenshotsDir);
+
+        Map<String, Object> debugBuf = (Map<String, Object>) doc.getOrDefault("debug_buffer", Map.of());
+        c.debugBufferBackend = (String) debugBuf.getOrDefault("backend", c.debugBufferBackend);
+        c.debugRedisUrl = (String) debugBuf.getOrDefault("redis_url", c.debugRedisUrl);
+        c.debugRedisKeyPrefix = (String) debugBuf.getOrDefault("key_prefix", c.debugRedisKeyPrefix);
+        if (debugBuf.get("recent_max") instanceof Number n) c.adminRecentBuffer = n.intValue();
+        if (debugBuf.get("ttl_sec") instanceof Number n) c.debugBufferTtlSec = n.intValue();
 
         Map<String, Object> auth = (Map<String, Object>) doc.getOrDefault("auth", Map.of());
         if (auth.get("app_keys") instanceof List<?> keys) c.appKeys = (List<String>) keys;
@@ -314,6 +329,10 @@ public final class GatewayConfig {
         env("GISO_DB_PASSWORD").ifPresent(v -> c.dbPassword = v);
         env("GISO_DB_SCHEMA").ifPresent(v -> c.dbSchema = v);
         envInt("GISO_REGISTRY_POLL_SEC").ifPresent(v -> c.registryPollIntervalSec = v);
+        env("GISO_DEBUG_BUFFER_BACKEND").ifPresent(v -> c.debugBufferBackend = v);
+        env("GISO_DEBUG_REDIS_URL").ifPresent(v -> c.debugRedisUrl = v);
+        env("GISO_DEBUG_REDIS_KEY_PREFIX").ifPresent(v -> c.debugRedisKeyPrefix = v);
+        envInt("GISO_DEBUG_BUFFER_TTL_SEC").ifPresent(v -> c.debugBufferTtlSec = v);
         applyKafkaSaslFromEnv(c);
     }
 
