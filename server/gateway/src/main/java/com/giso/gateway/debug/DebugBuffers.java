@@ -39,7 +39,8 @@ public final class DebugBuffers {
             } else {
                 System.err.println("[redis-debug-buffer] initial ping failed for "
                         + config.debugRedisInfo.safeLabel()
-                        + " (auth=" + config.debugRedisInfo.authMode() + "): " + pingErr);
+                        + " (auth=" + config.debugRedisInfo.authMode() + "): " + pingErr
+                        + "; check GISO_DEBUG_REDIS_URL/HOST/PASSWORD secret values");
             }
             return new Handle(buffer, relay);
         }
