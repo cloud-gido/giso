@@ -176,6 +176,16 @@ public final class RedisConnections {
         return lower.startsWith("redis://") || lower.startsWith("rediss://");
     }
 
+    /** 日志/报错用，隐藏 URL 中的凭据。 */
+    public static String redactUrl(String url) {
+        if (url == null || url.isBlank()) return "";
+        int at = url.lastIndexOf('@');
+        if (at < 0) return url.trim();
+        int schemeEnd = url.indexOf("://");
+        if (schemeEnd < 0) return url.trim();
+        return url.substring(0, schemeEnd + 3) + ":***@" + url.substring(at + 1);
+    }
+
     private static String percentDecode(String value) {
         if (value == null || value.indexOf('%') < 0) return value;
         StringBuilder out = new StringBuilder(value.length());

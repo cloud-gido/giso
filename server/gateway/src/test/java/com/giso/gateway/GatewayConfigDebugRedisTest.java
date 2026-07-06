@@ -36,24 +36,39 @@ class GatewayConfigDebugRedisTest {
     }
 
     @Test
+    void explicitUrlIgnoresSplitHostAndPassword() {
+        GatewayConfig c = new GatewayConfig();
+        c.debugRedisUrl = "rediss://:url-token@master.cache.amazonaws.com/0";
+        c.debugRedisHost = "ignored";
+        c.debugRedisPassword = "ignored-password";
+        GatewayConfig.resolveDebugRedisUrl(c);
+        assertEquals("url-token", c.debugRedisInfo.password());
+        assertEquals(RedisConnections.PASSWORD_SOURCE_URL, c.debugRedisInfo.passwordSource());
+    }
+
+    @Test
+    void redisUriInHostFieldIsRejected() {
+        GatewayConfig c = new GatewayConfig();
+        c.debugRedisHost = "rediss://:token@master.cache.amazonaws.com/0";
+        IllegalStateException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalStateException.class, () -> GatewayConfig.resolveDebugRedisUrl(c));
+        org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("GISO_DEBUG_REDIS_URL"));
+    }
+
+    @Test
     void elasticacheUrlWithoutEmbeddedPasswordUsesEnvPassword() {
         GatewayConfig c = new GatewayConfig();
-        c.debugRedisHost = "rediss://master.gamelinelab-dev-sharedcache.cddsor.sae1.cache.amazonaws.com/0";
-        c.debugRedisPassword = "elasticache-auth-token";
-        c.debugRedisDb = 2;
+        c.debugRedisUrl = "rediss://master.gamelinelab-dev-sharedcache.cddsor.sae1.cache.amazonaws.com/0";
         GatewayConfig.resolveDebugRedisUrl(c);
         assertEquals("rediss", c.debugRedisInfo.scheme());
-        assertEquals("elasticache-auth-token", c.debugRedisInfo.password());
-        assertEquals(RedisConnections.PASSWORD_SOURCE_ENV, c.debugRedisInfo.passwordSource());
-        assertEquals(0, c.debugRedisInfo.db());
+        assertEquals("", c.debugRedisInfo.password());
+        assertEquals("", c.debugRedisInfo.passwordSource());
     }
 
     @Test
     void fullRedissUrlWithSpecialPasswordAndNoPort() {
         GatewayConfig c = new GatewayConfig();
-        c.debugRedisHost = "rediss://:sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI@master.cache.amazonaws.com/0";
-        c.debugRedisPassword = "sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI";
-        c.debugRedisDb = 2;
+        c.debugRedisUrl = "rediss://:sTtN?Yo5q-qaHGpP6=kEWJRT!WOTFPI@master.cache.amazonaws.com/0";
         GatewayConfig.resolveDebugRedisUrl(c);
         assertEquals("rediss", c.debugRedisInfo.scheme());
         assertEquals("master.cache.amazonaws.com", c.debugRedisInfo.host());

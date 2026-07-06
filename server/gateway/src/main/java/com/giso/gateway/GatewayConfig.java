@@ -360,29 +360,27 @@ public final class GatewayConfig {
     }
 
     /**
-     * 未配置 redis_url 时，由 host + password + port + db 拼装（复用平台 INFRA_ARCHERY_REDIS_* 等）。
-     * host 若已是 redis:// / rediss:// 整 URL，则解析后只改 logical db。
+     * 联调 Redis 只认一种来源，避免 URL 与 HOST/PASSWORD 互相覆盖：
+     * 1. {@code debugRedisUrl} / {@code GISO_DEBUG_REDIS_URL}（推荐，含 ElastiCache 整段 rediss://:token@host/0）
+     * 2. 仅本地 internal-redis：短主机名 + password（无 URL 时）
      */
     static void resolveDebugRedisUrl(GatewayConfig c) {
         if (c.debugRedisInfo != null) return;
 
-        int db = c.debugRedisDb >= 0 ? c.debugRedisDb : 2;
-
         if (c.debugRedisUrl != null && !c.debugRedisUrl.isBlank()) {
-            c.debugRedisInfo = RedisConnections.parseUrl(
-                    c.debugRedisUrl, c.debugRedisUsername, c.debugRedisPassword, -1);
+            c.debugRedisInfo = RedisConnections.parseUrl(c.debugRedisUrl.trim(), null, null, -1);
             return;
         }
 
         if (c.debugRedisHost == null || c.debugRedisHost.isBlank()) return;
         String hostRaw = c.debugRedisHost.trim();
-
         if (RedisConnections.isRedisUri(hostRaw)) {
-            c.debugRedisInfo = RedisConnections.parseUrl(
-                    hostRaw, c.debugRedisUsername, c.debugRedisPassword, db);
-            return;
+            throw new IllegalStateException(
+                    "debug Redis URL must use GISO_DEBUG_REDIS_URL (or debug_buffer.redis_url), "
+                            + "not GISO_DEBUG_REDIS_HOST: " + RedisConnections.redactUrl(hostRaw));
         }
 
+        int db = c.debugRedisDb >= 0 ? c.debugRedisDb : 2;
         if (c.debugRedisPassword == null || c.debugRedisPassword.isBlank()) return;
         String host = normalizeRedisHost(hostRaw, c.debugRedisSearchNamespace);
         int port = c.debugRedisPort > 0 ? c.debugRedisPort : 6379;
@@ -394,7 +392,7 @@ public final class GatewayConfig {
             } catch (NumberFormatException ignored) { }
         }
         c.debugRedisInfo = RedisConnections.fromParts(
-                "redis", host, c.debugRedisUsername, c.debugRedisPassword, port, db);
+                "redis", host, "", c.debugRedisPassword, port, db);
     }
 
     static String normalizeRedisHost(String host, String searchNamespace) {
