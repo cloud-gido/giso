@@ -207,6 +207,10 @@ public final class AdminHandler implements HttpHandler {
             return require(ex, globalRole, spaceRole,
                     AdminPermissions.canEditRegistry(globalRole, spaceRole), "无权导入注册表");
         }
+        if (path.equals("/registry/import-bundle") && method.equals("POST")) {
+            return require(ex, globalRole, spaceRole,
+                    AdminPermissions.canApproveRegistry(globalRole, spaceRole), "无权导入注册表包");
+        }
         if (path.equals("/screenshots") && method.equals("POST")) {
             return require(ex, globalRole, spaceRole,
                     AdminPermissions.canEditRegistry(globalRole, spaceRole), "无权上传预览图");
@@ -348,6 +352,12 @@ public final class AdminHandler implements HttpHandler {
 
         } else if (path.equals("/registry/import") && method.equals("POST")) {
             routeImport(ex, spaceKey, spaceRole);
+
+        } else if (path.equals("/registry/export") && method.equals("GET")) {
+            routeExportBundle(ex, spaceKey);
+
+        } else if (path.equals("/registry/import-bundle") && method.equals("POST")) {
+            routeImportBundle(ex, spaceKey);
 
         } else if (path.equals("/registry/batch") && method.equals("POST")) {
             routeBatch(ex, spaceKey, globalRole, spaceRole);
@@ -690,6 +700,31 @@ public final class AdminHandler implements HttpHandler {
         String csv = RegistryImportTemplates.csvTemplate(kind);
         String filename = RegistryKinds.yamlFile(kind).replace(".yaml", "_import_template.csv");
         Http.csvAttachment(ex, filename, csv);
+    }
+
+    private void routeExportBundle(HttpExchange ex, String spaceKey) throws Exception {
+        String operator = auth.operator(ex);
+        Map<String, Object> bundle = registry.exportBundle(spaceKey, operator);
+        String safeSpace = spaceKey.replaceAll("[^a-zA-Z0-9_-]", "_");
+        String date = java.time.LocalDate.now().toString().replace("-", "");
+        String filename = "giso-registry-" + safeSpace + "-live-" + date + ".json";
+        String json = M.writerWithDefaultPrettyPrinter().writeValueAsString(bundle);
+        Http.jsonAttachment(ex, filename, json);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void routeImportBundle(HttpExchange ex, String spaceKey) throws Exception {
+        Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+        boolean dryRun = Boolean.TRUE.equals(body.get("dry_run"));
+        Object rawBundle = body.get("bundle");
+        if (!(rawBundle instanceof Map<?, ?> map)) {
+            Http.json(ex, 400, "{\"error\":\"需要 bundle 对象\"}");
+            return;
+        }
+        Map<String, Object> bundle = new java.util.LinkedHashMap<>();
+        map.forEach((k, v) -> bundle.put(String.valueOf(k), v));
+        String operator = auth.operator(ex);
+        Http.json(ex, 200, M.writeValueAsString(registry.importBundle(spaceKey, bundle, dryRun, operator)));
     }
 
     private void routeImport(HttpExchange ex, String spaceKey, String spaceRole) throws Exception {

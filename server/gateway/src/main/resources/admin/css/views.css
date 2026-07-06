@@ -299,7 +299,18 @@ td .muted { color: var(--faint); }
 tr.row-selected { background: var(--accent-soft); }
 th.reg-th-check, td.reg-td-check { width: 36px; text-align: center; }
 #reg-import-dialog { width: min(640px, 92vw); }
+#reg-bundle-import-dialog { width: min(640px, 92vw); }
+.registry-action-group { display: inline-flex; align-items: center; gap: 4px; }
+.registry-action-sep {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  margin: 0 8px;
+  background: var(--border, #e0e0e0);
+  vertical-align: middle;
+}
 #reg-import-preview { font-size: 12px; margin: 8px 0; max-height: 80px; overflow: auto; }
+#reg-bundle-preview { font-size: 12px; margin: 8px 0; max-height: 120px; overflow: auto; white-space: pre-wrap; }
 
 /* 编辑弹窗 · 池化选取 */
 .editor-resume-bar {

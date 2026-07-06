@@ -236,8 +236,15 @@ biz_event code=video_play_start</textarea>
               <button type="button" class="density-btn" data-density="comfort" data-i18n="reg.densityComfort">宽松</button>
             </div>
             <span class="spacer"></span>
-            <button type="button" id="btn-reg-template" class="ghost nav-admin-only">下载导入模板</button>
-            <button type="button" id="btn-reg-import" class="ghost nav-admin-only">批量导入</button>
+            <span class="registry-action-group" title="测试环境登记完成后，整包晋升到生产">
+              <button type="button" id="btn-reg-export" class="ghost">导出空间包</button>
+              <button type="button" id="btn-reg-bundle-import" class="ghost nav-admin-only">导入空间包</button>
+            </span>
+            <span class="registry-action-sep" aria-hidden="true"></span>
+            <span class="registry-action-group" title="下载 CSV 模板，本地填写后按池导入（非环境间迁移）">
+              <button type="button" id="btn-reg-template" class="ghost nav-admin-only">下载 CSV 模板</button>
+              <button type="button" id="btn-reg-import" class="ghost nav-admin-only">CSV 批量导入</button>
+            </span>
             <button type="button" id="btn-visual-picker" class="ghost nav-admin-only" data-i18n="nav.visual">可视化圈选</button>
             <button type="button" id="btn-add" class="primary">＋ 新增</button>
           </div>
@@ -482,8 +489,8 @@ biz_event code=video_play_start</textarea>
 
 <dialog id="reg-import-dialog">
   <form method="dialog" id="reg-import-form">
-    <h3>批量导入 · <span id="reg-import-kind-label">参数池</span></h3>
-    <p class="hint">先<a href="#" id="reg-import-dl-template">下载当前池的 CSV 模板</a>，按格式填写后上传。单次最多 500 条。</p>
+    <h3>CSV 批量导入 · <span id="reg-import-kind-label">参数池</span></h3>
+    <p class="hint">用于<strong>本环境</strong>按池补登记：先<a href="#" id="reg-import-dl-template">下载 CSV 模板</a>，填写后上传。<strong>不是</strong>测试→生产的整包迁移（请用「导入空间包」+ JSON）。单次最多 500 条。</p>
     <div class="field">
       <label>CSV 文件</label>
       <input type="file" id="reg-import-file" accept=".csv,text/csv,text/plain">
@@ -496,6 +503,23 @@ biz_event code=video_play_start</textarea>
     <div class="dialog-actions">
       <button value="cancel" class="ghost">取消</button>
       <button type="button" class="primary" id="reg-import-run">开始导入</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="reg-bundle-import-dialog">
+  <form method="dialog" id="reg-bundle-import-form">
+    <h3>导入空间包（JSON）</h3>
+    <p class="hint">用于<strong>测试 → 生产</strong>整包晋升：上传测试环境「导出空间包」得到的 <code>.json</code> 文件。导入后条目直接为 <b>live</b>（跳过审批）。<strong>不要</strong>上传 CSV 模板文件。建议先「预览校验」再确认写入。</p>
+    <div class="field">
+      <label>JSON 包文件</label>
+      <input type="file" id="reg-bundle-file" accept=".json,application/json">
+    </div>
+    <div id="reg-bundle-preview" class="muted"></div>
+    <div class="dialog-actions">
+      <button value="cancel" class="ghost">取消</button>
+      <button type="button" class="ghost" id="reg-bundle-dry-run">预览校验</button>
+      <button type="button" class="primary" id="reg-bundle-import-run" disabled>确认导入</button>
     </div>
   </form>
 </dialog>

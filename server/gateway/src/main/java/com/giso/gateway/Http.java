@@ -134,9 +134,18 @@ final class Http {
     }
 
     static void csvAttachment(HttpExchange ex, String filename, String body) throws IOException {
+        attachment(ex, filename, "text/csv; charset=utf-8", body);
+    }
+
+    static void jsonAttachment(HttpExchange ex, String filename, String body) throws IOException {
+        attachment(ex, filename, "application/json; charset=utf-8", body);
+    }
+
+    private static void attachment(HttpExchange ex, String filename, String contentType, String body)
+            throws IOException {
         cors(ex);
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        ex.getResponseHeaders().set("Content-Type", "text/csv; charset=utf-8");
+        ex.getResponseHeaders().set("Content-Type", contentType);
         ex.getResponseHeaders().set("Content-Disposition",
                 "attachment; filename=\"" + filename.replace("\"", "") + "\"");
         ex.sendResponseHeaders(200, bytes.length);

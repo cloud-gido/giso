@@ -152,6 +152,7 @@ function applyRole(me) {
   setVisible('#btn-clear', isSpaceManager && me.space_role !== 'viewer');
   setVisible('#btn-add', canEdit && me.space_role !== 'viewer');
   setVisible('#btn-reg-import', isSpaceManager);
+  setVisible('#btn-reg-bundle-import', isSpaceManager);
   setVisible('#btn-reg-template', isSpaceManager);
   setVisible('#btn-visual-picker', isSpaceManager);
 

@@ -1,5 +1,6 @@
 /* 注册表配置：参数池/页面池/元素池/业务事件 CRUD + 批量操作 + CSV 导入 */
 import { $, $$, esc, toast } from '../util.js';
+import { api, getSpace } from '../api.js';
 import {
   POOL_FIELD,
   renderPoolPicker,
@@ -625,6 +626,99 @@ async function resumeEditor() {
   toast('已恢复编辑草稿，请核对引用后保存');
 }
 
+let bundlePayload = null;
+
+async function exportRegistryBundle() {
+  const r = await fetch('/admin/api/registry/export?format=json', {
+    credentials: 'same-origin',
+    headers: { 'X-GISO-Space': getSpace() },
+  });
+  if (r.status === 401) {
+    window.location.href = '/admin/login.html';
+    return;
+  }
+  if (!r.ok) {
+    let msg = '导出失败';
+    try { msg = (await r.json()).error || msg; } catch { /* ignore */ }
+    toast(msg, 'error');
+    return;
+  }
+  const blob = await r.blob();
+  const cd = r.headers.get('Content-Disposition') || '';
+  const m = cd.match(/filename="([^"]+)"/);
+  const filename = m?.[1] || `giso-registry-${getSpace()}-live.json`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('已导出当前空间 live 登记（JSON 空间包）');
+}
+
+function openBundleImportDialog() {
+  bundlePayload = null;
+  $('#reg-bundle-file').value = '';
+  $('#reg-bundle-preview').textContent = '';
+  $('#reg-bundle-import-run').disabled = true;
+  $('#reg-bundle-import-dialog').showModal();
+}
+
+async function readBundleFile() {
+  const file = $('#reg-bundle-file').files?.[0];
+  if (!file) return null;
+  const text = await file.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    toast('JSON 解析失败', 'error');
+    return null;
+  }
+}
+
+function formatBundlePreview(r, bundle) {
+  const counts = bundle?.counts || {};
+  const lines = [
+    r.warning ? `⚠ ${r.warning}` : null,
+    `校验：成功 ${r.ok}，失败 ${r.failed}（新建 ${r.created}，更新 ${r.updated}）`,
+    `包内：params ${counts.params ?? '?'} · pages ${counts.pages ?? '?'} · elements ${counts.elements ?? '?'} · events ${counts.events ?? '?'}`,
+  ].filter(Boolean);
+  if (r.failed > 0) {
+    lines.push('');
+    lines.push('失败条目：');
+    (r.errors || []).slice(0, 8).forEach((e) => {
+      lines.push(`· ${e.kind || ''}/${e.key}: ${e.error}`);
+    });
+    if ((r.errors || []).length > 8) lines.push(`… 另有 ${r.errors.length - 8} 条`);
+  }
+  return lines.join('\n');
+}
+
+async function runBundleImport(dryRun) {
+  const bundle = bundlePayload || await readBundleFile();
+  if (!bundle) { toast('请选择 JSON 空间包文件', 'error'); return; }
+  bundlePayload = bundle;
+  const r = await api('/registry/import-bundle', {
+    method: 'POST',
+    body: JSON.stringify({ dry_run: dryRun, bundle }),
+  });
+  $('#reg-bundle-preview').textContent = formatBundlePreview(r, bundle);
+  if (r.failed > 0) {
+    toast(dryRun ? `预览：${r.ok} 条通过，${r.failed} 条失败` : `导入：成功 ${r.ok}，失败 ${r.failed}`,
+      r.ok ? 'warn' : 'error');
+    $('#reg-bundle-import-run').disabled = true;
+    return;
+  }
+  if (dryRun) {
+    toast(`预览通过：将新建 ${r.created}、更新 ${r.updated} 条`);
+    $('#reg-bundle-import-run').disabled = false;
+    return;
+  }
+  toast(`导入完成：${r.ok} 条（新建 ${r.created}，更新 ${r.updated}）`);
+  $('#reg-bundle-import-dialog').close();
+  renderRegistry(true);
+  document.dispatchEvent(new CustomEvent('giso:pending-changed'));
+}
+
 async function downloadTemplate() {
   const r = await fetch(`/admin/api/registry/import-template?kind=${encodeURIComponent(curKind)}`, {
     credentials: 'same-origin',
@@ -720,8 +814,22 @@ export function initRegistry() {
     searchTimer = setTimeout(() => { clearSelection(); renderTable(); }, 120);
   });
   $('#btn-add').onclick = () => openEditor(null);
+  $('#btn-reg-export')?.addEventListener('click', exportRegistryBundle);
+  $('#btn-reg-bundle-import')?.addEventListener('click', openBundleImportDialog);
   $('#btn-reg-template')?.addEventListener('click', downloadTemplate);
   $('#btn-reg-import')?.addEventListener('click', openImportDialog);
+  $('#reg-bundle-dry-run')?.addEventListener('click', () => runBundleImport(true));
+  $('#reg-bundle-import-run')?.addEventListener('click', () => {
+    if (!confirm('确认将包内 live 条目写入当前空间？此操作不可自动撤销。')) return;
+    runBundleImport(false);
+  });
+  $('#reg-bundle-file')?.addEventListener('change', () => {
+    bundlePayload = null;
+    $('#reg-bundle-preview').textContent = '';
+    $('#reg-bundle-import-run').disabled = true;
+    const f = $('#reg-bundle-file').files?.[0];
+    if (f) $('#reg-bundle-preview').textContent = `已选：${f.name}`;
+  });
   $('#reg-import-dl-template')?.addEventListener('click', (e) => { e.preventDefault(); downloadTemplate(); });
   $('#reg-import-run')?.addEventListener('click', runImport);
   $('#reg-import-file')?.addEventListener('change', async () => {

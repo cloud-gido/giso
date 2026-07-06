@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.giso.gateway.auth.AdminPermissions;
 import com.giso.gateway.auth.AdminUser;
 import com.giso.gateway.registry.PostgresRegistryStore;
+import com.giso.gateway.registry.RegistryBundle;
 import com.giso.gateway.registry.RegistryKinds;
 import com.giso.gateway.registry.RegistryRefs;
 import com.giso.gateway.registry.RegistrySnapshot;
@@ -277,6 +278,95 @@ public final class Registry {
         out.put("failed", errors.size());
         out.put("errors", errors);
         return out;
+    }
+
+    /** 导出当前空间 live 条目为整包（测试 → 生产晋升）。 */
+    public synchronized Map<String, Object> exportBundle(String spaceKey, String operator) {
+        return RegistryBundle.buildExport(spaceKey, all(spaceKey), globalRevision, operator);
+    }
+
+    /**
+     * 导入整包：强制 status=live，按 params → pages → elements → events 顺序写入。
+     * {@code dryRun=true} 时仅校验，不落库。
+     */
+    public synchronized Map<String, Object> importBundle(String spaceKey, Map<String, Object> bundle,
+            boolean dryRun, String operator) throws Exception {
+        String shapeErr = RegistryBundle.validateBundleShape(bundle);
+        if (shapeErr != null) {
+            Map<String, Object> bad = new LinkedHashMap<>();
+            bad.put("dry_run", dryRun);
+            bad.put("ok", 0);
+            bad.put("failed", 1);
+            bad.put("created", 0);
+            bad.put("updated", 0);
+            bad.put("errors", List.of(Map.of("kind", "", "key", "", "error", shapeErr)));
+            bad.put("detail", List.of());
+            return bad;
+        }
+        String bundleSpace = String.valueOf(bundle.getOrDefault("space_key", ""));
+        String spaceWarn = null;
+        if (!bundleSpace.isBlank() && !bundleSpace.equals(spaceKey)) {
+            spaceWarn = "包内 space_key=" + bundleSpace + " 与当前空间 " + spaceKey
+                    + " 不一致，将写入当前空间";
+        }
+        List<Map<String, String>> errors = new ArrayList<>();
+        List<Map<String, Object>> detail = new ArrayList<>();
+        int created = 0;
+        int updated = 0;
+        int ok = 0;
+        boolean changed = false;
+        for (String kind : RegistryBundle.KIND_ORDER) {
+            for (Map<String, Object> item : RegistryBundle.itemsOf(bundle, kind)) {
+                String idField = RegistryKinds.idField(kind);
+                String key = String.valueOf(item.getOrDefault(idField, "?"));
+                Map<String, Object> existing = tablesFor(spaceKey).get(kind).get(key);
+                String action = existing == null ? "create" : "update";
+                String err = applyBundleUpsert(spaceKey, kind, item, operator, dryRun);
+                if (err == null) {
+                    ok++;
+                    if ("create".equals(action)) created++;
+                    else updated++;
+                    if (!dryRun) changed = true;
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("kind", kind);
+                    row.put("key", key);
+                    row.put("action", action);
+                    row.put("status", RegistryBundle.STATUS_LIVE);
+                    detail.add(row);
+                } else {
+                    errors.add(Map.of("kind", kind, "key", key, "error", err));
+                }
+            }
+        }
+        if (changed) reload();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("dry_run", dryRun);
+        out.put("ok", ok);
+        out.put("failed", errors.size());
+        out.put("created", created);
+        out.put("updated", updated);
+        out.put("errors", errors);
+        out.put("detail", detail);
+        if (spaceWarn != null) out.put("warning", spaceWarn);
+        return out;
+    }
+
+    private synchronized String applyBundleUpsert(String spaceKey, String kind, Map<String, Object> item,
+            String operator, boolean dryRun) throws Exception {
+        String idField = RegistryKinds.idField(kind);
+        Object idVal = item.get(idField);
+        if (idVal == null || String.valueOf(idVal).isBlank()) {
+            return "缺少 " + idField;
+        }
+        item = new LinkedHashMap<>(item);
+        RegistryRefs.normalizeLists(item);
+        item.put("status", RegistryBundle.STATUS_LIVE);
+        String err = validateUpsert(spaceKey, kind, item);
+        if (err != null) return err;
+        if (dryRun) return null;
+        WriteResult wr = store.upsert(spaceKey, kind, item, operator);
+        if (wr.error() != null) return wr.error();
+        return null;
     }
 
     private String applySubmit(String spaceKey, String kind, String key, String operator, String spaceRole)
