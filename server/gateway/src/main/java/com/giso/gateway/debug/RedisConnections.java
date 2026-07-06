@@ -100,11 +100,11 @@ public final class RedisConnections {
         return normalizeForProvider(new Info(scheme, host, port, username, password, db));
     }
 
-    /** ElastiCache：仅 db/0；AUTH 使用 URL/环境中的密码，不强行注入 ACL 用户名。 */
+    /** ElastiCache auth-token 模式：仅 db/0，且 AUTH 只传密码，不传 ACL username。 */
     static Info normalizeForProvider(Info info) {
         if (!isElastiCacheHost(info.host())) return info;
         int db = 0;
-        return new Info(info.scheme(), info.host(), info.port(), info.username(), info.password(), db);
+        return new Info(info.scheme(), info.host(), info.port(), "", info.password(), db);
     }
 
     static boolean isElastiCacheHost(String host) {

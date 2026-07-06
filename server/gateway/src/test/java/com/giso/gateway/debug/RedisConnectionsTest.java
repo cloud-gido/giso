@@ -51,6 +51,26 @@ class RedisConnectionsTest {
     }
 
     @Test
+    void elasticacheIgnoresOverrideUsernameForAuthTokenMode() {
+        var info = RedisConnections.parseUrl(
+                "rediss://:correct-secret@master.cache.amazonaws.com:6379/0",
+                "default", null, -1);
+        assertEquals("correct-secret", info.password());
+        assertEquals("", info.username());
+        assertEquals(0, info.db());
+    }
+
+    @Test
+    void elasticacheStripsUsernameFromUrlForAuthTokenMode() {
+        var info = RedisConnections.parseUrl(
+                "rediss://default:correct-secret@master.cache.amazonaws.com:6379/0",
+                null, null, -1);
+        assertEquals("correct-secret", info.password());
+        assertEquals("", info.username());
+        assertEquals(0, info.db());
+    }
+
+    @Test
     void internalRedisKeepsDb2() {
         var info = RedisConnections.fromParts(
                 "redis", "internal-redis.business-platform.svc.cluster.local", "", "secret", 6379, 2);
