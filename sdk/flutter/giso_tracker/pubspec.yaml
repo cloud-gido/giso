@@ -1,6 +1,6 @@
 name: giso_tracker
 description: GISO tracking SDK for Flutter — page/biz events, gzip batch upload, registry constants.
-version: 1.0.5
+version: 1.0.6
 homepage: https://github.com/cloud-gido/giso
 repository: https://github.com/cloud-gido/giso
 issue_tracker: https://github.com/cloud-gido/giso/issues
@@ -13,6 +13,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  package_info_plus: ^8.3.0
   connectivity_plus: ^6.1.4
   device_info_plus: ^11.3.0
   http: ^1.2.2

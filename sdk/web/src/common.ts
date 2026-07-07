@@ -1,6 +1,6 @@
 import type { CommonParams, TrackerConfig } from './types';
 
-const SDK_VERSION = '1.0.0';
+const SDK_VERSION = '1.0.6';
 const DID_KEY = '_giso_did';
 const SESSION_KEY = '_giso_session';
 const SESSION_GAP_MS = 30 * 60 * 1000;
@@ -61,6 +61,7 @@ export function collectCommonParams(config: TrackerConfig, uid: string): CommonP
   const env = config.env ?? (config.debug ? 'test' : 'prod');
   return {
     app_id: config.appId,
+    app_pkg: config.appPkg ?? '',
     platform: 'web',
     app_vrsn: config.appVersion,
     sdk_vrsn: SDK_VERSION,

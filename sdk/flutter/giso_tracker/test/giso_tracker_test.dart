@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:giso_tracker/giso_tracker.dart';
 import 'package:giso_tracker/src/device_collector.dart';
+import 'package:giso_tracker/src/types.dart';
 
 void main() {
   test('PageContext serializes optional fields', () {
@@ -35,6 +36,29 @@ void main() {
   test('pickCommonField prefers explicit config overrides', () {
     expect(pickCommonField('custom', 'auto'), 'custom');
     expect(pickCommonField('', 'auto'), 'auto');
+  });
+
+  test('CommonParams includes app_pkg', () {
+    const common = CommonParams(
+      appId: 'demo',
+      platform: 'android',
+      appPkg: 'com.example.demo',
+      appVersion: '1.0.0',
+      sdkVersion: '1.0.6',
+      did: 'did-1',
+      uid: '',
+      sessionId: 's-1',
+      channel: 'google_play',
+      env: 'test',
+      osVersion: '14',
+      devBrand: 'Google',
+      devModel: 'Pixel',
+      screenRes: '1080x2400',
+      netType: 'wifi',
+      lang: 'zh-CN',
+      tz: '+08:00',
+    );
+    expect(common.toJson()['app_pkg'], 'com.example.demo');
   });
 
   test('GisoConfig resolves env from debug flag', () {

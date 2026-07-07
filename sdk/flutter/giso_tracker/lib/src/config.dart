@@ -17,6 +17,7 @@ class GisoConfig {
     this.screenRes = '',
     this.netType = '',
     this.lang = '',
+    this.appPkg = '',
     this.tz = '',
   });
 
@@ -55,6 +56,9 @@ class GisoConfig {
 
   /// Overrides auto-detected locale when non-empty.
   final String lang;
+
+  /// Overrides auto-detected package name when non-empty.
+  final String appPkg;
   final String tz;
 
   String resolvedEnv() => env ?? (debug ? 'test' : 'prod');

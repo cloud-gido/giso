@@ -1,6 +1,6 @@
 /* 注册表配置：参数池/页面池/元素池/业务事件 CRUD + 批量操作 + CSV 导入 */
 import { $, $$, esc, toast } from '../util.js';
-import { api, getSpace } from '../api.js';
+import { api, getSpace, uploadScreenshot } from '../api.js';
 import {
   POOL_FIELD,
   renderPoolPicker,

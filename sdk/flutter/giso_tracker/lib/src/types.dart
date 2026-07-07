@@ -8,6 +8,7 @@ class CommonParams {
   const CommonParams({
     required this.appId,
     required this.platform,
+    required this.appPkg,
     required this.appVersion,
     required this.sdkVersion,
     required this.did,
@@ -26,6 +27,7 @@ class CommonParams {
 
   final String appId;
   final String platform;
+  final String appPkg;
   final String appVersion;
   final String sdkVersion;
   final String did;
@@ -43,6 +45,7 @@ class CommonParams {
 
   Map<String, Object?> toJson() => {
         'app_id': appId,
+        'app_pkg': appPkg,
         'platform': platform,
         'app_vrsn': appVersion,
         'sdk_vrsn': sdkVersion,

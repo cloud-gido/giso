@@ -14,6 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.6] - 2026-07-07
+
+### Added
+
+- **全端 SDK**：`common.app_pkg` 应用包名（Android `applicationId` / iOS Bundle ID / Flutter 自动采集；Web 可 `appPkg` 覆盖）。
+
+### Fixed
+
+- **管理台**：注册表编辑上传截图 `uploadScreenshot is not defined`（补 `api.js` 导入）。
+
+---
+
 ## [1.0.5] - 2026-07-03
 
 ### Added
@@ -110,7 +122,9 @@ Initial open-source baseline (pre-SDK package publish).
 
 ---
 
-[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/cloud-gido/giso/releases/tag/v1.0.6
+[1.0.5]: https://github.com/cloud-gido/giso/releases/tag/v1.0.5
 [1.0.3]: https://github.com/cloud-gido/giso/releases/tag/v1.0.3
 [1.0.2]: https://github.com/cloud-gido/giso/releases/tag/v1.0.2
 [1.0.1]: https://github.com/cloud-gido/giso/releases/tag/v1.0.1

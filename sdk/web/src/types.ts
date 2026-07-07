@@ -17,6 +17,7 @@ export type Passthrough = Record<string, unknown>;
 
 export interface CommonParams {
   app_id: string;
+  app_pkg: string;
   platform: 'web';
   app_vrsn: string;
   sdk_vrsn: string;
@@ -76,6 +77,8 @@ export interface TrackerConfig {
   debug?: boolean;
   /** prod | test；默认 debug=true → test，否则 prod */
   env?: string;
+  /** 应用包名覆盖（Web 无自动采集，可手动传入） */
+  appPkg?: string;
   /** 曝光判定：可视面积比例阈值，默认 0.5 */
   exposureRatio?: number;
   /** 曝光判定：持续时长 ms，默认 500 */

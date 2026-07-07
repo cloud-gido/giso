@@ -6,7 +6,7 @@ import 'config.dart';
 import 'device_collector.dart';
 import 'types.dart';
 
-const sdkVersion = '1.0.5';
+const sdkVersion = '1.0.6';
 const _didKey = 'giso_did';
 const _sessionKey = 'giso_session';
 const _activatedKey = 'giso_activated';
@@ -76,6 +76,7 @@ Future<CommonParams> buildCommon({
   return CommonParams(
     appId: config.appId,
     platform: platform,
+    appPkg: pickCommonField(config.appPkg, device?.appPkg ?? ''),
     appVersion: config.appVersion,
     sdkVersion: sdkVersion,
     did: await getOrCreateDid(prefs),

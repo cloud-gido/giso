@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// Collects device / network fields for [common] — mirrors Android [CommonParams].
 class DeviceCollector {
@@ -17,6 +18,7 @@ class DeviceCollector {
   String _osVersion = '';
   String _devBrand = '';
   String _devModel = '';
+  String _appPkg = '';
   bool _initialized = false;
 
   Future<void> init(String platform) async {
@@ -39,12 +41,19 @@ class DeviceCollector {
     } catch (_) {
       /* keep defaults on desktop / test */
     }
+    try {
+      final pkg = await PackageInfo.fromPlatform();
+      _appPkg = pkg.packageName;
+    } catch (_) {
+      /* keep empty on unsupported platforms */
+    }
     _initialized = true;
   }
 
   String get osVersion => _osVersion;
   String get devBrand => _devBrand;
   String get devModel => _devModel;
+  String get appPkg => _appPkg;
 
   String screenRes() {
     try {
