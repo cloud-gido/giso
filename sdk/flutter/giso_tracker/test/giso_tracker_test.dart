@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:giso_tracker/giso_tracker.dart';
 import 'package:giso_tracker/src/device_collector.dart';
-import 'package:giso_tracker/src/types.dart';
 
 void main() {
   test('PageContext serializes optional fields', () {
