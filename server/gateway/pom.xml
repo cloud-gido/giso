@@ -56,6 +56,12 @@
       <artifactId>s3</artifactId>
       <version>2.25.70</version>
     </dependency>
+    <!-- IRSA (EKS WebIdentityToken) 需要 sts 模块，否则 DefaultCredentialsProvider 无法 AssumeRole -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>sts</artifactId>
+      <version>2.25.70</version>
+    </dependency>
     <dependency>
       <groupId>redis.clients</groupId>
       <artifactId>jedis</artifactId>
