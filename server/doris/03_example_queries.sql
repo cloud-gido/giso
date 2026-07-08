@@ -46,8 +46,10 @@ GROUP BY event, app_vrsn
 HAVING missing_rate > 0.01
 ORDER BY missing_rate DESC;
 
--- 隔离区今日错误 TOP
-SELECT event, issues, count(*) AS cnt
+-- 隔离区今日错误 TOP（字段从 raw 查询时解析，入库不拆列）
+SELECT get_json_string(raw, '$.event') AS event,
+       get_json_string(raw, '$._issues') AS issues,
+       count(*) AS cnt
 FROM ods_events_quarantine
 WHERE event_date = curdate()
 GROUP BY event, issues ORDER BY cnt DESC LIMIT 20;

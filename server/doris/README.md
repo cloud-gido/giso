@@ -8,6 +8,9 @@
 | `02_routine_load.sql` | Routine Load：`giso_events_raw`（prod）、`giso_events_raw_test`（test）、`giso_events_quarantine` |
 | `03_alter_add_env.sql` | 已有表补 `env` 列（与 ClickHouse 对齐） |
 | `03_example_queries.sql` | CTR、播放时长、投注漏斗、双链路对账、质量监控等示例查询 |
+| `06_rebuild_quarantine_raw_only.sql` | 隔离区 raw-only 重建 + 全量重灌（新 consumer group） |
+
+隔离区 `ods_events_quarantine` 入库只保留 `event_date` / `stime` / `raw` 三列（jsonpaths 仅 `$.`），`stime`/`event_date` 用入库时刻；原始事件时间从 `get_json_string(raw, '$.stime')` 读取，避免 `stime/ctime=0` 落到 1970 分区导致 Routine Load 失败。
 
 ## env 分流（与 ClickHouse 一致）
 

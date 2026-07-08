@@ -63,13 +63,13 @@ FROM KAFKA (
 
 CREATE ROUTINE LOAD tracking.load_ods_quarantine ON ods_events_quarantine
 COLUMNS(
-    stime_ms, event, app_id, platform, did, issues, raw,
-    stime = from_unixtime(stime_ms / 1000),
-    event_date = to_date(from_unixtime(stime_ms / 1000))
+    raw,
+    stime = now(),
+    event_date = curdate()
 )
 PROPERTIES (
     "format" = "json",
-    "jsonpaths" = "[\"$.stime\",\"$.event\",\"$.common.app_id\",\"$.common.platform\",\"$.common.did\",\"$._issues\",\"$\"]",
+    "jsonpaths" = "[\"$.\"]",
     "max_batch_interval" = "10",
     "max_error_number" = "10000",
     "strict_mode" = "false"
@@ -78,5 +78,5 @@ FROM KAFKA (
     "kafka_broker_list" = "kafka:9092",
     "kafka_topic" = "giso_events_quarantine",
     "property.kafka_default_offsets" = "OFFSET_BEGINNING",
-    "property.group.id" = "doris_ods_quarantine"
+    "property.group.id" = "doris_ods_quarantine_v8"
 );

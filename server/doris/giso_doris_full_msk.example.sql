@@ -68,22 +68,17 @@ PROPERTIES (
 );
 
 CREATE TABLE IF NOT EXISTS ods_events_quarantine (
-    event_date   DATE         NOT NULL,
-    stime        DATETIME(3)  NOT NULL,
-    event        VARCHAR(32),
-    app_id       VARCHAR(32),
-    platform     VARCHAR(16),
-    did          VARCHAR(64),
-    issues       JSON         COMMENT '校验失败明细',
-    raw          JSON         COMMENT '完整原始信封'
+    event_date   DATE         NOT NULL COMMENT '分区日期',
+    stime        DATETIME(3)  NOT NULL COMMENT '事件时间',
+    raw          STRING       NOT NULL COMMENT '完整 Kafka JSON 原文'
 )
 DUPLICATE KEY(event_date, stime)
 PARTITION BY RANGE(event_date) ()
-DISTRIBUTED BY HASH(did) BUCKETS AUTO
+DISTRIBUTED BY RANDOM BUCKETS AUTO
 PROPERTIES (
     "dynamic_partition.enable" = "true",
     "dynamic_partition.time_unit" = "DAY",
-    "dynamic_partition.start" = "-30",
+    "dynamic_partition.start" = "-365",
     "dynamic_partition.end" = "3",
     "dynamic_partition.prefix" = "p",
     "replication_num" = "1"
@@ -172,13 +167,13 @@ FROM KAFKA (
 
 CREATE ROUTINE LOAD tracking.load_ods_quarantine ON ods_events_quarantine
 COLUMNS(
-    stime_ms, event, app_id, platform, did, issues, raw,
-    stime = from_unixtime(stime_ms / 1000),
-    event_date = to_date(from_unixtime(stime_ms / 1000))
+    raw,
+    stime = now(),
+    event_date = curdate()
 )
 PROPERTIES (
     "format" = "json",
-    "jsonpaths" = "[\"$.stime\",\"$.event\",\"$.common.app_id\",\"$.common.platform\",\"$.common.did\",\"$._issues\",\"$\"]",
+    "jsonpaths" = "[\"$.\"]",
     "max_batch_interval" = "10",
     "max_error_number" = "10000",
     "strict_mode" = "false"
@@ -187,7 +182,7 @@ FROM KAFKA (
     "kafka_broker_list" = "b-1.gamelinelabdevkafkakaf.qfouvr.c2.kafka.sa-east-1.amazonaws.com:9096,b-2.gamelinelabdevkafkakaf.qfouvr.c2.kafka.sa-east-1.amazonaws.com:9096,b-3.gamelinelabdevkafkakaf.qfouvr.c2.kafka.sa-east-1.amazonaws.com:9096",
     "kafka_topic" = "giso_events_quarantine",
     "property.kafka_default_offsets" = "OFFSET_BEGINNING",
-    "property.group.id" = "doris_giso_ods_quarantine",
+    "property.group.id" = "doris_giso_ods_quarantine_v8",
     "property.security.protocol" = "SASL_SSL",
     "property.sasl.mechanism" = "SCRAM-SHA-512",
     "property.sasl.username" = "<MSK_USERNAME>",
