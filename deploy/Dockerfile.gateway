@@ -29,7 +29,7 @@ WORKDIR /app
 
 RUN apk add --no-cache su-exec \
     && addgroup -S giso && adduser -S giso -G giso \
-    && mkdir -p /app/config /app/schema /data/events /data/spill /data/screenshots \
+    && mkdir -p /app/config /app/schema /data/events /data/spill /data/screenshots /data/screenshots-cache \
     && chown -R giso:giso /app /data
 
 COPY deploy/gateway-entrypoint.sh /gateway-entrypoint.sh

@@ -15,9 +15,16 @@ class ScreenshotStoreTest {
     @TempDir
     Path tmp;
 
+    private ScreenshotStore localStore() throws Exception {
+        GatewayConfig c = new GatewayConfig();
+        c.screenshotsBackend = "local";
+        c.screenshotsDir = tmp.toString();
+        return ScreenshotStore.create(c);
+    }
+
     @Test
     void saveAndLoad() throws Exception {
-        ScreenshotStore store = new ScreenshotStore(tmp);
+        ScreenshotStore store = localStore();
         byte[] png = new byte[] { (byte) 0x89, 0x50, 0x4e, 0x47 };
         String url = store.save("default", "home.png", png);
         assertTrue(url.startsWith("/admin/screenshots/default/"));
@@ -30,7 +37,7 @@ class ScreenshotStoreTest {
 
     @Test
     void rejectsOversize() throws Exception {
-        ScreenshotStore store = new ScreenshotStore(tmp);
+        ScreenshotStore store = localStore();
         byte[] big = new byte[ScreenshotStore.MAX_BYTES + 1];
         assertThrows(IllegalArgumentException.class, () -> store.save("default", "x.png", big));
     }

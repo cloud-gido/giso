@@ -3,18 +3,14 @@ package com.giso.gateway.sink;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.giso.gateway.GatewayConfig;
 import com.giso.gateway.Metrics;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import com.giso.gateway.aws.S3Clients;
 import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,24 +45,12 @@ public final class S3Sink implements EventSink {
             throw new IllegalArgumentException("s3 sink 需要配置 s3.bucket 或 GISO_S3_BUCKET");
         }
         this.bucket = config.s3Bucket;
-        this.prefix = normalizePrefix(config.s3Prefix);
+        String p = S3Clients.normalizePrefix(config.s3Prefix);
+        this.prefix = p.isEmpty() ? "giso/" : p;
         this.bufferDir = Path.of(config.s3BufferDir);
         this.flushBytes = config.s3FlushBytes;
         Files.createDirectories(bufferDir);
-
-        var builder = S3Client.builder().region(Region.of(config.s3Region));
-        if (config.s3Endpoint != null && !config.s3Endpoint.isBlank()) {
-            builder = builder.endpointOverride(URI.create(config.s3Endpoint.trim()));
-            builder = builder.forcePathStyle(true);
-        }
-        if (config.s3AccessKey != null && !config.s3AccessKey.isBlank()
-                && config.s3SecretKey != null && !config.s3SecretKey.isBlank()) {
-            builder = builder.credentialsProvider(StaticCredentialsProvider.create(
-                    AwsBasicCredentials.create(config.s3AccessKey, config.s3SecretKey)));
-        } else {
-            builder = builder.credentialsProvider(DefaultCredentialsProvider.create());
-        }
-        this.s3 = builder.build();
+        this.s3 = S3Clients.create(config);
         roll();
     }
 
@@ -141,11 +125,6 @@ public final class S3Sink implements EventSink {
         quarantine = Files.newBufferedWriter(quarantinePath, StandardCharsets.UTF_8);
         rawBytes = 0;
         quarantineBytes = 0;
-    }
-
-    private static String normalizePrefix(String p) {
-        if (p == null || p.isBlank()) return "giso/";
-        return p.endsWith("/") ? p : p + "/";
     }
 
     @Override

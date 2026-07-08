@@ -77,8 +77,16 @@ public final class GatewayConfig {
     public String debugRedisSearchNamespace = "";
     public String debugRedisKeyPrefix = "giso:debug";
     public int debugBufferTtlSec = 3600;
-    /** 注册表预览图存储目录（默认 {file.dir}/screenshots） */
+    /** 预览图后端：auto（有 s3.bucket 则用 S3）| local | s3 */
+    public String screenshotsBackend = "auto";
+    /** 本地模式目录（默认 {file.dir}/screenshots） */
     public String screenshotsDir = "";
+    /** S3 对象 key 前缀（默认 {s3.prefix}screenshots/） */
+    public String screenshotsS3Prefix = "";
+    /** S3 回源磁盘缓存目录 */
+    public String screenshotsCacheDir = "./data/screenshots-cache";
+    /** S3 回源内存缓存上限（MB） */
+    public int screenshotsCacheMaxMb = 128;
 
     // ── 安全 ──
     /** 上报鉴权：X-App-Key 白名单；空列表 = 不校验（仅限本地开发） */
@@ -182,7 +190,13 @@ public final class GatewayConfig {
 
         Map<String, Object> admin = (Map<String, Object>) doc.getOrDefault("admin", Map.of());
         c.adminRecentBuffer = (int) admin.getOrDefault("recent_buffer", c.adminRecentBuffer);
+        c.screenshotsBackend = (String) admin.getOrDefault("screenshots_backend", c.screenshotsBackend);
         c.screenshotsDir = (String) admin.getOrDefault("screenshots_dir", c.screenshotsDir);
+        c.screenshotsS3Prefix = (String) admin.getOrDefault("screenshots_s3_prefix", c.screenshotsS3Prefix);
+        c.screenshotsCacheDir = (String) admin.getOrDefault("screenshots_cache_dir", c.screenshotsCacheDir);
+        if (admin.get("screenshots_cache_max_mb") instanceof Number n) {
+            c.screenshotsCacheMaxMb = n.intValue();
+        }
 
         Map<String, Object> debugBuf = (Map<String, Object>) doc.getOrDefault("debug_buffer", Map.of());
         c.debugBufferBackend = (String) debugBuf.getOrDefault("backend", c.debugBufferBackend);
@@ -336,6 +350,11 @@ public final class GatewayConfig {
         envLong("GISO_S3_FLUSH_BYTES").ifPresent(v -> c.s3FlushBytes = v);
         env("GISO_AWS_ACCESS_KEY_ID").ifPresent(v -> c.s3AccessKey = v);
         env("GISO_AWS_SECRET_ACCESS_KEY").ifPresent(v -> c.s3SecretKey = v);
+        env("GISO_SCREENSHOTS_BACKEND").ifPresent(v -> c.screenshotsBackend = v);
+        env("GISO_SCREENSHOTS_DIR").ifPresent(v -> c.screenshotsDir = v);
+        env("GISO_SCREENSHOTS_S3_PREFIX").ifPresent(v -> c.screenshotsS3Prefix = v);
+        env("GISO_SCREENSHOTS_CACHE_DIR").ifPresent(v -> c.screenshotsCacheDir = v);
+        envInt("GISO_SCREENSHOTS_CACHE_MAX_MB").ifPresent(v -> c.screenshotsCacheMaxMb = v);
         env("GISO_REGISTRY_BACKEND").ifPresent(v -> c.registryBackend = v);
         env("GISO_DB_URL").ifPresent(v -> c.dbUrl = v);
         env("GISO_DB_HOST").ifPresent(v -> c.dbHost = v);

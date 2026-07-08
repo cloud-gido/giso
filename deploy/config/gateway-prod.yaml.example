@@ -31,6 +31,16 @@ kafka:
 
 admin:
   recent_buffer: 5000
+  # 配置 s3.bucket 后预览图自动走 S3（IRSA）；本地开发不配 bucket 则用磁盘
+  screenshots_backend: auto
+  screenshots_cache_dir: /data/screenshots-cache
+  screenshots_cache_max_mb: 128
+
+# 预览图 / 湖仓归档共用 bucket（测试环境见 deployment apps/bigdata/giso）
+s3:
+  bucket: ""
+  prefix: giso/
+  region: sa-east-1
 
 auth:
   app_keys: []          # 用 GISO_APP_KEYS=key1,key2 注入
