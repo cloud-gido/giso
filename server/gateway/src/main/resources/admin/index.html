@@ -403,18 +403,17 @@ biz_event code=video_play_start</textarea>
           <option value="user">平台用户</option>
           <option value="system_admin">平台管理员</option>
         </select>
-        <select name="space_role" id="user-space-role">
-          <option value="viewer">只读 · viewer</option>
+        <select name="space_role" id="user-space-role" title="首次授权的空间角色（默认只读）">
+          <option value="viewer" selected>只读 · viewer</option>
           <option value="editor">编辑员 · editor</option>
           <option value="space_admin">空间管理员</option>
         </select>
-        <select name="space_key" id="user-space-key">
+        <select name="space_key" id="user-space-key" title="首次加入的空间；列表由接口加载">
           <option value="default">默认空间</option>
-          <option value="__all__">全部空间</option>
         </select>
         <button type="submit" class="primary">创建</button>
       </form>
-      <p class="muted" id="user-form-hint">平台用户须指定空间角色；创建后自动加入所选空间（默认只读）。</p>
+      <p class="muted" id="user-form-hint">平台用户须指定<strong>一个</strong>目标空间 + 角色（默认只读）。「全部空间」会写入每个业务空间，请慎用。之后加减成员请到「空间设置」。</p>
     </div>
     <div class="card">
       <div class="card-title">有效账号</div>

@@ -155,7 +155,14 @@ function memberHintHtml(candidates) {
   if (!candidates.length) {
     return `<p class="member-form-hint warn">所有平台账号已在本空间，或尚无账号。请平台管理员在「账号管理」中先创建用户。</p>`;
   }
-  return `<p class="member-form-hint">可选 ${candidates.length} 个平台账号（不含已在本空间的成员）。</p>`;
+  return `<p class="member-form-hint">可选 ${candidates.length} 个平台账号（不含已在本空间的成员）。已在本空间的成员可直接改角色，无需先移除。</p>`;
+}
+
+function memberRoleSelectHtml(username, currentRole) {
+  const opts = ['viewer', 'editor', 'space_admin'].map((r) =>
+    `<option value="${r}" ${r === currentRole ? 'selected' : ''}>${SPACE_ROLE_LABEL[r] || r}</option>`).join('');
+  return `<select class="member-role-select" data-user="${esc(username)}" data-prev="${esc(currentRole || '')}"
+    aria-label="修改 ${esc(username)} 的空间角色">${opts}</select>`;
 }
 
 export async function renderSpaces() {
@@ -178,10 +185,11 @@ export async function renderSpaces() {
     const list = Array.isArray(members) ? members : [];
     const pickList = Array.isArray(candidates) ? candidates : [];
     membersHtml = `<h3>本空间成员</h3>
+      <p class="muted" style="margin-top:0">只影响<strong>当前空间</strong>。平台账号请先在「账号管理」创建；添加默认<strong>只读</strong>，列表内可随时改角色。</p>
       <table><thead><tr><th>用户名</th><th>角色</th><th>操作</th></tr></thead>
       <tbody>${list.map((m) => `<tr>
         <td>${esc(m.username)}${m.display_name ? ` <span class="muted">(${esc(m.display_name)})</span>` : ''}</td>
-        <td>${SPACE_ROLE_LABEL[m.role] || esc(m.role)}</td>
+        <td>${memberRoleSelectHtml(m.username, m.role)}</td>
         <td><button class="danger" data-rm="${esc(m.username)}">移除</button></td>
       </tr>`).join('') || '<tr><td colspan="3" class="muted">暂无成员</td></tr>'}
       </tbody></table>
@@ -189,9 +197,9 @@ export async function renderSpaces() {
         <label class="muted" style="font-size:12px;font-weight:600">添加成员</label>
         ${memberSelectHtml(pickList)}
         <select name="role" aria-label="空间角色">
+          <option value="viewer" selected>只读</option>
+          <option value="editor">编辑员</option>
           <option value="space_admin">空间管理员</option>
-          <option value="editor" selected>编辑员</option>
-          <option value="viewer">只读</option>
         </select>
         <button type="submit" ${pickList.length ? '' : 'disabled'}>添加成员</button>
         <div id="member-form-feedback" hidden></div>
@@ -257,6 +265,28 @@ export async function renderSpaces() {
     showMemberFeedback(msg, 'ok');
     toast(msg);
     renderSpaces();
+  });
+
+  wrap.querySelectorAll('select.member-role-select').forEach((sel) => {
+    sel.addEventListener('change', async () => {
+      const username = sel.dataset.user;
+      const role = sel.value;
+      const prev = sel.dataset.prev || '';
+      if (!username || role === prev) return;
+      sel.disabled = true;
+      const r = await api(`/spaces/${encodeURIComponent(getSpace())}/members`, {
+        method: 'POST', body: JSON.stringify({ username, role }),
+      });
+      sel.disabled = false;
+      if (r.error) {
+        sel.value = prev;
+        toast(r.error, 'error');
+        return;
+      }
+      sel.dataset.prev = role;
+      const label = SPACE_ROLE_LABEL[role] || role;
+      toast(r.message || `已将「${username}」改为 ${label}`);
+    });
   });
 
   wrap.querySelectorAll('button[data-rm]').forEach((btn) => {

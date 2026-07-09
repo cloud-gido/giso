@@ -186,6 +186,7 @@ a.nav-link:hover { color: var(--accent); background: var(--panel2); }
 .topbar-actions { flex-shrink: 0; }
 .inline-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
 .inline-form select[name="username"] { min-width: 200px; max-width: 280px; }
+.member-role-select { min-width: 120px; font-size: 13px; }
 .member-form-hint { font-size: 12px; color: var(--muted); margin-top: 6px; width: 100%; }
 .member-form-hint.warn { color: var(--yellow); }
 .form-feedback {

@@ -504,13 +504,15 @@ public final class AdminHandler implements HttpHandler {
         }
         if (path.equals("/users") && method.equals("POST")) {
             Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
+            String spaceKey = blankToNull(str(body, "space_key"));
+            String spaceRole = blankToNull(str(body, "space_role"));
             String err = auth.saveUser(
                     str(body, "username"),
                     str(body, "password"),
                     str(body, "role"),
                     str(body, "display_name"),
-                    str(body, "space_key"),
-                    str(body, "space_role"),
+                    spaceKey,
+                    spaceRole,
                     bool(body, "all_spaces"));
             if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
             else Http.json(ex, 200, "{\"ok\":true}");
@@ -538,8 +540,12 @@ public final class AdminHandler implements HttpHandler {
                 Map<String, Object> body = M.readValue(Http.readBody(ex), new TypeReference<>() { });
                 String pass = body.containsKey("password") ? str(body, "password") : null;
                 if (pass != null && pass.isBlank()) pass = null;
+                // 仅改密码/平台角色时不传 space_*，避免误扩写空间成员
+                String spaceKey = body.containsKey("space_key") ? blankToNull(str(body, "space_key")) : null;
+                String spaceRole = body.containsKey("space_role") ? blankToNull(str(body, "space_role")) : null;
+                boolean allSpaces = body.containsKey("all_spaces") && bool(body, "all_spaces");
                 String err = auth.saveUser(username, pass, str(body, "role"), str(body, "display_name"),
-                        str(body, "space_key"), str(body, "space_role"), bool(body, "all_spaces"));
+                        spaceKey, spaceRole, allSpaces);
                 if (err != null) Http.json(ex, 400, M.writeValueAsString(Map.of("error", err)));
                 else Http.json(ex, 200, "{\"ok\":true}");
                 return;
@@ -902,6 +908,10 @@ public final class AdminHandler implements HttpHandler {
     private static String str(Map<String, Object> m, String key) {
         Object v = m.get(key);
         return v == null ? "" : String.valueOf(v).trim();
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s;
     }
 
     private static boolean bool(Map<String, Object> m, String key) {

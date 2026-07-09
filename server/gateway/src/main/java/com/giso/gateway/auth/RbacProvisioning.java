@@ -5,7 +5,12 @@ import com.giso.gateway.space.SpaceService;
 import java.util.List;
 import java.util.Map;
 
-/** 账号创建后的空间成员自动授权（避免「有账号、无空间」无法登录）。 */
+/**
+ * 账号创建后的空间成员授权。
+ * <p>
+ * 约定：账号管理负责「首次」授权（单空间或显式全部）；
+ * 日常加减成员 / 改角色走 {@code SpaceService#saveMember}（空间设置页）。
+ */
 public final class RbacProvisioning {
     private RbacProvisioning() { }
 

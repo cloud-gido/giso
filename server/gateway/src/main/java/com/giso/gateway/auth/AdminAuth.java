@@ -161,7 +161,10 @@ public final class AdminAuth {
     }
 
     /**
-     * 创建/更新账号；平台用户可同步授权空间成员（space_key / space_role / all_spaces）。
+     * 创建/更新账号。
+     * <p>平台用户首次创建须带 space_key / space_role（或 all_spaces）；
+     * 仅改密码/平台角色时<strong>不</strong>自动扩写空间成员。
+     * 后续加减空间请走 {@code POST /spaces/{key}/members}。
      */
     public String saveUser(String username, String password, String role, String displayName,
             String spaceKey, String spaceRole, boolean allSpaces) throws Exception {
@@ -171,14 +174,21 @@ public final class AdminAuth {
                 role != null && !role.isBlank() ? role : store.lookupRole(username));
         if (platformRole == null) return "role 非法";
         if (!RbacRoles.requiresSpaceMembership(platformRole)) return null;
-        boolean shouldProvision = spaceRole != null && !spaceRole.isBlank()
+        if (spaces == null) return null;
+
+        boolean explicitSpace = (spaceRole != null && !spaceRole.isBlank())
                 || allSpaces
                 || RbacRoles.provisionAllSpaces(spaceKey)
-                || (role != null && (AdminUser.ROLE_EDITOR.equals(role) || AdminUser.ROLE_VIEWER.equals(role)));
-        if (!shouldProvision && spaces != null) {
-            shouldProvision = spaces.listMembershipsForUser(username).isEmpty();
+                || (spaceKey != null && !spaceKey.isBlank());
+        boolean needsBootstrap = spaces.listMembershipsForUser(username).isEmpty();
+        if (!explicitSpace && !needsBootstrap) return null;
+        // 无显式空间参数且已有成员：不改动空间授权（例如仅重置密码）
+        if (!explicitSpace) {
+            // 新账号且未指定空间：默认加入 default · viewer，避免无法登录
+            return RbacProvisioning.provisionSpaceAccess(
+                    spaces, username, platformRole, SpaceService.DEFAULT_SPACE,
+                    AdminUser.ROLE_VIEWER, false);
         }
-        if (!shouldProvision) return null;
         return RbacProvisioning.provisionSpaceAccess(
                 spaces, username, platformRole, spaceKey, spaceRole, allSpaces);
     }

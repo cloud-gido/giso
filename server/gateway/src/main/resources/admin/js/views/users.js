@@ -1,4 +1,7 @@
-/* 账号管理（仅 platform admin） */
+/* 账号管理（仅 platform admin）
+ * 职责：创建平台账号 + 首次授权「一个」空间（或显式全部）。
+ * 后续改某空间角色 / 加减成员 → 请到「空间设置」。
+ */
 import { $, esc, toast } from '../util.js';
 import { api } from '../api.js';
 import { isAdmin } from '../session.js';
@@ -6,13 +9,16 @@ import { isAdmin } from '../session.js';
 const ROLE_LABEL = { system_admin: '平台管理员', user: '平台用户', admin: '管理员' };
 const SPACE_ROLE_LABEL = { space_admin: '空间管理员', editor: '编辑员', viewer: '只读' };
 
+let cachedSpaces = [];
+
 function formatSpaces(spaces) {
   if (!Array.isArray(spaces) || spaces.length === 0) {
     return '<span class="tag tag-warn">未授权空间</span>';
   }
   return spaces.map((s) => {
     const label = SPACE_ROLE_LABEL[s.role] || s.role;
-    return `<span class="tag">${esc(s.space_key)} · ${esc(label)}</span>`;
+    const name = s.display_name ? `${s.display_name}` : s.space_key;
+    return `<span class="tag" title="${esc(s.space_key)}">${esc(name)} · ${esc(label)}</span>`;
   }).join(' ');
 }
 
@@ -24,12 +30,38 @@ function toggleSpaceFields() {
   $('#user-form-hint')?.toggleAttribute('hidden', !show);
 }
 
+async function loadSpaceOptions() {
+  const sel = $('#user-space-key');
+  if (!sel) return;
+  try {
+    const spaces = await api('/spaces');
+    cachedSpaces = Array.isArray(spaces)
+      ? spaces.filter((s) => s.status === 'active' || !s.status)
+      : [];
+  } catch {
+    cachedSpaces = [];
+  }
+  const prev = sel.value || 'default';
+  const opts = cachedSpaces.map((s) => {
+    const label = s.display_name
+      ? `${s.display_name}（${s.space_key}）`
+      : s.space_key;
+    return `<option value="${esc(s.space_key)}">${esc(label)}</option>`;
+  });
+  opts.push('<option value="__all__">⚠ 全部空间（高权限，慎用）</option>');
+  sel.innerHTML = opts.join('') || '<option value="default">默认空间</option>';
+  if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  else if (cachedSpaces.some((s) => s.space_key === 'default')) sel.value = 'default';
+  else if (cachedSpaces[0]) sel.value = cachedSpaces[0].space_key;
+}
+
 export async function renderUsers() {
   const wrap = $('#users-table');
   if (!isAdmin()) {
     wrap.innerHTML = '<p class="muted">仅平台管理员可管理账号。</p>';
     return;
   }
+  await loadSpaceOptions();
   const users = await api('/users');
   const list = Array.isArray(users) ? users : [];
   wrap.innerHTML = `<table>
@@ -102,6 +134,7 @@ export async function renderUsers() {
 
 export function initUsers() {
   toggleSpaceFields();
+  loadSpaceOptions();
   $('#user-platform-role')?.addEventListener('change', toggleSpaceFields);
   $('#user-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -109,6 +142,7 @@ export function initUsers() {
     const fd = new FormData(e.target);
     const platformRole = (fd.get('role') || 'user').toString();
     const spaceKey = (fd.get('space_key') || 'default').toString();
+    const spaceRole = (fd.get('space_role') || 'viewer').toString();
     const body = {
       username: (fd.get('username') || '').toString().trim(),
       password: (fd.get('password') || '').toString(),
@@ -116,16 +150,28 @@ export function initUsers() {
       display_name: (fd.get('display_name') || '').toString().trim(),
     };
     if (platformRole === 'user') {
-      body.space_role = (fd.get('space_role') || 'viewer').toString();
+      if (spaceKey === '__all__') {
+        const n = cachedSpaces.length || '全部';
+        if (!confirm(`确认将「${body.username}」授权到全部 ${n} 个空间（角色：${SPACE_ROLE_LABEL[spaceRole] || spaceRole}）？\n\n通常应只选一个业务空间；后续可在「空间设置」加减成员。`)) {
+          return;
+        }
+      }
+      body.space_role = spaceRole;
       body.space_key = spaceKey;
       body.all_spaces = spaceKey === '__all__';
     }
     const r = await api('/users', { method: 'POST', body: JSON.stringify(body) });
     if (r.error) toast(r.error, 'error');
     else {
-      toast(`已创建 ${body.username}，空间授权已同步`);
+      const where = platformRole === 'system_admin'
+        ? '平台管理员（全部空间）'
+        : (spaceKey === '__all__'
+          ? `全部空间 · ${SPACE_ROLE_LABEL[spaceRole] || spaceRole}`
+          : `${spaceKey} · ${SPACE_ROLE_LABEL[spaceRole] || spaceRole}`);
+      toast(`已创建 ${body.username}（${where}）`);
       e.target.reset();
       toggleSpaceFields();
+      await loadSpaceOptions();
       renderUsers();
     }
   });
