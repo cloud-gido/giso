@@ -30,7 +30,14 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 | 构建 | endpoint | App Key | env | Kafka topic |
 |------|----------|---------|-----|-------------|
 | debug | `https://gamelinelab-giso.envir.dev/v1/track` | `video-android-beta` | test | `giso_events_raw_test` |
-| release | 同上 | `video-android-prod` | prod | `giso_events_raw` |
+| release | `https://gamelinelab-giso.actuvex.com/v1/track` | `video-android-prod` | prod | `giso_events_raw` |
+
+正式包：
+
+```bash
+./gradlew :app:assembleRelease
+# 安装包：app/build/outputs/apk/release/app-release.apk
+```
 
 1. 确认 Doppler 已配置 `INFRA_GISO_APP_KEYS`（含上述 key，见 `deploy/DEPLOYMENT.md`）
 2. 真机安装 `app-debug.apk`（或 Android Studio Run debug 包，4G 即可）

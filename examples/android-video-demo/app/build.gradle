@@ -26,7 +26,13 @@ android {
 
     buildTypes {
         release {
+            // 正式环境：公网 gamelinelab-giso.actuvex.com → EKS giso-gateway:8123
             minifyEnabled false
+            signingConfig signingConfigs.debug
+            buildConfigField 'String', 'TRACK_ENDPOINT',
+                    '"https://gamelinelab-giso.actuvex.com/v1/track"'
+            buildConfigField 'String', 'ADMIN_URL',
+                    '"https://gamelinelab-giso.actuvex.com/admin/"'
             buildConfigField 'String', 'APP_KEY', '"video-android-prod"'
             buildConfigField 'String', 'TRACK_ENV', '"prod"'
             buildConfigField 'boolean', 'TRACK_DEBUG', 'false'
