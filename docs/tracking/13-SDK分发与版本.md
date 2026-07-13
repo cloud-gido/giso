@@ -265,7 +265,7 @@ SDK 内的 `Pages` / `Elements` / `Params` / `BizEvents`（Web 为 `generated.ts
 | 4 | 长视频确认 `common.space` 为 `longvideo` |
 | 5 | 播放心跳：业务定时器 + `bizEvent(VIDEO_PLAY_HEARTBEAT)`，**不是**长连接 |
 
-常见误解见 [08-FAQ Q21b–Q21g](08-接入常见问题FAQ.md)、[10-空间与多租户](10-空间与多租户.md)。
+常见误解见 [08-FAQ Q28–Q35](08-接入常见问题FAQ.md)、[10-空间与多租户](10-空间与多租户.md)。
 
 ---
 
@@ -320,7 +320,7 @@ git push origin v1.0.0
 
 [CHANGELOG.md](../../CHANGELOG.md) · 当前 SDK **1.0.0**（tag `v1.0.0`）。
 
-### Q6. 没有 GitHub 账号怎么办？
+### Q7. 没有 GitHub 账号怎么办？
 
 由平台提供：**离线 AAR**（Android）、**tgz**（npm）、或 **XCFramework**（iOS）+ 校验 SHA256（流程与坐标版本一致）。默认推荐 GitHub Packages。
 
