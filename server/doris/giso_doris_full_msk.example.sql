@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS ods_events (
     ref_eid      VARCHAR(64),
     pg_stay      BIGINT       COMMENT '页面停留ms（仅page_exit）',
     pg_params    JSON         COMMENT '页面参数',
+    fg_dur       BIGINT       COMMENT '前台时长ms（仅app_background）',
 
     eid          VARCHAR(64),
     mod          VARCHAR(64),
@@ -52,8 +53,12 @@ CREATE TABLE IF NOT EXISTS ods_events (
     biz_params   JSON,
 
     quality      VARCHAR(16)  COMMENT 'ok/missing',
-    common_ext   JSON         COMMENT '其余公共参数',
-    pt           JSON         COMMENT '后台参数透传包'
+    common_ext   JSON         COMMENT '完整 common 对象',
+    pt           JSON         COMMENT '后台参数透传包',
+    page_ext     JSON         COMMENT '完整 page 对象',
+    element_ext  JSON         COMMENT '完整 element 对象',
+    biz_ext      JSON         COMMENT '完整 biz 对象',
+    raw          STRING       COMMENT '完整 Kafka JSON 原文'
 )
 DUPLICATE KEY(event_date, event, stime)
 PARTITION BY RANGE(event_date) ()
@@ -103,9 +108,10 @@ CREATE ROUTINE LOAD tracking.load_ods_events ON ods_events
 COLUMNS(
     stime_ms, ctime, log_id, event,
     app_id, platform, app_vrsn, did, uid, session_id, channel, env,
-    pgid, ref_pgid, ref_eid, pg_stay, pg_params,
+    pgid, ref_pgid, ref_eid, pg_stay, pg_params, fg_dur,
     eid, mod, pos, exp_dur, exp_ratio, el_params,
     biz_code, biz_params, quality, common_ext, pt,
+    page_ext, element_ext, biz_ext, raw,
     stime = from_unixtime(stime_ms / 1000),
     event_date = to_date(from_unixtime(stime_ms / 1000)),
     env = IFNULL(env, 'prod')
@@ -114,9 +120,10 @@ PROPERTIES (
     "format" = "json",
     "jsonpaths" = "[\"$.stime\",\"$.ctime\",\"$.log_id\",\"$.event\",
         \"$.common.app_id\",\"$.common.platform\",\"$.common.app_vrsn\",\"$.common.did\",\"$.common.uid\",\"$.common.session_id\",\"$.common.channel\",\"$.common.env\",
-        \"$.page.pgid\",\"$.page.ref_pgid\",\"$.page.ref_eid\",\"$.page.pg_stay\",\"$.page.pg_params\",
+        \"$.page.pgid\",\"$.page.ref_pgid\",\"$.page.ref_eid\",\"$.page.pg_stay\",\"$.page.pg_params\",\"$.page.fg_dur\",
         \"$.element.eid\",\"$.element.mod\",\"$.element.pos\",\"$.element.exp_dur\",\"$.element.exp_ratio\",\"$.element.params\",
-        \"$.biz.code\",\"$.biz.params\",\"$._quality\",\"$.common\",\"$.pt\"]",
+        \"$.biz.code\",\"$.biz.params\",\"$._quality\",\"$.common\",\"$.pt\",
+        \"$.page\",\"$.element\",\"$.biz\",\"$.\"]",
     "max_batch_interval" = "10",
     "max_error_number" = "1000",
     "strict_mode" = "false"
@@ -125,7 +132,7 @@ FROM KAFKA (
     "kafka_broker_list" = "b-1.gamelinelabdevkafkakaf.qfouvr.c2.kafka.sa-east-1.amazonaws.com:9096,b-2.gamelinelabdevkafkakaf.qfouvr.c2.kafka.sa-east-1.amazonaws.com:9096,b-3.gamelinelabdevkafkakaf.qfouvr.c2.kafka.sa-east-1.amazonaws.com:9096",
     "kafka_topic" = "giso_events_raw",
     "property.kafka_default_offsets" = "OFFSET_BEGINNING",
-    "property.group.id" = "doris_giso_ods_events",
+    "property.group.id" = "doris_giso_ods_events_v2",
     "property.security.protocol" = "SASL_SSL",
     "property.sasl.mechanism" = "SCRAM-SHA-512",
     "property.sasl.username" = "<MSK_USERNAME>",
@@ -136,9 +143,10 @@ CREATE ROUTINE LOAD tracking.load_ods_events_test ON ods_events
 COLUMNS(
     stime_ms, ctime, log_id, event,
     app_id, platform, app_vrsn, did, uid, session_id, channel, env,
-    pgid, ref_pgid, ref_eid, pg_stay, pg_params,
+    pgid, ref_pgid, ref_eid, pg_stay, pg_params, fg_dur,
     eid, mod, pos, exp_dur, exp_ratio, el_params,
     biz_code, biz_params, quality, common_ext, pt,
+    page_ext, element_ext, biz_ext, raw,
     stime = from_unixtime(stime_ms / 1000),
     event_date = to_date(from_unixtime(stime_ms / 1000)),
     env = IFNULL(env, 'test')
@@ -147,9 +155,10 @@ PROPERTIES (
     "format" = "json",
     "jsonpaths" = "[\"$.stime\",\"$.ctime\",\"$.log_id\",\"$.event\",
         \"$.common.app_id\",\"$.common.platform\",\"$.common.app_vrsn\",\"$.common.did\",\"$.common.uid\",\"$.common.session_id\",\"$.common.channel\",\"$.common.env\",
-        \"$.page.pgid\",\"$.page.ref_pgid\",\"$.page.ref_eid\",\"$.page.pg_stay\",\"$.page.pg_params\",
+        \"$.page.pgid\",\"$.page.ref_pgid\",\"$.page.ref_eid\",\"$.page.pg_stay\",\"$.page.pg_params\",\"$.page.fg_dur\",
         \"$.element.eid\",\"$.element.mod\",\"$.element.pos\",\"$.element.exp_dur\",\"$.element.exp_ratio\",\"$.element.params\",
-        \"$.biz.code\",\"$.biz.params\",\"$._quality\",\"$.common\",\"$.pt\"]",
+        \"$.biz.code\",\"$.biz.params\",\"$._quality\",\"$.common\",\"$.pt\",
+        \"$.page\",\"$.element\",\"$.biz\",\"$.\"]",
     "max_batch_interval" = "10",
     "max_error_number" = "1000",
     "strict_mode" = "false"
@@ -158,7 +167,7 @@ FROM KAFKA (
     "kafka_broker_list" = "b-1.gamelinelabdevkafkakaf.qfouvr.c2.kafka.sa-east-1.amazonaws.com:9096,b-2.gamelinelabdevkafkakaf.qfouvr.c2.kafka.sa-east-1.amazonaws.com:9096,b-3.gamelinelabdevkafkakaf.qfouvr.c2.kafka.sa-east-1.amazonaws.com:9096",
     "kafka_topic" = "giso_events_raw_test",
     "property.kafka_default_offsets" = "OFFSET_BEGINNING",
-    "property.group.id" = "doris_giso_ods_events_test",
+    "property.group.id" = "doris_giso_ods_events_test_v2",
     "property.security.protocol" = "SASL_SSL",
     "property.sasl.mechanism" = "SCRAM-SHA-512",
     "property.sasl.username" = "<MSK_USERNAME>",

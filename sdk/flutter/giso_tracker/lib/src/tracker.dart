@@ -221,7 +221,14 @@ class GisoTracker with WidgetsBindingObserver {
     };
     final page = _pageContext(extras: pageExtras);
     if (page.pgid.isNotEmpty || pageExtras != null) {
-      envelope['page'] = page.toJson();
+      // Merge extras (e.g. fg_dur) after toJson — PageContext fields alone drop them.
+      final pageJson = page.toJson();
+      if (pageExtras != null) {
+        for (final e in pageExtras.entries) {
+          if (e.key != 'pg_stay') pageJson[e.key] = e.value;
+        }
+      }
+      envelope['page'] = pageJson;
     }
     if (element != null) envelope['element'] = element.toJson();
     if (biz != null) envelope['biz'] = biz.toJson();

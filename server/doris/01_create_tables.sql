@@ -7,8 +7,8 @@ CREATE DATABASE IF NOT EXISTS tracking;
 USE tracking;
 
 -- ── 事件明细表（ODS）────────────────────────────────────────
--- 明细模型（DUPLICATE KEY），高频公共字段拉平成列做过滤/聚合，
--- 长尾参数保留 JSON 列，新增参数无需改表（注册表加字段即可查 params['xxx']）。
+-- 明细模型（DUPLICATE KEY）：高频字段拉平做过滤；嵌套对象整包 JSON 保留；
+-- raw 存完整 Kafka 原文，未拉平字段永不丢（get_json_* 事后补查）。
 CREATE TABLE IF NOT EXISTS ods_events (
     event_date   DATE         NOT NULL COMMENT '分区日期（stime）',
     event        VARCHAR(32)  NOT NULL COMMENT '标准事件名',
@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS ods_events (
     ref_eid      VARCHAR(64),
     pg_stay      BIGINT       COMMENT '页面停留ms（仅page_exit）',
     pg_params    JSON         COMMENT '页面参数',
+    fg_dur       BIGINT       COMMENT '前台时长ms（仅app_background）',
 
     -- 元素上下文（仅元素事件）
     eid          VARCHAR(64),
@@ -47,8 +48,14 @@ CREATE TABLE IF NOT EXISTS ods_events (
     biz_params   JSON,
 
     quality      VARCHAR(16)  COMMENT 'ok/missing',
-    common_ext   JSON         COMMENT '其余公共参数（机型/网络/语言等）',
-    pt           JSON         COMMENT '后台参数透传包（推荐trace/赔率版本等），原样落地不校验'
+    common_ext   JSON         COMMENT '完整 common 对象（含未拉平字段）',
+    pt           JSON         COMMENT '后台参数透传包（推荐trace/赔率版本等），原样落地不校验',
+
+    -- 嵌套整包 + 原文兜底（未拉平字段从这里取）
+    page_ext     JSON         COMMENT '完整 page 对象（含 fg_dur 等）',
+    element_ext  JSON         COMMENT '完整 element 对象',
+    biz_ext      JSON         COMMENT '完整 biz 对象',
+    raw          STRING       COMMENT '完整 Kafka JSON 原文，保证字段不丢'
 )
 DUPLICATE KEY(event_date, event, stime)
 PARTITION BY RANGE(event_date) ()

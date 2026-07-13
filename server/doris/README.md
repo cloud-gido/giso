@@ -9,6 +9,7 @@
 | `03_alter_add_env.sql` | 已有表补 `env` 列（与 ClickHouse 对齐） |
 | `03_example_queries.sql` | CTR、播放时长、投注漏斗、双链路对账、质量监控等示例查询 |
 | `06_rebuild_quarantine_raw_only.sql` | 隔离区 raw-only 重建 + 全量重灌（新 consumer group） |
+| `07_alter_ods_events_keep_raw.sql` | 已有表补 `fg_dur` / `page_ext` / `element_ext` / `biz_ext` / `raw` |
 
 隔离区 `ods_events_quarantine` 入库只保留 `event_date` / `stime` / `raw` 三列（jsonpaths 仅 `$.`），`stime`/`event_date` 用入库时刻；原始事件时间从 `get_json_string(raw, '$.stime')` 读取，避免 `stime/ctime=0` 落到 1970 分区导致 Routine Load 失败。
 
@@ -45,6 +46,6 @@ mysql> SELECT env, event, count(*) FROM tracking.ods_events GROUP BY env, event;
 
 ## 设计要点
 
-- **高频字段拉平成列**（event/did/uid/pgid/eid/biz_code/env…）做分区裁剪和谓词下推；**长尾参数留 JSON 列**（`pg_params`/`el_params`/`biz_params`），注册表新增参数不用改表，`params->'$.xxx'` 直接查。
+- **高频字段拉平成列**（event/did/uid/pgid/eid/biz_code/env/`fg_dur`…）做分区裁剪和谓词下推；**长尾参数留 JSON**（`pg_params`/`el_params`/`biz_params`）；**嵌套整包**（`page_ext`/`element_ext`/`biz_ext`/`common_ext`）+ **`raw` 原文**保证未映射字段不丢，事后用 `get_json_*` / `->` 补查。
 - **去重**：`log_id` 列保留，明细模型不强制去重（Routine Load 本身 exactly-once 到分区级）；需要严格幂等的报表在 DWD 层按 `log_id` 去重物化。
 - **后续分层**：ODS 之上建 DWD（按业务域拆表+去重）、DWS（天级聚合：曝光点击宽表、漏斗宽表），用 Doris 物化视图或定时 INSERT 维护。
