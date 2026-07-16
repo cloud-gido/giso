@@ -43,7 +43,7 @@ void main() {
       platform: 'android',
       appPkg: 'com.example.demo',
       appVersion: '1.0.0',
-      sdkVersion: '1.0.6',
+      sdkVersion: '1.0.7',
       did: 'did-1',
       uid: '',
       sessionId: 's-1',

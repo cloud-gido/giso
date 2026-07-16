@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.7] - 2026-07-16
+
+### Added
+
+- **全端 SDK**：`common.sdk_runtime`（`native` | `flutter` | `web`），与 `platform`（OS）正交，便于分析区分 Flutter / 原生 / Web 上报栈。
+
+---
+
 ## [1.0.6] - 2026-07-07
 
 ### Added
@@ -122,7 +130,8 @@ Initial open-source baseline (pre-SDK package publish).
 
 ---
 
-[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/cloud-gido/giso/releases/tag/v1.0.7
 [1.0.6]: https://github.com/cloud-gido/giso/releases/tag/v1.0.6
 [1.0.5]: https://github.com/cloud-gido/giso/releases/tag/v1.0.5
 [1.0.3]: https://github.com/cloud-gido/giso/releases/tag/v1.0.3

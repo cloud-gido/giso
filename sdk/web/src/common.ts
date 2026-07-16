@@ -1,6 +1,6 @@
 import type { CommonParams, TrackerConfig } from './types';
 
-const SDK_VERSION = '1.0.6';
+const SDK_VERSION = '1.0.7';
 const DID_KEY = '_giso_did';
 const SESSION_KEY = '_giso_session';
 const SESSION_GAP_MS = 30 * 60 * 1000;
