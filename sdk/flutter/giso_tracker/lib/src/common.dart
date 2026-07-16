@@ -6,7 +6,7 @@ import 'config.dart';
 import 'device_collector.dart';
 import 'types.dart';
 
-const sdkVersion = '1.0.7';
+const sdkVersion = '1.0.8';
 const _didKey = 'giso_did';
 const _sessionKey = 'giso_session';
 const _activatedKey = 'giso_activated';
@@ -67,6 +67,7 @@ Future<CommonParams> buildCommon({
   required GisoConfig config,
   required SharedPreferences prefs,
   required String uid,
+  String bizDid = '',
   required String platform,
   DeviceCollector? device,
 }) async {
@@ -81,6 +82,7 @@ Future<CommonParams> buildCommon({
     sdkVersion: sdkVersion,
     did: await getOrCreateDid(prefs),
     uid: uid,
+    bizDid: bizDid,
     sessionId: await touchSession(prefs),
     channel: config.channel,
     env: config.resolvedEnv(),

@@ -77,6 +77,11 @@ public final class Tracker {
 
     public func setUid(_ uid: String) { common.setUid(uid) }
     public func clearUid() { common.setUid("") }
+
+    /// 业务设备 ID（历史账号体系兼容）；启动后尽早调用
+    public func setBizDid(_ bizDid: String) { common.setBizDid(bizDid) }
+    public func clearBizDid() { common.setBizDid("") }
+
     public func flush() { queue.flush() }
 
     // ── 页面 ──────────────────────────────────────────────

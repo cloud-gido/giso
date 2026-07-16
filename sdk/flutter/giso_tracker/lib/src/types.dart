@@ -14,6 +14,7 @@ class CommonParams {
     this.sdkRuntime = 'flutter',
     required this.did,
     required this.uid,
+    this.bizDid = '',
     required this.sessionId,
     required this.channel,
     required this.env,
@@ -35,6 +36,8 @@ class CommonParams {
   final String sdkRuntime;
   final String did;
   final String uid;
+  /// 业务设备 ID（历史账号体系兼容）；由 App [GisoTracker.setBizDid] 设置
+  final String bizDid;
   final String sessionId;
   final String channel;
   final String env;
@@ -55,6 +58,7 @@ class CommonParams {
         'sdk_runtime': sdkRuntime,
         'did': did,
         'uid': uid,
+        'biz_did': bizDid,
         'session_id': sessionId,
         'channel': channel,
         'env': env,

@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.8] - 2026-07-16
+
+### Added
+
+- **全端 SDK**：`common.biz_did`（业务设备 ID），由 App `setBizDid` / `clearBizDid` 上报，用于兼容历史无账号体系的业务设备去重；与 SDK 自生成的 `did` 正交。不落 Doris 独立列，查询 `json_extract_string(common_ext,'$.biz_did')`。
+
+---
+
 ## [1.0.7] - 2026-07-16
 
 ### Added
@@ -130,7 +138,8 @@ Initial open-source baseline (pre-SDK package publish).
 
 ---
 
-[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.7...HEAD
+[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.8...HEAD
+[1.0.8]: https://github.com/cloud-gido/giso/releases/tag/v1.0.8
 [1.0.7]: https://github.com/cloud-gido/giso/releases/tag/v1.0.7
 [1.0.6]: https://github.com/cloud-gido/giso/releases/tag/v1.0.6
 [1.0.5]: https://github.com/cloud-gido/giso/releases/tag/v1.0.5

@@ -11,7 +11,7 @@
 |--|--------------|---------|
 | 路径 | `examples/android-video-demo/` | `examples/flutter-video-demo/` |
 | 包名 | `com.giso.demo.video` | `com.giso.demo.flutter` |
-| SDK | `sdk/android` · `com.giso:tracker` | `sdk/flutter/giso_tracker` @ **`v1.0.7`** |
+| SDK | `sdk/android` · `com.giso:tracker` | `sdk/flutter/giso_tracker` @ **`v1.0.8`** |
 | 构建 | `./gradlew :app:assembleDebug` | `./build-apk.sh` |
 | APK | `app/build/outputs/apk/debug/app-debug.apk` | `build/app/outputs/flutter-apk/app-debug.apk` |
 
@@ -144,7 +144,7 @@ dependencies:
   giso_tracker:
     git:
       url: https://github.com/cloud-gido/giso.git
-      ref: v1.0.7
+      ref: v1.0.8
       path: sdk/flutter/giso_tracker
 ```
 

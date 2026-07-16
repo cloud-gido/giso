@@ -25,6 +25,8 @@ export interface CommonParams {
   sdk_runtime: 'web' | 'native' | 'flutter';
   did: string;
   uid: string;
+  /** 业务设备 ID（历史账号体系兼容）；App setBizDid 设置，SDK 不生成 */
+  biz_did: string;
   session_id: string;
   channel: string;
   env: string;

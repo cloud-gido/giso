@@ -27,6 +27,7 @@ export class Tracker {
   private exposure: ExposureObserver;
   private metas = new WeakMap<Element, ElementMeta>();
   private uid = '';
+  private bizDid = '';
 
   private curPage: { pgid: string; params?: Params; pt?: Passthrough; enterTs: number } | null = null;
   private refPgid = '';
@@ -87,6 +88,10 @@ export class Tracker {
 
   setUid(uid: string): void { this.uid = uid; }
   clearUid(): void { this.uid = ''; }
+
+  /** 业务设备 ID（历史账号体系兼容）；SDK 不生成、不持久化。启动后尽早调用。 */
+  setBizDid(bizDid: string): void { this.bizDid = bizDid; }
+  clearBizDid(): void { this.bizDid = ''; }
 
   // ── 页面 ──────────────────────────────────────────────
 
@@ -215,7 +220,7 @@ export class Tracker {
       event,
       log_id: uuid(),
       ctime: Date.now(),
-      common: collectCommonParams(this.config, this.uid),
+      common: collectCommonParams(this.config, this.uid, this.bizDid),
       ...parts,
     };
     if (pt) ev.pt = pt;

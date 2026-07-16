@@ -16,7 +16,7 @@ import java.util.UUID;
 
 /** 公共参数采集：did 自生成持久化；session 前后台间隔 30min 重开。 */
 final class CommonParams {
-    private static final String SDK_VERSION = "1.0.7";
+    private static final String SDK_VERSION = "1.0.8";
     private static final String SP_NAME = "giso_tracker";
     private static final String KEY_DID = "did";
     private static final long SESSION_GAP_MS = 30 * 60 * 1000L;
@@ -26,6 +26,7 @@ final class CommonParams {
     private final String did;
 
     private volatile String uid = "";
+    private volatile String bizDid = "";
     private String sessionId;
     private long lastActiveTs;
 
@@ -37,6 +38,9 @@ final class CommonParams {
     }
 
     void setUid(String uid) { this.uid = uid == null ? "" : uid; }
+
+    /** 业务设备 ID（历史账号体系兼容）；SDK 不生成、不持久化 */
+    void setBizDid(String bizDid) { this.bizDid = bizDid == null ? "" : bizDid; }
 
     /** 进前台时调用：超过会话间隔则重开 session */
     synchronized void onForeground() {
@@ -72,6 +76,7 @@ final class CommonParams {
             o.put("sdk_runtime", "native"); // 与 Flutter sdk_runtime=flutter 区分
             o.put("did", did);
             o.put("uid", uid);
+            o.put("biz_did", bizDid);
             o.put("session_id", sessionId);
             o.put("channel", config.channel);
             o.put("env", config.env);

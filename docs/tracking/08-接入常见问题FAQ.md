@@ -10,7 +10,7 @@
 | 一、架构与部署 | Q1–Q10 |
 | 二、App Key 与鉴权 | Q11–Q13 |
 | 三、注册表与登记 | Q14–Q18 |
-| 四、session_id、uid、did | Q19–Q21 |
+| 四、session_id、uid、did、biz_did | Q19–Q21 |
 | 五、生命周期与标准事件 | Q22–Q24 |
 | 六、联调与校验 | Q25–Q36 |
 | 七、资金与服务端事实 | Q37 |
@@ -314,7 +314,7 @@ Doppler 可选：`INFRA_GISO_ADMIN_USER` / `PASSWORD`、`INFRA_GISO_VIEWER_*`、
 
 ---
 
-## 四、session_id、uid、did
+## 四、session_id、uid、did、biz_did
 
 ### Q19. `session_id` 谁生成？规则是什么？
 
@@ -327,15 +327,20 @@ Doppler 可选：`INFRA_GISO_ADMIN_USER` / `PASSWORD`、`INFRA_GISO_VIEWER_*`、
 
 用于会话级 PV/停留分析，与登录无关（未登录也有 session）。
 
-### Q20. `uid` 和 `session_id` 有什么区别？
+### Q20. `uid`、`did`、`biz_did` 和 `session_id` 有什么区别？
 
 | 字段 | 含义 | 谁设置 |
 |------|------|--------|
-| `did` | 设备标识，卸载前持久 | SDK |
+| `did` | SDK 设备标识，卸载前持久 | SDK |
+| `biz_did` | 业务设备 ID（历史账号/去重体系） | 业务调用 `setBizDid()` / `clearBizDid()` |
 | `session_id` | 一次使用会话（30min 规则） | SDK |
 | `uid` | 登录用户 ID | 业务调用 `setUid()` / `clearUid()` |
 
 登录只影响 `uid`，**不会**单独重置 session（除非同时满足 30min 规则）。
+
+- **新安装 / 合规匿名设备**：用 `did`（卸载重装会变）。
+- **兼容历史「用业务设备 ID 当唯一用户」**：用 `biz_did`（App 负责生成/恢复；SDK 不生成、不持久化）。
+- Doris 未单独落列，查询：`json_extract_string(common_ext,'$.biz_did')`。
 
 ### Q21. `rec_trace_id` 和 `session_id` 是一回事吗？
 

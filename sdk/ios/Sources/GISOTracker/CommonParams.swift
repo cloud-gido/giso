@@ -3,7 +3,7 @@ import UIKit
 
 /// 公共参数采集：did 自生成持久化；session 前后台间隔 30 分钟重开。
 final class CommonParams {
-    private static let sdkVersion = "1.0.7"
+    private static let sdkVersion = "1.0.8"
     private static let didKey = "giso_tracker_did"
     private static let sessionGap: TimeInterval = 30 * 60
 
@@ -11,6 +11,7 @@ final class CommonParams {
     private let did: String
 
     private var uid = ""
+    private var bizDid = ""
     private var sessionId = ""
     private var lastActiveTs = Date.distantPast
 
@@ -26,6 +27,9 @@ final class CommonParams {
     }
 
     func setUid(_ uid: String) { self.uid = uid }
+
+    /// 业务设备 ID（历史账号体系兼容）；SDK 不生成、不持久化
+    func setBizDid(_ bizDid: String) { self.bizDid = bizDid }
 
     /// 进前台时调用：超过会话间隔则重开 session
     func onForeground() {
@@ -54,6 +58,7 @@ final class CommonParams {
             "sdk_runtime": "native", // 与 Flutter sdk_runtime=flutter 区分
             "did": did,
             "uid": uid,
+            "biz_did": bizDid,
             "session_id": sessionId,
             "channel": config.channel,
             "env": config.env ?? (config.debug ? "test" : "prod"),

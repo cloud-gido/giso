@@ -1,6 +1,6 @@
 import type { CommonParams, TrackerConfig } from './types';
 
-const SDK_VERSION = '1.0.7';
+const SDK_VERSION = '1.0.8';
 const DID_KEY = '_giso_did';
 const SESSION_KEY = '_giso_session';
 const SESSION_GAP_MS = 30 * 60 * 1000;
@@ -57,7 +57,7 @@ function tzOffset(): string {
   return `${sign}${h}:${mm}`;
 }
 
-export function collectCommonParams(config: TrackerConfig, uid: string): CommonParams {
+export function collectCommonParams(config: TrackerConfig, uid: string, bizDid = ''): CommonParams {
   const env = config.env ?? (config.debug ? 'test' : 'prod');
   return {
     app_id: config.appId,
@@ -68,6 +68,7 @@ export function collectCommonParams(config: TrackerConfig, uid: string): CommonP
     sdk_runtime: 'web',
     did: getOrCreateDid(),
     uid,
+    biz_did: bizDid,
     session_id: getSessionId(),
     channel: config.channel ?? '',
     env,

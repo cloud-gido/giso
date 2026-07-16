@@ -24,6 +24,7 @@ class GisoTracker with WidgetsBindingObserver {
   EventQueue? _queue;
   final DeviceCollector _device = DeviceCollector();
   String _uid = '';
+  String _bizDid = '';
   String _platform = 'android';
   bool _lifecycleHooked = false;
   int _foregroundTs = 0;
@@ -88,6 +89,10 @@ class GisoTracker with WidgetsBindingObserver {
 
   void setUid(String uid) => _uid = uid;
   void clearUid() => _uid = '';
+
+  /// 业务设备 ID（历史账号体系兼容）；SDK 不生成、不持久化。启动后尽早调用。
+  void setBizDid(String bizDid) => _bizDid = bizDid;
+  void clearBizDid() => _bizDid = '';
 
   Future<void> enterPage(
     String pgid, [
@@ -210,6 +215,7 @@ class GisoTracker with WidgetsBindingObserver {
       config: cfg,
       prefs: prefs,
       uid: _uid,
+      bizDid: _bizDid,
       platform: _platform,
       device: _device,
     );

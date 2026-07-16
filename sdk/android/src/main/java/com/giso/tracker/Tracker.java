@@ -96,6 +96,11 @@ public final class Tracker {
 
     public void setUid(String uid) { common.setUid(uid); }
     public void clearUid() { common.setUid(""); }
+
+    /** 业务设备 ID（历史账号体系兼容）；启动后尽早调用 */
+    public void setBizDid(String bizDid) { common.setBizDid(bizDid); }
+    public void clearBizDid() { common.setBizDid(""); }
+
     public void flush() { queue.flush(); }
 
     // ── 页面 ──────────────────────────────────────────────

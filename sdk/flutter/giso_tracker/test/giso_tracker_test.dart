@@ -43,9 +43,10 @@ void main() {
       platform: 'android',
       appPkg: 'com.example.demo',
       appVersion: '1.0.0',
-      sdkVersion: '1.0.7',
+      sdkVersion: '1.0.8',
       did: 'did-1',
       uid: '',
+      bizDid: 'legacy-device-1',
       sessionId: 's-1',
       channel: 'google_play',
       env: 'test',
@@ -59,6 +60,7 @@ void main() {
     );
     expect(common.toJson()['app_pkg'], 'com.example.demo');
     expect(common.toJson()['sdk_runtime'], 'flutter');
+    expect(common.toJson()['biz_did'], 'legacy-device-1');
   });
 
   test('GisoConfig resolves env from debug flag', () {
