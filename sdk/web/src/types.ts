@@ -1,6 +1,11 @@
 /** 协议类型定义，与 docs/tracking/02-上报协议规范.md 一一对应 */
 
 export type StandardEvent =
+  | 'app_install'
+  | 'app_launch'
+  | 'app_foreground'
+  | 'app_background'
+  | 'app_heartbeat'
   | 'page_enter'
   | 'page_exit'
   | 'element_exposure'
@@ -45,6 +50,8 @@ export interface PageContext {
   ref_pgid?: string;
   ref_eid?: string;
   pg_stay?: number;
+  /** app_background / app_heartbeat：前台时长区间 ms */
+  fg_dur?: number;
 }
 
 export interface ElementContext {
@@ -93,4 +100,6 @@ export interface TrackerConfig {
   batchSize?: number;
   /** 攒批最大间隔 ms，默认 15000 */
   flushInterval?: number;
+  /** 前台应用心跳间隔 ms，默认 60000 */
+  heartbeatIntervalMs?: number;
 }

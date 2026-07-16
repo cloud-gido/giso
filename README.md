@@ -18,7 +18,7 @@
 
 ## 特性
 
-- **9 个标准事件** — SDK 统一触发时机，业务差异用 `pgid / eid / biz.code + params` 表达
+- **10 个标准事件** — SDK 统一触发时机，业务差异用 `pgid / eid / biz.code + params` 表达
 - **五端 SDK** — Web (TS) · Android (Java) · iOS (Swift) · **Flutter (Dart)** · Server (Kafka 事实流)
 - **注册表驱动** — PostgreSQL 运行时权威 + `schema/*.yaml` Git 审计 → CI 生成常量 → 网关强校验
 - **接入网关** — 鉴权 / 限流 / 三分类校验 / 远程配置 / 多副本热更新 / Prometheus

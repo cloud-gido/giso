@@ -25,10 +25,12 @@ Future<void> main() async {
   await GisoTracker.instance.init(GisoConfig(
     appId: gisoAppKey,
     appKey: gisoAppKey,
-    appVersion: '1.0.8-demo',
+    appVersion: '1.0.10-demo',
     endpoint: gisoEndpoint,
     channel: gisoChannel,
     debug: kDebugMode,
+    // Demo 用 15s 便于验证 app_heartbeat；生产默认 60s，也可由 /v1/config 下发
+    heartbeatIntervalMs: 15000,
   ));
   // 历史无账号体系：业务自管设备 ID → common.biz_did
   final prefs = await SharedPreferences.getInstance();

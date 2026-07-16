@@ -1,6 +1,6 @@
 # Overview
 
-GISO is a self-hosted behavioral analytics platform: **9 standard events**, **registry-driven validation**, and a **pluggable sink pipeline** (Kafka → Doris for realtime; optional S3 → Paimon for lakehouse).
+GISO is a self-hosted behavioral analytics platform: **10 standard events**, **registry-driven validation**, and a **pluggable sink pipeline** (Kafka → Doris for realtime; optional S3 → Paimon for lakehouse).
 
 ## Architecture
 

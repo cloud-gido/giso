@@ -22,7 +22,7 @@ export class Tracker {
   private static instance: Tracker | null = null;
 
   private config: Required<Pick<TrackerConfig,
-    'exposureRatio' | 'exposureDuration' | 'exposureMaxPerPage' | 'batchSize' | 'flushInterval'>> & TrackerConfig;
+    'exposureRatio' | 'exposureDuration' | 'exposureMaxPerPage' | 'batchSize' | 'flushInterval' | 'heartbeatIntervalMs'>> & TrackerConfig;
   private queue: EventQueue;
   private exposure: ExposureObserver;
   private metas = new WeakMap<Element, ElementMeta>();
@@ -32,6 +32,9 @@ export class Tracker {
   private curPage: { pgid: string; params?: Params; pt?: Passthrough; enterTs: number } | null = null;
   private refPgid = '';
   private refEid = '';
+  private heartbeatIntervalMs = 60_000;
+  private lastHeartbeatTs = 0;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   static init(config: TrackerConfig): Tracker {
     if (!Tracker.instance) Tracker.instance = new Tracker(config);
@@ -50,8 +53,10 @@ export class Tracker {
       exposureMaxPerPage: 3,
       batchSize: 20,
       flushInterval: 15_000,
+      heartbeatIntervalMs: 60_000,
       ...config,
     };
+    this.heartbeatIntervalMs = Tracker.clampHeartbeat(this.config.heartbeatIntervalMs);
     this.queue = new EventQueue(
       config.endpoint, config.appId,
       this.config.batchSize, this.config.flushInterval, !!config.debug,
@@ -61,7 +66,15 @@ export class Tracker {
       (r) => this.onExposure(r),
     );
     document.addEventListener('click', (e) => this.onClick(e), { capture: true });
-    window.addEventListener('pagehide', () => this.exitPage());
+    window.addEventListener('pagehide', () => {
+      this.stopHeartbeat();
+      this.exitPage();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') this.startHeartbeat();
+      else this.stopHeartbeat();
+    });
+    if (document.visibilityState === 'visible') this.startHeartbeat();
     this.fetchRemoteConfig();
   }
 
@@ -82,8 +95,39 @@ export class Tracker {
           c.batch_size ?? this.config.batchSize,
           c.flush_interval_ms ?? this.config.flushInterval,
         );
+        if (c.heartbeat_interval_ms != null) {
+          this.heartbeatIntervalMs = Tracker.clampHeartbeat(Number(c.heartbeat_interval_ms));
+          if (document.visibilityState === 'visible') this.startHeartbeat();
+        }
       })
       .catch(() => { /* 静默降级 */ });
+  }
+
+  private static clampHeartbeat(ms: number): number {
+    if (!Number.isFinite(ms)) return 60_000;
+    return Math.min(300_000, Math.max(15_000, ms));
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.lastHeartbeatTs = Date.now();
+    this.heartbeatTimer = setInterval(() => this.onHeartbeatTick(), this.heartbeatIntervalMs);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer != null) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  private onHeartbeatTick(): void {
+    const now = Date.now();
+    const dur = Math.max(0, now - this.lastHeartbeatTs);
+    this.lastHeartbeatTs = now;
+    this.emit('app_heartbeat', {
+      page: { ...this.pageContext(), fg_dur: dur },
+    });
   }
 
   setUid(uid: string): void { this.uid = uid; }

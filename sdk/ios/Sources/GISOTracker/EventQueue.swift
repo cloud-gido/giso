@@ -1,7 +1,7 @@
 import Foundation
 
-/// 事件队列：串行队列调度，攒批（条数/时间双触发）、gzip 上报、
-/// 5xx 指数退避重试、失败落盘（JSONL 文件，上限 500 条）、启动续传。
+/// 事件队列：与 Android 对齐的生命周期约定——
+/// 冷启动 spill 延后到首次 foreground 之后；退后台排空；再入前台先清残留再发 foreground。
 final class EventQueue {
     private static let maxStored = 500
     private static let maxBackoff: TimeInterval = 60
@@ -11,6 +11,8 @@ final class EventQueue {
     private let storeURL: URL
 
     private var buffer: [[String: Any]] = []
+    private var spill: [[String: Any]] = []
+    private var spillReleased = false
     private var timerScheduled = false
     private var backoff: TimeInterval = 1
     private var batchSize: Int
@@ -23,10 +25,9 @@ final class EventQueue {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         storeURL = dir.appendingPathComponent("giso_tracker_queue.jsonl")
-        queue.async { self.restore() }
+        queue.async { self.loadSpillFromDisk() }
     }
 
-    /// 远程配置下发后更新攒批参数
     func updateBatching(batchSize: Int, flushInterval: TimeInterval) {
         queue.async {
             self.batchSize = batchSize
@@ -36,87 +37,176 @@ final class EventQueue {
 
     func push(_ event: [String: Any]) {
         queue.async {
-            if self.config.debug {
-                NSLog("[QyTracker] %@", (event["event"] as? String) ?? "?")
-                self.buffer.append(event)
-                self.flushNow() // debug 模式不攒批，便于实时联调
-                return
-            }
             self.buffer.append(event)
-            if self.buffer.count >= self.batchSize {
-                self.flushNow()
-            } else if !self.timerScheduled {
-                self.timerScheduled = true
-                self.queue.asyncAfter(deadline: .now() + self.flushInterval) {
-                    self.timerScheduled = false
-                    self.flushNow()
-                }
-            }
+            self.maybeFlush(urgent: false)
         }
     }
 
-    /// 退后台等时机调用
+    /// 进入前台：排空残留 → foreground → 释放冷启动 spill
+    func onForeground(_ event: [String: Any], timeout: TimeInterval = 2.5) {
+        runBlocking(timeout: timeout) {
+            self.flushAll(urgent: false)
+            self.buffer.append(event)
+            self.flushAll(urgent: false)
+            self.releaseSpill()
+        }
+    }
+
+    /// 退后台：写入 background，落盘并排空
+    func onBackground(_ event: [String: Any], timeout: TimeInterval = 2.5) {
+        runBlocking(timeout: timeout) {
+            self.cancelTimer()
+            self.buffer.append(event)
+            self.persistAll()
+            self.flushAll(urgent: true)
+        }
+    }
+
     func flush() {
-        queue.async { self.flushNow() }
+        queue.async { self.flushAll(urgent: false) }
     }
 
     // ── 串行队列内 ────────────────────────────────────────
 
-    private func flushNow() {
-        guard !buffer.isEmpty else { return }
-        let batch = Array(buffer.prefix(batchSize))
-        buffer.removeFirst(batch.count)
-
-        send(batch) { [weak self] status in
-            guard let self else { return }
-            self.queue.async {
-                if status >= 200 && status < 500 && status != 429 {
-                    // 2xx 成功；4xx（除 429 限流外）数据有误不重试（网关已记隔离区）
-                    self.backoff = 1
-                    if self.buffer.count >= self.batchSize { self.flushNow() }
-                } else {
-                    self.buffer.insert(contentsOf: batch, at: 0)
-                    self.persist()
-                    self.queue.asyncAfter(deadline: .now() + self.backoff) { self.flushNow() }
-                    self.backoff = min(self.backoff * 2, Self.maxBackoff)
-                }
-            }
-        }
-    }
-
-    private func send(_ batch: [[String: Any]], completion: @escaping (Int) -> Void) {
-        guard let body = try? JSONSerialization.data(withJSONObject: batch) else {
-            completion(400)
-            return
-        }
-        var req = URLRequest(url: config.endpoint)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(config.appId, forHTTPHeaderField: "X-App-Key")
-        req.httpBody = body
-        URLSession.shared.dataTask(with: req) { _, resp, error in
-            if error != nil { completion(-1); return }
-            completion((resp as? HTTPURLResponse)?.statusCode ?? -1)
-        }.resume()
-    }
-
-    private func persist() {
-        let tail = buffer.suffix(Self.maxStored)
-        let lines = tail.compactMap { ev -> String? in
-            guard let d = try? JSONSerialization.data(withJSONObject: ev) else { return nil }
-            return String(data: d, encoding: .utf8)
-        }
-        try? lines.joined(separator: "\n").write(to: storeURL, atomically: true, encoding: .utf8)
-    }
-
-    private func restore() {
+    private func loadSpillFromDisk() {
         guard let text = try? String(contentsOf: storeURL, encoding: .utf8) else { return }
         try? FileManager.default.removeItem(at: storeURL)
         let events = text.split(separator: "\n").compactMap {
             try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]
         }
-        guard !events.isEmpty else { return }
-        buffer.insert(contentsOf: events.suffix(Self.maxStored), at: 0)
-        flushNow()
+        spill = Array(events.suffix(Self.maxStored))
+        if !spill.isEmpty { persistAll() }
+    }
+
+    private func releaseSpill() {
+        guard !spillReleased else { return }
+        spillReleased = true
+        while !spill.isEmpty {
+            let n = min(batchSize, spill.count)
+            let batch = Array(spill.prefix(n))
+            spill.removeFirst(n)
+            let status = sendSync(batch)
+            if isAccept(status) {
+                backoff = 1
+            } else {
+                spill.insert(contentsOf: batch, at: 0)
+                persistAll()
+                scheduleRetry()
+                return
+            }
+        }
+        persistAll()
+    }
+
+    private func maybeFlush(urgent: Bool) {
+        if urgent || config.debug {
+            flushAll(urgent: urgent)
+            return
+        }
+        if buffer.count >= batchSize {
+            flushAll(urgent: false)
+        } else if !timerScheduled {
+            timerScheduled = true
+            queue.asyncAfter(deadline: .now() + flushInterval) { [weak self] in
+                guard let self else { return }
+                self.timerScheduled = false
+                self.flushAll(urgent: false)
+            }
+        }
+    }
+
+    private func flushAll(urgent: Bool) {
+        cancelTimer()
+        while !buffer.isEmpty {
+            let n = min(batchSize, buffer.count)
+            let batch = Array(buffer.prefix(n))
+            buffer.removeFirst(n)
+            let status = sendSync(batch)
+            if isAccept(status) {
+                backoff = 1
+            } else {
+                buffer.insert(contentsOf: batch, at: 0)
+                persistAll()
+                if !urgent { scheduleRetry() }
+                return
+            }
+        }
+        if spill.isEmpty {
+            try? FileManager.default.removeItem(at: storeURL)
+        } else {
+            persistAll()
+        }
+    }
+
+    private func scheduleRetry() {
+        let delay = backoff
+        backoff = min(backoff * 2, Self.maxBackoff)
+        queue.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            self.flushAll(urgent: false)
+            if self.spillReleased && !self.spill.isEmpty { self.releaseSpill() }
+        }
+    }
+
+    private func cancelTimer() {
+        // 简化：用 timerScheduled 门闩；已调度的 block 会自检 buffer
+        timerScheduled = false
+    }
+
+    private func isAccept(_ status: Int) -> Bool {
+        status >= 200 && status < 500 && status != 429
+    }
+
+    private func sendSync(_ batch: [[String: Any]]) -> Int {
+        guard let body = try? JSONSerialization.data(withJSONObject: batch) else { return 400 }
+        var req = URLRequest(url: config.endpoint)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 8
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(config.appId, forHTTPHeaderField: "X-App-Key")
+        req.httpBody = body
+
+        let sem = DispatchSemaphore(value: 0)
+        var status = -1
+        URLSession.shared.dataTask(with: req) { _, resp, error in
+            if error == nil {
+                status = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            }
+            sem.signal()
+        }.resume()
+        _ = sem.wait(timeout: .now() + 8)
+        return status
+    }
+
+    private func persistAll() {
+        if spill.isEmpty && buffer.isEmpty {
+            try? FileManager.default.removeItem(at: storeURL)
+            return
+        }
+        var lines: [String] = []
+        for ev in spill {
+            if lines.count >= Self.maxStored { break }
+            if let d = try? JSONSerialization.data(withJSONObject: ev),
+               let s = String(data: d, encoding: .utf8) {
+                lines.append(s)
+            }
+        }
+        for ev in buffer {
+            if lines.count >= Self.maxStored { break }
+            if let d = try? JSONSerialization.data(withJSONObject: ev),
+               let s = String(data: d, encoding: .utf8) {
+                lines.append(s)
+            }
+        }
+        try? lines.joined(separator: "\n").write(to: storeURL, atomically: true, encoding: .utf8)
+    }
+
+    private func runBlocking(timeout: TimeInterval, _ work: @escaping () -> Void) {
+        let sem = DispatchSemaphore(value: 0)
+        queue.async {
+            work()
+            sem.signal()
+        }
+        _ = sem.wait(timeout: .now() + max(0.5, timeout))
     }
 }

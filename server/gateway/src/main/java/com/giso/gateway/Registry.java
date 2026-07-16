@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
 public final class Registry {
     private static final ObjectMapper M = new ObjectMapper();
     public static final java.util.Set<String> STANDARD_EVENTS = java.util.Set.of(
-            "app_install", "app_launch", "app_foreground", "app_background",
+            "app_install", "app_launch", "app_foreground", "app_background", "app_heartbeat",
             "page_enter", "page_exit", "element_exposure", "element_click", "biz_event");
 
     private static final Pattern SNAKE = Pattern.compile("^[a-z][a-z0-9_]{0,31}$");

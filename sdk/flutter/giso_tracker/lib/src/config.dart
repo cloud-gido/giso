@@ -11,6 +11,7 @@ class GisoConfig {
     this.env,
     this.batchSize = 20,
     this.flushIntervalMs = 15000,
+    this.heartbeatIntervalMs = 60000,
     this.osVersion = '',
     this.devBrand = '',
     this.devModel = '',
@@ -38,6 +39,9 @@ class GisoConfig {
   final String? env;
   final int batchSize;
   final int flushIntervalMs;
+
+  /// Foreground app heartbeat interval in ms (default 60s).
+  final int heartbeatIntervalMs;
 
   /// Overrides auto-detected OS version when non-empty.
   final String osVersion;

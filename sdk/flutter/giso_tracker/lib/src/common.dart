@@ -6,7 +6,7 @@ import 'config.dart';
 import 'device_collector.dart';
 import 'types.dart';
 
-const sdkVersion = '1.0.8';
+const sdkVersion = '1.0.10';
 const _didKey = 'giso_did';
 const _sessionKey = 'giso_session';
 const _activatedKey = 'giso_activated';

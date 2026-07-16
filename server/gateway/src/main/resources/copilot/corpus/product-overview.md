@@ -6,7 +6,7 @@
 
 ## 核心能力
 
-- 9 个标准事件 + 注册表强校验
+- 10 个标准事件 + 注册表强校验
 - 四端 SDK（Web / Android / iOS / Server）
 - 管理台：联调 SSE、注册表 CRUD、审批、空间、**接入助手**答疑
 - **轻量 Gateway**（Java 单体 JAR，非 Spring）→ Kafka → Doris 实时 + 可选 S3/Paimon 湖仓

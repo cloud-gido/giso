@@ -33,11 +33,11 @@ Unified envelope for Web, Android, iOS, and server-side facts.
 
 ## Standard events
 
-`app_install`, `app_launch`, `app_foreground`, `app_background`, `page_enter`, `page_exit`, `element_exposure`, `element_click`, `biz_event`.
+`app_install`, `app_launch`, `app_foreground`, `app_background`, `app_heartbeat`, `page_enter`, `page_exit`, `element_exposure`, `element_click`, `biz_event`.
 
 ## Remote config
 
-`GET /v1/config` returns SDK tunables: batch size, exposure thresholds, `event_sample_rates`, `events_disabled`.
+`GET /v1/config` returns SDK tunables: batch size, exposure thresholds, `heartbeat_interval_ms` (15s–300s), `event_sample_rates`, `events_disabled`.
 
 ## Environment routing
 

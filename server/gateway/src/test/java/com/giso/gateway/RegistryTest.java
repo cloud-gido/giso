@@ -37,6 +37,15 @@ class RegistryTest {
     }
 
     @Test
+    void appHeartbeatIsStandardOk() throws IOException {
+        var r = registry.validate(ev("""
+            {"event":"app_heartbeat","log_id":"x-hb",
+             "common":{"app_id":"web","platform":"web","did":"d-1"},
+             "page":{"fg_dur":60000}}"""));
+        assertEquals("ok", r.status(), () -> r.issues().toString());
+    }
+
+    @Test
     void nonStandardEventIsError() throws IOException {
         var r = registry.validate(ev("{\"event\":\"my_custom_click\"}"));
         assertEquals("error", r.status());

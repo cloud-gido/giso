@@ -125,7 +125,7 @@ limits:
 
 ### 容量与压测
 
-10 万 DAU + 默认攒批下，单副本 Gateway **性能足够**；生产 **≥2 副本** 主要为高可用。多副本联调需 **Redis 共享缓冲**，见 [08-FAQ Q34](../../docs/tracking/08-接入常见问题FAQ.md)。
+10 万 DAU + 默认攒批下，单副本 Gateway **性能足够**；生产 **≥2 副本** 主要为高可用。多副本联调需 **Redis 共享缓冲**，见 [08-FAQ Q37](../../docs/tracking/08-接入常见问题FAQ.md)。
 
 ```bash
 mvn package -DskipTests

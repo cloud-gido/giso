@@ -20,6 +20,8 @@ public final class TrackerConfig {
     public final int batchSize;
     /** 攒批最大间隔 ms */
     public final long flushIntervalMs;
+    /** 前台应用心跳间隔 ms（默认 60s） */
+    public final long heartbeatIntervalMs;
 
     private TrackerConfig(Builder b) {
         this.appId = b.appId;
@@ -33,6 +35,7 @@ public final class TrackerConfig {
         this.exposureMaxPerPage = b.exposureMaxPerPage;
         this.batchSize = b.batchSize;
         this.flushIntervalMs = b.flushIntervalMs;
+        this.heartbeatIntervalMs = b.heartbeatIntervalMs;
     }
 
     public static Builder builder(String appId, String appVersion, String endpoint) {
@@ -51,6 +54,7 @@ public final class TrackerConfig {
         private int exposureMaxPerPage = 3;
         private int batchSize = 20;
         private long flushIntervalMs = 15_000L;
+        private long heartbeatIntervalMs = 60_000L;
 
         private Builder(String appId, String appVersion, String endpoint) {
             this.appId = appId;
@@ -66,6 +70,7 @@ public final class TrackerConfig {
         public Builder exposureMaxPerPage(int n) { this.exposureMaxPerPage = n; return this; }
         public Builder batchSize(int n) { this.batchSize = n; return this; }
         public Builder flushIntervalMs(long ms) { this.flushIntervalMs = ms; return this; }
+        public Builder heartbeatIntervalMs(long ms) { this.heartbeatIntervalMs = ms; return this; }
 
         public TrackerConfig build() { return new TrackerConfig(this); }
     }

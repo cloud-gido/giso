@@ -10,10 +10,10 @@
 | 一、架构与部署 | Q1–Q10 |
 | 二、App Key 与鉴权 | Q11–Q13 |
 | 三、注册表与登记 | Q14–Q18 |
-| 四、session_id、uid、did、biz_did | Q19–Q21 |
-| 五、生命周期与标准事件 | Q22–Q24 |
-| 六、联调与校验 | Q25–Q36 |
-| 七、资金与服务端事实 | Q37 |
+| 四、session_id、uid、did、biz_did | Q19–Q23 |
+| 五、生命周期与标准事件 | Q24–Q27 |
+| 六、联调与校验 | Q28–Q39 |
+| 七、资金与服务端事实 | Q40 |
 | 八、文档索引 | — |
 | 九、仍不清楚时提供什么信息 | — |
 
@@ -342,7 +342,40 @@ Doppler 可选：`INFRA_GISO_ADMIN_USER` / `PASSWORD`、`INFRA_GISO_VIEWER_*`、
 - **兼容历史「用业务设备 ID 当唯一用户」**：用 `biz_did`（App 负责生成/恢复；SDK 不生成、不持久化）。
 - Doris 未单独落列，查询：`json_extract_string(common_ext,'$.biz_did')`。
 
-### Q21. `rec_trace_id` 和 `session_id` 是一回事吗？
+### Q21. `app_launch` / `app_install` 会不会改 `did`？
+
+**都不会去改写 `did`。**
+
+| 事件 | 与 `did` 的关系 |
+|------|----------------|
+| `app_launch` | 每次**进程冷启动**都报；`did` 仍从本地读，**不变** |
+| `app_install` | 本地尚无激活标记时报一次；事件本身**不生成**新 `did` |
+
+`did` 只在这些时候变：
+
+1. **首次安装 / 清除应用数据后第一次进 App**：本地没有 `did` → SDK 生成新 UUID 并持久化（此时通常会连着出现 `app_install` + `app_launch`）
+2. **卸载重装**，或用户/系统 **清除应用数据**
+
+因此：看到 `app_install` 往往意味着「新的一次安装周期开始」，和「新 `did`」经常一起出现；真正换 `did` 的是本地存储没了/新建，不是 launch/install 去改写。
+
+### Q22. 没有账号体系怎么判断新用户？卸载重装算不算？
+
+没有登录时，**无法 100% 认出「以前装过又卸了」的同一个人**——卸载会清掉本地 `did`，下次是新 `did` 并再打一次 `app_install`。这是系统与隐私限制下的常态。
+
+| 口径 | 怎么判 | 含义 |
+|------|--------|------|
+| **安装新用户（推荐默认）** | 出现 `app_install`，或该 `did` 首次出现 | 「这一次安装周期」的新用户；**含重装** |
+| **设备终身新用户** | 需要跨卸载仍不变的 ID | 本地 `did` 做不到；需业务自管更持久的标识 |
+
+建议：
+
+- **拉新 / 激活**：`app_install` 或 `did` 首次出现
+- **活跃**：`app_foreground` / `app_heartbeat` 等按 `did` 去重
+- **怀疑重装**：若业务能用 `setBizDid` 恢复跨卸载的同一 `biz_did`，则可看「同一 `biz_did` 下多个 `did` / 多次 `app_install`」；若 `biz_did` 也只存在普通本地存储里，卸载后一样会丢
+
+一句话：无账号就用 **安装级新用户**；跨卸载识别靠你们自己的 `biz_did`（或以后上账号），不是靠 `app_launch`。
+
+### Q23. `rec_trace_id` 和 `session_id` 是一回事吗？
 
 **不是。**
 
@@ -357,16 +390,37 @@ Doppler 可选：`INFRA_GISO_ADMIN_USER` / `PASSWORD`、`INFRA_GISO_VIEWER_*`、
 
 ## 五、生命周期与标准事件
 
-### Q22. 哪些事件 SDK 自动报？业务还要写吗？
+### Q24. 哪些事件 SDK 自动报？业务还要写吗？
 
 | 事件 | 谁报 |
 |------|------|
-| `app_install` / `app_launch` / `app_foreground` / `app_background` | **SDK 自动** |
+| `app_install` / `app_launch` / `app_foreground` / `app_background` / `app_heartbeat` | **SDK 自动** |
 | `page_enter` / `page_exit` | 业务在页面生命周期调 `enterPage` / `exitPage` |
 | `element_exposure` / `element_click` | `bind` 后 SDK 自动（勿自写滚动监听判曝光） |
 | `biz_event` | 业务调 `bizEvent()` |
 
-### Q23. 登录要怎么埋？
+`app_heartbeat`：仅前台、默认 60s（`/v1/config` 的 `heartbeat_interval_ms` 可调，15s–300s）。用于活跃时长兜底，**不替代** `app_background.fg_dur`；与长视频 `video_play_heartbeat`（播放业务心跳）不是一回事。
+
+### Q25. `app_launch` 和进前台重复吗？SDK 会清业务数据吗？
+
+**不重复；也不会清业务数据。**
+
+| 事件 | 含义 |
+|------|------|
+| `app_launch` | **进程冷启动**（`Tracker.init` / 进程被杀后再开） |
+| `app_foreground` | 进程还在，从后台回到前台 |
+| `app_background` | 切到后台（尽量上报；部分 OEM 杀得太快时可能看不到） |
+
+正常路径：
+
+- **第一次打开 / 被系统杀掉后再开**：`app_launch` → `app_foreground` → …
+- **只按 Home 再点图标（进程没死）**：只有 `app_foreground`，**不应再有** `app_launch`
+
+若每次「退出再进」都看到 `app_launch`，说明系统把进程杀掉了（冷启动），不是 SDK 把 launch 和 foreground 写成一回事。
+
+SDK **只**读写自己的本地键（如 `giso_tracker` 下的 `did` / 激活标记）与内存上报队列，**不会** `clear` 业务 SharedPreferences、数据库或登录态。联调时感觉「数据没了」，多半是进程被杀导致**未持久化的内存状态**丢失，或把管理台上新的一轮 `app_launch` 误当成 App 被重置。
+
+### Q26. 登录要怎么埋？
 
 ```java
 Tracker.setUid("10086");   // 登录成功
@@ -375,7 +429,7 @@ Tracker.clearUid();        // 登出
 
 **不要**为登录单独造 `biz_event`，除非已在事件字典登记且有明确看数需求。
 
-### Q24. 只有 9 个标准事件名吗？
+### Q27. 只有 10 个标准事件名吗？
 
 是。业务差异用 **`pgid` / `eid` / `biz.code` + params** 表达，禁止自造 `xxx_click` 事件名。
 
@@ -383,7 +437,7 @@ Tracker.clearUid();        // 登出
 
 ## 六、联调与校验
 
-### Q25. 管理台颜色各代表什么？
+### Q28. 管理台颜色各代表什么？
 
 | 标记 | 校验结果 | 数据去向 |
 |------|----------|----------|
@@ -391,13 +445,13 @@ Tracker.clearUid();        // 登出
 | 黄 | missing（必携参数空） | raw + `_quality=missing` |
 | 红 | error（未登记、类型错、元素未绑定页面等） | **quarantine 隔离区** |
 
-### Q26. 联调怎么只看自己设备？
+### Q29. 联调怎么只看自己设备？
 
 1. SDK `debug: true`（实时上报、走 test topic）
 2. 管理台 → **实时联调** → 按 `did` 过滤
 3. 可选：`POST /admin/api/assert` 固化期望事件序列
 
-### Q27. 长视频 Demo 对接测试环境怎么配？
+### Q30. 长视频 Demo 对接测试环境怎么配？
 
 ```kotlin
 TrackerConfig.builder("video-android-beta", version, endpoint)
@@ -408,11 +462,11 @@ TrackerConfig.builder("video-android-beta", version, endpoint)
 
 复用登记：`video_feed`、`video_detail`、`video_series` 及 Demo 中已有元素/事件常量（见 `sdk/android/.../Pages.java` 等）。
 
-### Q28. 多空间会往 Kafka 写两份吗？
+### Q31. 多空间会往 Kafka 写两份吗？
 
 **不会。** 每条上报只解析 **一个** 空间（`X-App-Key` → `space_key`），Kafka **只写一条**；空间标识在 `common.space`。Topic 不按空间拆分，查数时用 `space_key` 过滤。
 
-### Q29. 联调时为什么 default 和长视频空间都有数据？
+### Q32. 联调时为什么 default 和长视频空间都有数据？
 
 常见原因（**不是双写**）：
 
@@ -424,7 +478,7 @@ TrackerConfig.builder("video-android-beta", version, endpoint)
 
 长视频连调请统一使用 `video-android-beta` / `video-android-prod` 等 **`video-*` Key**。
 
-### Q30. 管理台「实时联调」的 SSE 是什么？和 App 上报一样吗？
+### Q33. 管理台「实时联调」的 SSE 是什么？和 App 上报一样吗？
 
 **不一样。**
 
@@ -436,11 +490,11 @@ TrackerConfig.builder("video-android-beta", version, endpoint)
 
 App **不需要**对 Gateway 建 WebSocket/SSE。
 
-### Q31. 切换管理台空间后，联调事件要不要手动刷新？
+### Q34. 切换管理台空间后，联调事件要不要手动刷新？
 
 **不需要**（Gateway 新版本起）：切空间或再次进入「实时联调」会自动 **断开旧 SSE → 拉当前空间缓冲 → 重连 SSE**。工具栏显示当前联调空间名；每条事件展示 **space:** 标签。
 
-### Q32. 播放心跳（`video_play_heartbeat`）要建立长连接吗？
+### Q35. 播放心跳（`video_play_heartbeat`）要建立长连接吗？
 
 **不要。** 心跳是业务事件，由 **App 播放器层**实现：
 
@@ -451,7 +505,7 @@ App **不需要**对 Gateway 建 WebSocket/SSE。
 
 典型播放序列：`video_play_start` → 若干 `video_play_heartbeat` → `video_play_end`。
 
-### Q33. 注册表改 PostgreSQL 后，管理台「只看参数」变慢？
+### Q36. 注册表改 PostgreSQL 后，管理台「只看参数」变慢？
 
 **只读不应等 `poll_interval_sec`（默认 10s）**——该间隔只影响 **保存后** Gateway 校验缓存刷新。
 
@@ -465,7 +519,7 @@ App **不需要**对 Gateway 建 WebSocket/SSE。
 
 ---
 
-### Q34. Gateway 多副本时，实时联调看不到 App 上报怎么办？
+### Q37. Gateway 多副本时，实时联调看不到 App 上报怎么办？
 
 **原因**：旧版联调缓冲在**各 Pod 进程内存**，App 打到 Pod B、浏览器 SSE 连在 Pod A 时会漏事件。
 
@@ -490,7 +544,7 @@ GISO_DEBUG_REDIS_URL=redis://:<password>@your-redis:6379/2
 
 `GET /health` 返回 `debug_buffer: redis` 与 `instance_id`（当前 Pod 名），便于排障。
 
-### Q35. Kafka 有数据，Doris 表却是空的 / Routine Load 一直 PAUSED？
+### Q38. Kafka 有数据，Doris 表却是空的 / Routine Load 一直 PAUSED？
 
 先分清链路：
 
@@ -514,7 +568,7 @@ Gateway 写 Kafka 成功 **不等于** Doris 已入库。常见情况：
 
 不想灌历史时：换新 `group.id` + `OFFSET_END`，只消费增量。
 
-### Q36. Flutter App 能用 Android SDK 的 bind() 吗？
+### Q39. Flutter App 能用 Android SDK 的 bind() 吗？
 
 **不能指望自动化。** Android SDK 的曝光/点击/参数继承依赖原生 `View` 树，标准 Flutter UI 不在该树上。  
 推荐：官方 **`giso_tracker`** 包（Git path 依赖）+ 路由层 `enterPage`/`exitPage`，元素手动或 `VisibilityDetector` 上报。完整说明见 [14-Flutter接入指南](14-Flutter接入指南.md)。
@@ -523,7 +577,7 @@ Gateway 写 Kafka 成功 **不等于** Doris 已入库。常见情况：
 
 ## 七、资金与服务端事实
 
-### Q37. 客户端能报「投注成功」「到账」吗？
+### Q40. 客户端能报「投注成功」「到账」吗？
 
 **不能**（若事件字典标记 `source: server`）。网关会判 **error** 并隔离。
 

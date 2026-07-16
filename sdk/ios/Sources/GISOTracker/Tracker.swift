@@ -3,12 +3,12 @@ import UIKit
 
 /// iOS 埋点 SDK 门面（单例）。与 Android/Web 端同协议、同口径。
 ///
-/// 事件收敛：9 个标准事件全部由 SDK 控制触发时机——
-/// 生命周期事件自动采集（首次激活/启动/前后台）；
-/// 页面事件 enterPage/exitPage（建议在 BaseViewController 收口）；
-/// 元素曝光/点击通过 bind() 声明，参数沿视图树自动继承。
+/// 事件收敛：10 个标准事件全部由 SDK 控制触发时机——
+/// 生命周期（含前台 app_heartbeat）、页面、元素曝光/点击。
 public final class Tracker {
     public static private(set) var shared: Tracker!
+    private static let heartbeatMin: TimeInterval = 15
+    private static let heartbeatMax: TimeInterval = 300
 
     private let config: TrackerConfig
     private let common: CommonParams
@@ -25,6 +25,9 @@ public final class Tracker {
     private var refPgid = ""
     private var refEid = ""
     private var foregroundTs = Date()
+    private var heartbeatInterval: TimeInterval
+    private var lastHeartbeatTs = Date()
+    private var heartbeatTimer: Timer?
 
     @discardableResult
     public static func initialize(config: TrackerConfig) -> Tracker {
@@ -34,6 +37,7 @@ public final class Tracker {
 
     private init(config: TrackerConfig) {
         self.config = config
+        self.heartbeatInterval = Self.clampHeartbeat(config.heartbeatInterval)
         self.common = CommonParams(config: config)
         self.queue = EventQueue(config: config)
 
@@ -72,7 +76,38 @@ public final class Tracker {
             self.queue.updateBatching(
                 batchSize: c["batch_size"] as? Int ?? self.config.batchSize,
                 flushInterval: (c["flush_interval_ms"] as? Double).map { $0 / 1000 } ?? self.config.flushInterval)
+            if let hb = c["heartbeat_interval_ms"] as? Double {
+                DispatchQueue.main.async {
+                    self.heartbeatInterval = Self.clampHeartbeat(hb / 1000)
+                }
+            }
         }.resume()
+    }
+
+    private static func clampHeartbeat(_ sec: TimeInterval) -> TimeInterval {
+        min(max(sec, heartbeatMin), heartbeatMax)
+    }
+
+    private func startHeartbeat() {
+        stopHeartbeat()
+        lastHeartbeatTs = Date()
+        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: heartbeatInterval, repeats: true) { [weak self] _ in
+            self?.onHeartbeatTick()
+        }
+    }
+
+    private func stopHeartbeat() {
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = nil
+    }
+
+    private func onHeartbeatTick() {
+        let now = Date()
+        let dur = Int(now.timeIntervalSince(lastHeartbeatTs) * 1000)
+        lastHeartbeatTs = now
+        var page = pageContext()
+        page["fg_dur"] = max(0, dur)
+        emit("app_heartbeat", page: page)
     }
 
     public func setUid(_ uid: String) { common.setUid(uid) }
@@ -236,14 +271,28 @@ public final class Tracker {
             guard let self else { return }
             self.common.onForeground()
             self.foregroundTs = Date()
-            self.emit("app_foreground")
+            var ev: [String: Any] = [
+                "event": "app_foreground",
+                "log_id": UUID().uuidString.lowercased(),
+                "ctime": Int(Date().timeIntervalSince1970 * 1000),
+                "common": self.common.snapshot(),
+            ]
+            self.queue.onForeground(ev)
+            self.startHeartbeat()
         }
         nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
+            self.stopHeartbeat()
             var page = self.pageContext()
             page["fg_dur"] = Int(Date().timeIntervalSince(self.foregroundTs) * 1000)
-            self.emit("app_background", page: page)
-            self.queue.flush() // 退后台兜底上报
+            var ev: [String: Any] = [
+                "event": "app_background",
+                "log_id": UUID().uuidString.lowercased(),
+                "ctime": Int(Date().timeIntervalSince1970 * 1000),
+                "common": self.common.snapshot(),
+                "page": page,
+            ]
+            self.queue.onBackground(ev)
         }
     }
 

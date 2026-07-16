@@ -28,6 +28,11 @@ class GisoTracker with WidgetsBindingObserver {
   String _platform = 'android';
   bool _lifecycleHooked = false;
   int _foregroundTs = 0;
+  int _heartbeatIntervalMs = 60000;
+  int _lastHeartbeatTs = 0;
+  Timer? _heartbeatTimer;
+  static const _heartbeatMinMs = 15000;
+  static const _heartbeatMaxMs = 300000;
 
   _PageState? _curPage;
   String _refPgid = '';
@@ -49,6 +54,7 @@ class GisoTracker with WidgetsBindingObserver {
       batchSize: config.batchSize,
       flushIntervalMs: config.flushIntervalMs,
     );
+    _heartbeatIntervalMs = _clampHeartbeat(config.heartbeatIntervalMs);
     await _fetchRemoteConfig();
     if (await markActivated(_prefs!)) {
       await _emit('app_install');
@@ -73,18 +79,46 @@ class GisoTracker with WidgetsBindingObserver {
     switch (state) {
       case AppLifecycleState.resumed:
         _foregroundTs = DateTime.now().millisecondsSinceEpoch;
-        unawaited(_emit('app_foreground'));
+        unawaited(_emitForeground());
+        _startHeartbeat();
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
+        _stopHeartbeat();
         final fgDur = _foregroundTs > 0
             ? DateTime.now().millisecondsSinceEpoch - _foregroundTs
             : 0;
-        unawaited(_emit('app_background', pageExtras: {'fg_dur': fgDur}));
-        unawaited(flush());
+        unawaited(_emitBackground(fgDur));
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
         break;
     }
+  }
+
+  void _startHeartbeat() {
+    _stopHeartbeat();
+    _lastHeartbeatTs = DateTime.now().millisecondsSinceEpoch;
+    _heartbeatTimer = Timer.periodic(
+      Duration(milliseconds: _heartbeatIntervalMs),
+      (_) => unawaited(_onHeartbeatTick()),
+    );
+  }
+
+  void _stopHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+  }
+
+  Future<void> _onHeartbeatTick() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final dur = now - _lastHeartbeatTs;
+    _lastHeartbeatTs = now;
+    await _emit('app_heartbeat', pageExtras: {'fg_dur': dur < 0 ? 0 : dur});
+  }
+
+  int _clampHeartbeat(int ms) {
+    if (ms < _heartbeatMinMs) return _heartbeatMinMs;
+    if (ms > _heartbeatMaxMs) return _heartbeatMaxMs;
+    return ms;
   }
 
   void setUid(String uid) => _uid = uid;
@@ -205,10 +239,44 @@ class GisoTracker with WidgetsBindingObserver {
     Map<String, Object?>? pageExtras,
     Passthrough? pt,
   }) async {
-    final cfg = _config;
     final queue = _queue;
+    if (queue == null) {
+      throw StateError('GisoTracker.init() must be called first');
+    }
+    queue.push(await _buildEnvelope(
+      event,
+      element: element,
+      biz: biz,
+      pageExtras: pageExtras,
+      pt: pt,
+    ));
+  }
+
+  Future<void> _emitForeground() async {
+    final queue = _queue;
+    if (queue == null) return;
+    await queue.onForeground(await _buildEnvelope('app_foreground'));
+  }
+
+  Future<void> _emitBackground(int fgDur) async {
+    final queue = _queue;
+    if (queue == null) return;
+    await queue.onBackground(await _buildEnvelope(
+      'app_background',
+      pageExtras: {'fg_dur': fgDur},
+    ));
+  }
+
+  Future<Map<String, dynamic>> _buildEnvelope(
+    String event, {
+    ElementContext? element,
+    BizContext? biz,
+    Map<String, Object?>? pageExtras,
+    Passthrough? pt,
+  }) async {
+    final cfg = _config;
     final prefs = _prefs;
-    if (cfg == null || queue == null || prefs == null) {
+    if (cfg == null || prefs == null) {
       throw StateError('GisoTracker.init() must be called first');
     }
     final common = await buildCommon(
@@ -227,7 +295,6 @@ class GisoTracker with WidgetsBindingObserver {
     };
     final page = _pageContext(extras: pageExtras);
     if (page.pgid.isNotEmpty || pageExtras != null) {
-      // Merge extras (e.g. fg_dur) after toJson — PageContext fields alone drop them.
       final pageJson = page.toJson();
       if (pageExtras != null) {
         for (final e in pageExtras.entries) {
@@ -240,7 +307,7 @@ class GisoTracker with WidgetsBindingObserver {
     if (biz != null) envelope['biz'] = biz.toJson();
     final mergedPt = _mergePt(_curPage?.pt, pt);
     if (mergedPt != null && mergedPt.isNotEmpty) envelope['pt'] = mergedPt;
-    queue.push(envelope);
+    return envelope;
   }
 
   Future<void> _fetchRemoteConfig() async {
@@ -259,6 +326,8 @@ class GisoTracker with WidgetsBindingObserver {
         flushIntervalMs:
             (c['flush_interval_ms'] as num?)?.toInt() ?? cfg.flushIntervalMs,
       );
+      final hb = (c['heartbeat_interval_ms'] as num?)?.toInt();
+      if (hb != null) _heartbeatIntervalMs = _clampHeartbeat(hb);
     } catch (_) {
       /* silent fallback */
     }

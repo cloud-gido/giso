@@ -14,6 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.10] - 2026-07-16
+
+### Added
+
+- **标准事件 `app_heartbeat`**：仅前台默认每 60s 上报（`page.fg_dur` 为本区间）；`/v1/config` 支持 `heartbeat_interval_ms`（15s–300s）。用于活跃时长兜底，与 `video_play_heartbeat` 无关。
+
+### Fixed
+
+- **全端 SDK 队列 / 生命周期**：切后台排空发送（Android WakeLock 同步 flush）；冷启动磁盘续传延后到首次 `app_foreground` 之后；回前台先清残留再发 `app_foreground`。
+
+---
+
 ## [1.0.8] - 2026-07-16
 
 ### Added
@@ -131,14 +143,15 @@ Initial open-source baseline (pre-SDK package publish).
 ### Added
 
 - Four-end SDK (Web / Android / iOS / Server reporter).
-- Gateway: 9-event protocol, registry validation, Kafka sinks, admin console.
+- Gateway: 10-event protocol, registry validation, Kafka sinks, admin console.
 - PostgreSQL registry backend, multi-space tenancy, approval workflow.
 - Doris Routine Load SQL, Docker Compose local stack, EKS deployment manifests (deployment repo).
 - Apache 2.0 [LICENSE](LICENSE), product docs under `docs/tracking/`.
 
 ---
 
-[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.8...HEAD
+[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.10...HEAD
+[1.0.10]: https://github.com/cloud-gido/giso/releases/tag/v1.0.10
 [1.0.8]: https://github.com/cloud-gido/giso/releases/tag/v1.0.8
 [1.0.7]: https://github.com/cloud-gido/giso/releases/tag/v1.0.7
 [1.0.6]: https://github.com/cloud-gido/giso/releases/tag/v1.0.6

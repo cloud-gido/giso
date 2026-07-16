@@ -20,6 +20,8 @@ public struct TrackerConfig {
     public var batchSize: Int = 20
     /// 攒批最大间隔（秒）
     public var flushInterval: TimeInterval = 15
+    /// 前台应用心跳间隔（秒），默认 60
+    public var heartbeatInterval: TimeInterval = 60
 
     public init(appId: String, appVersion: String, endpoint: URL) {
         self.appId = appId

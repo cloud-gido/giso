@@ -5,6 +5,8 @@ import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewParent;
 
@@ -18,18 +20,19 @@ import java.util.Map;
 /**
  * Android 埋点 SDK 门面（单例）。
  *
- * 事件收敛：9 个标准事件全部由 SDK 控制触发时机——
- * 生命周期事件自动采集（首次激活/启动/前后台）；
- * 页面事件 enterPage/exitPage（建议在 BaseActivity/BaseFragment 收口）；
- * 元素曝光/点击通过 bind() 声明，参数沿 View 树自动继承。
+ * 事件收敛：10 个标准事件全部由 SDK 控制触发时机——
+ * 生命周期（含前台 app_heartbeat）、页面、元素曝光/点击。
  */
 public final class Tracker {
     private static volatile Tracker instance;
+    private static final long HEARTBEAT_MIN_MS = 15_000L;
+    private static final long HEARTBEAT_MAX_MS = 300_000L;
 
     private final TrackerConfig config;
     private final CommonParams common;
     private final EventQueue queue;
     private final ExposureTracker exposure;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     /** View → 元素声明；参数继承沿 View 树向上查找 */
     private final Map<View, ElementMeta> metas = new java.util.WeakHashMap<>();
@@ -41,6 +44,9 @@ public final class Tracker {
     private String refPgid = "";
     private String refEid = "";
     private long foregroundTs;
+    private long heartbeatIntervalMs;
+    private long lastHeartbeatTs;
+    private final Runnable heartbeatTick = this::onHeartbeatTick;
 
     public static synchronized Tracker init(Application app, TrackerConfig config) {
         if (instance == null) {
@@ -56,6 +62,7 @@ public final class Tracker {
 
     private Tracker(Application app, TrackerConfig config) {
         this.config = config;
+        this.heartbeatIntervalMs = clampHeartbeat(config.heartbeatIntervalMs);
         this.common = new CommonParams(app, config);
         this.queue = new EventQueue(app, config);
         this.exposure = new ExposureTracker(
@@ -86,12 +93,41 @@ public final class Tracker {
                 queue.updateBatching(
                         c.optInt("batch_size", config.batchSize),
                         c.optLong("flush_interval_ms", config.flushIntervalMs));
+                if (c.has("heartbeat_interval_ms")) {
+                    heartbeatIntervalMs = clampHeartbeat(c.optLong("heartbeat_interval_ms", heartbeatIntervalMs));
+                }
             } catch (Exception ignored) {
                 // 静默降级
             } finally {
                 if (conn != null) conn.disconnect();
             }
-        }, "qy-tracker-config").start();
+        }, "giso-tracker-config").start();
+    }
+
+    private static long clampHeartbeat(long ms) {
+        if (ms < HEARTBEAT_MIN_MS) return HEARTBEAT_MIN_MS;
+        if (ms > HEARTBEAT_MAX_MS) return HEARTBEAT_MAX_MS;
+        return ms;
+    }
+
+    private void startHeartbeat() {
+        stopHeartbeat();
+        lastHeartbeatTs = System.currentTimeMillis();
+        mainHandler.postDelayed(heartbeatTick, heartbeatIntervalMs);
+    }
+
+    private void stopHeartbeat() {
+        mainHandler.removeCallbacks(heartbeatTick);
+    }
+
+    private void onHeartbeatTick() {
+        long now = System.currentTimeMillis();
+        long dur = Math.max(0L, now - lastHeartbeatTs);
+        lastHeartbeatTs = now;
+        JSONObject page = pageContext(null);
+        try { page.put("fg_dur", dur); } catch (JSONException ignored) { }
+        emit("app_heartbeat", page, null, null);
+        mainHandler.postDelayed(heartbeatTick, heartbeatIntervalMs);
     }
 
     public void setUid(String uid) { common.setUid(uid); }
@@ -262,22 +298,31 @@ public final class Tracker {
     private void registerLifecycle(Application app) {
         app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             private int started = 0;
+            private boolean appForeground = false;
 
             @Override public void onActivityStarted(Activity a) {
                 if (started++ == 0) {
+                    appForeground = true;
                     common.onForeground();
                     foregroundTs = System.currentTimeMillis();
-                    emit("app_foreground", null, null, null);
+                    queue.onForeground(
+                            TrackEvent.of("app_foreground", common.snapshot(), null, null, null),
+                            3000L);
+                    startHeartbeat();
                 }
             }
 
             @Override public void onActivityStopped(Activity a) {
-                if (--started == 0) {
+                if (--started == 0 && appForeground) {
+                    appForeground = false;
+                    stopHeartbeat();
                     long fgDur = System.currentTimeMillis() - foregroundTs;
                     JSONObject page = pageContext(null);
                     try { page.put("fg_dur", fgDur); } catch (JSONException ignored) { }
-                    emit("app_background", page, null, null);
-                    queue.flush(); // 退后台兜底上报
+                    // 主线程同步 flush + WakeLock；超时加长以应对弱网 / OEM
+                    queue.onBackground(
+                            TrackEvent.of("app_background", common.snapshot(), page, null, null),
+                            5000L);
                 }
             }
 

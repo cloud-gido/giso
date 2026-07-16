@@ -123,6 +123,7 @@ public final class GatewayConfig {
         m.put("exposure_max_per_page", 3);
         m.put("batch_size", 20);
         m.put("flush_interval_ms", 15000);
+        m.put("heartbeat_interval_ms", 60000);
         m.put("event_sample_rates", new LinkedHashMap<String, Object>());
         m.put("events_disabled", List.<String>of());
         return m;

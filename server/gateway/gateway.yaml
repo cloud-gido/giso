@@ -60,6 +60,7 @@ sdk_config:
   exposure_max_per_page: 3
   batch_size: 20
   flush_interval_ms: 15000
+  heartbeat_interval_ms: 60000
 
 # 玑源 Copilot（产品 / 埋点流程答疑，插拔式 provider）
 assistant:
