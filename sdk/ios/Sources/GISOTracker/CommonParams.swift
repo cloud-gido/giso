@@ -51,6 +51,7 @@ final class CommonParams {
             "platform": "ios",
             "app_vrsn": config.appVersion,
             "sdk_vrsn": Self.sdkVersion,
+            "sdk_runtime": "native", // 与 Flutter sdk_runtime=flutter 区分
             "did": did,
             "uid": uid,
             "session_id": sessionId,

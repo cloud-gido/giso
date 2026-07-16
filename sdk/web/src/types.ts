@@ -21,6 +21,8 @@ export interface CommonParams {
   platform: 'web';
   app_vrsn: string;
   sdk_vrsn: string;
+  /** SDK 实现栈：web / native / flutter（与 platform OS 正交） */
+  sdk_runtime: 'web' | 'native' | 'flutter';
   did: string;
   uid: string;
   session_id: string;

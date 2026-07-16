@@ -65,6 +65,7 @@ export function collectCommonParams(config: TrackerConfig, uid: string): CommonP
     platform: 'web',
     app_vrsn: config.appVersion,
     sdk_vrsn: SDK_VERSION,
+    sdk_runtime: 'web',
     did: getOrCreateDid(),
     uid,
     session_id: getSessionId(),

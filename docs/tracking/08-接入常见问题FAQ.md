@@ -514,6 +514,8 @@ Gateway 写 Kafka 成功 **不等于** Doris 已入库。常见情况：
 **不能指望自动化。** Android SDK 的曝光/点击/参数继承依赖原生 `View` 树，标准 Flutter UI 不在该树上。  
 推荐：官方 **`giso_tracker`** 包（Git path 依赖）+ 路由层 `enterPage`/`exitPage`，元素手动或 `VisibilityDetector` 上报。完整说明见 [14-Flutter接入指南](14-Flutter接入指南.md)。
 
+区分 Flutter / 原生上报：看 `common.sdk_runtime`（`flutter` | `native` | `web`），**不要**用 `platform`（Flutter 在安卓上仍是 `android`）。Doris：`json_extract_string(common_ext,'$.sdk_runtime')`。
+
 ## 七、资金与服务端事实
 
 ### Q37. 客户端能报「投注成功」「到账」吗？

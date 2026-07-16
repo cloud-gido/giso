@@ -69,6 +69,7 @@ final class CommonParams {
             o.put("platform", "android");
             o.put("app_vrsn", config.appVersion);
             o.put("sdk_vrsn", SDK_VERSION);
+            o.put("sdk_runtime", "native"); // 与 Flutter sdk_runtime=flutter 区分
             o.put("did", did);
             o.put("uid", uid);
             o.put("session_id", sessionId);

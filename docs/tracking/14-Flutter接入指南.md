@@ -96,6 +96,7 @@ dependencies:
 | `appId` | 与 Doppler `INFRA_GISO_APP_KEYS` 中某项一致 |
 | `X-App-Key` | 同上，HTTP Header |
 | `platform` | `"android"` / `"ios"`（按真实 OS，勿写 `flutter`） |
+| `sdk_runtime` | SDK 自动填 `flutter`（与原生 `native`、Web `web` 区分） |
 | `env` | 联调包 `test` → Kafka test topic；正式包 `prod` |
 | `debug` | `true` 时不攒批，便于管理台 **实时联调** |
 | `channel` | 安装渠道（如 `google_play` / `demo`），需业务在打包时注入 |
@@ -254,6 +255,7 @@ Future<void> flush(List<Map<String, dynamic>> batch) async {
   "common": {
     "app_id": "video-android-beta",
     "platform": "android",
+    "sdk_runtime": "flutter",
     "app_vrsn": "2.1.0",
     "did": "device-uuid",
     "env": "test"
@@ -330,7 +332,8 @@ Future<void> flush(List<Map<String, dynamic>> batch) async {
 
 ### Q1. `platform` 填什么？
 
-填 **`android` 或 `ios`**（设备 OS），不要填 `flutter`。框架信息可放 `common` 扩展字段或版本号备注，协议层无 `flutter` 枚举。
+填 **`android` 或 `ios`**（设备 OS），不要填 `flutter`。  
+区分 Flutter / 原生 SDK 用 **`common.sdk_runtime`**：`flutter` | `native` | `web`（SDK 自动填充，业务勿改）。
 
 ### Q2. 能否只报 `biz_event`，不报页面？
 

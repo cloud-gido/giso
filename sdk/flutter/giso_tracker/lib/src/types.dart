@@ -11,6 +11,7 @@ class CommonParams {
     required this.appPkg,
     required this.appVersion,
     required this.sdkVersion,
+    this.sdkRuntime = 'flutter',
     required this.did,
     required this.uid,
     required this.sessionId,
@@ -30,6 +31,8 @@ class CommonParams {
   final String appPkg;
   final String appVersion;
   final String sdkVersion;
+  /// SDK 实现栈：`flutter` / `native` / `web`（与 [platform] OS 正交）
+  final String sdkRuntime;
   final String did;
   final String uid;
   final String sessionId;
@@ -49,6 +52,7 @@ class CommonParams {
         'platform': platform,
         'app_vrsn': appVersion,
         'sdk_vrsn': sdkVersion,
+        'sdk_runtime': sdkRuntime,
         'did': did,
         'uid': uid,
         'session_id': sessionId,

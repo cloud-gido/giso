@@ -58,6 +58,7 @@ void main() {
       tz: '+08:00',
     );
     expect(common.toJson()['app_pkg'], 'com.example.demo');
+    expect(common.toJson()['sdk_runtime'], 'flutter');
   });
 
   test('GisoConfig resolves env from debug flag', () {
