@@ -11,7 +11,7 @@ android {
         minSdk 24
         targetSdk 34
         versionCode 1
-        versionName '1.0.9-demo'
+        versionName '1.0.8-demo'
 
         // 测试环境（全国网络 HTTPS）；本地 docker compose 见 README「本地联调」
         buildConfigField 'String', 'TRACK_ENDPOINT',

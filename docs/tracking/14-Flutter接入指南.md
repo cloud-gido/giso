@@ -14,7 +14,7 @@
 | 还能用 GISO 吗？ | **可以**。页面 / 业务 / 生命周期事件 + 管理台登记 + 联调校验全链路可用。 |
 | 元素曝光 / 点击怎么办？ | Dart 侧**手动上报** `element_exposure` / `element_click`，或用 `VisibilityDetector` 等实现与 Web/Android **同口径**（≥50% 可视 ≥500ms）。 |
 | 注册表 / App Key 要单独改吗？ | **不用**。与 Android 共用 `schema/` 与 `video-*` → `longvideo` 空间；见 [16-长视频双端Demo对照](16-长视频双端Demo与接入对照.md)。 |
-| 推荐 SDK 版本？ | Git tag **`v1.0.9`**（含 `app_heartbeat` / `biz_did` / `sdk_runtime`；勿用过旧 tag）。 |
+| 推荐 SDK 版本？ | Git tag **`v1.0.8`**（含 `app_heartbeat` / `biz_did` / `sdk_runtime`；勿用过旧 tag）。 |
 
 ---
 
@@ -75,7 +75,7 @@ dependencies:
   giso_tracker:
     git:
       url: https://github.com/cloud-gido/giso.git
-      ref: v1.0.9
+      ref: v1.0.8
       path: sdk/flutter/giso_tracker
 ```
 
