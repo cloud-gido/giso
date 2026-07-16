@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.10] - 2026-07-16
+## [1.0.9] - 2026-07-16
 
 ### Added
 
@@ -150,8 +150,8 @@ Initial open-source baseline (pre-SDK package publish).
 
 ---
 
-[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.10...HEAD
-[1.0.10]: https://github.com/cloud-gido/giso/releases/tag/v1.0.10
+[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.9...HEAD
+[1.0.9]: https://github.com/cloud-gido/giso/releases/tag/v1.0.9
 [1.0.8]: https://github.com/cloud-gido/giso/releases/tag/v1.0.8
 [1.0.7]: https://github.com/cloud-gido/giso/releases/tag/v1.0.7
 [1.0.6]: https://github.com/cloud-gido/giso/releases/tag/v1.0.6

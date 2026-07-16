@@ -25,7 +25,7 @@ Future<void> main() async {
   await GisoTracker.instance.init(GisoConfig(
     appId: gisoAppKey,
     appKey: gisoAppKey,
-    appVersion: '1.0.10-demo',
+    appVersion: '1.0.9-demo',
     endpoint: gisoEndpoint,
     channel: gisoChannel,
     debug: kDebugMode,
