@@ -74,10 +74,14 @@ class EventQueue {
     await _releaseSpill();
   }
 
-  /// Enter background: enqueue background, persist, drain.
-  Future<void> onBackground(Map<String, dynamic> event) async {
+  /// Enter background: enqueue partial heartbeat then background, persist, drain.
+  Future<void> onBackground(
+    Map<String, dynamic> event, {
+    List<Map<String, dynamic>> preceding = const [],
+  }) async {
     _timer?.cancel();
     _timer = null;
+    _buffer.addAll(preceding);
     _buffer.add(event);
     if (debug) debugPrint('[giso_tracker] ${event['event']} $event');
     await _persistAll();

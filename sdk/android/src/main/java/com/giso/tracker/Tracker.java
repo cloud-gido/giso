@@ -46,6 +46,7 @@ public final class Tracker {
     private long foregroundTs;
     private long heartbeatIntervalMs;
     private long lastHeartbeatTs;
+    private volatile boolean appForeground;
     private final Runnable heartbeatTick = this::onHeartbeatTick;
 
     public static synchronized Tracker init(Application app, TrackerConfig config) {
@@ -94,7 +95,13 @@ public final class Tracker {
                         c.optInt("batch_size", config.batchSize),
                         c.optLong("flush_interval_ms", config.flushIntervalMs));
                 if (c.has("heartbeat_interval_ms")) {
-                    heartbeatIntervalMs = clampHeartbeat(c.optLong("heartbeat_interval_ms", heartbeatIntervalMs));
+                    long next = clampHeartbeat(c.optLong("heartbeat_interval_ms", heartbeatIntervalMs));
+                    if (next != heartbeatIntervalMs) {
+                        heartbeatIntervalMs = next;
+                        mainHandler.post(() -> {
+                            if (appForeground) startHeartbeat();
+                        });
+                    }
                 }
             } catch (Exception ignored) {
                 // 静默降级
@@ -122,12 +129,18 @@ public final class Tracker {
 
     private void onHeartbeatTick() {
         long now = System.currentTimeMillis();
-        long dur = Math.max(0L, now - lastHeartbeatTs);
+        TrackEvent heartbeat = heartbeatEvent(now);
         lastHeartbeatTs = now;
-        JSONObject page = pageContext(null);
-        try { page.put("fg_dur", dur); } catch (JSONException ignored) { }
-        emit("app_heartbeat", page, null, null);
+        if (heartbeat != null) queue.push(heartbeat);
         mainHandler.postDelayed(heartbeatTick, heartbeatIntervalMs);
+    }
+
+    /** 应用级心跳只携带本区间 fg_dur，不继承当前页面。 */
+    private TrackEvent heartbeatEvent(long now) {
+        if (lastHeartbeatTs <= 0L || now <= lastHeartbeatTs) return null;
+        JSONObject page = new JSONObject();
+        try { page.put("fg_dur", now - lastHeartbeatTs); } catch (JSONException ignored) { }
+        return TrackEvent.of("app_heartbeat", common.snapshot(), page, null, null);
     }
 
     public void setUid(String uid) { common.setUid(uid); }
@@ -298,7 +311,6 @@ public final class Tracker {
     private void registerLifecycle(Application app) {
         app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             private int started = 0;
-            private boolean appForeground = false;
 
             @Override public void onActivityStarted(Activity a) {
                 if (started++ == 0) {
@@ -316,11 +328,15 @@ public final class Tracker {
                 if (--started == 0 && appForeground) {
                     appForeground = false;
                     stopHeartbeat();
-                    long fgDur = System.currentTimeMillis() - foregroundTs;
-                    JSONObject page = pageContext(null);
-                    try { page.put("fg_dur", fgDur); } catch (JSONException ignored) { }
+                    long now = System.currentTimeMillis();
+                    TrackEvent heartbeat = heartbeatEvent(now);
+                    lastHeartbeatTs = 0L;
+                    JSONObject page = new JSONObject();
+                    try { page.put("fg_dur", Math.max(0L, now - foregroundTs)); }
+                    catch (JSONException ignored) { }
                     // 主线程同步 flush + WakeLock；超时加长以应对弱网 / OEM
                     queue.onBackground(
+                            heartbeat,
                             TrackEvent.of("app_background", common.snapshot(), page, null, null),
                             5000L);
                 }

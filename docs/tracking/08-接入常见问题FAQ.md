@@ -399,7 +399,7 @@ Doppler 可选：`INFRA_GISO_ADMIN_USER` / `PASSWORD`、`INFRA_GISO_VIEWER_*`、
 | `element_exposure` / `element_click` | `bind` 后 SDK 自动（勿自写滚动监听判曝光） |
 | `biz_event` | 业务调 `bizEvent()` |
 
-`app_heartbeat`：仅前台、默认 60s（`/v1/config` 的 `heartbeat_interval_ms` 可调，15s–300s）。用于活跃时长兜底，**不替代** `app_background.fg_dur`；与长视频 `video_play_heartbeat`（播放业务心跳）不是一回事。
+`app_heartbeat`：应用级事件，**不携带 `pgid` / 页面参数**。仅前台、默认 60s（`/v1/config` 的 `heartbeat_interval_ms` 可调，15s–300s），退后台补报最后不足一个周期的区间后停止。用于活跃时长兜底，**不替代** `app_background.fg_dur`；与长视频 `video_play_heartbeat`（播放业务心跳）不是一回事。
 
 ### Q25. `app_launch` 和进前台重复吗？SDK 会清业务数据吗？
 
@@ -595,6 +595,7 @@ Gateway 写 Kafka 成功 **不等于** Doris 已入库。常见情况：
 | [07-外部视频App接入问卷](07-外部视频App接入问卷.md) | 外部 App 登记清单 |
 | [13-SDK分发与版本](13-SDK分发与版本.md) | **外部 App 拿包、坐标、Key、endpoint** |
 | [17-SDK-1.0.9升级说明](17-SDK-1.0.9升级说明.md) | **1.0.8→1.0.9 坐标对照、飞书模板、常见误解** |
+| [18-SDK-1.0.10心跳修复说明](18-SDK-1.0.10心跳修复说明.md) | **1.0.9→1.0.10 应用级心跳修复** |
 | [14-Flutter接入指南](14-Flutter接入指南.md) | **Flutter 直连接入（无官方 Plugin）** |
 | [09-账号与权限体系](09-账号与权限体系.md) | 管理台登录、角色、Doppler |
 | [10-空间与多租户](10-空间与多租户.md) | 空间路由、Kafka 单写、SSE 联调 |

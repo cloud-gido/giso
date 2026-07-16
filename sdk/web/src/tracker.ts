@@ -67,12 +67,16 @@ export class Tracker {
     );
     document.addEventListener('click', (e) => this.onClick(e), { capture: true });
     window.addEventListener('pagehide', () => {
-      this.stopHeartbeat();
+      this.flushHeartbeat();
       this.exitPage();
+      this.queue.flush(true);
     });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') this.startHeartbeat();
-      else this.stopHeartbeat();
+      else {
+        this.flushHeartbeat();
+        this.queue.flush(true);
+      }
     });
     if (document.visibilityState === 'visible') this.startHeartbeat();
     this.fetchRemoteConfig();
@@ -125,9 +129,17 @@ export class Tracker {
     const now = Date.now();
     const dur = Math.max(0, now - this.lastHeartbeatTs);
     this.lastHeartbeatTs = now;
-    this.emit('app_heartbeat', {
-      page: { ...this.pageContext(), fg_dur: dur },
-    });
+    if (dur > 0) this.emit('app_heartbeat', { page: { fg_dur: dur } });
+  }
+
+  /** Flush the final partial interval when the app leaves foreground. */
+  private flushHeartbeat(): void {
+    this.stopHeartbeat();
+    if (this.lastHeartbeatTs <= 0) return;
+    const now = Date.now();
+    const dur = Math.max(0, now - this.lastHeartbeatTs);
+    this.lastHeartbeatTs = 0;
+    if (dur > 0) this.emit('app_heartbeat', { page: { fg_dur: dur } });
   }
 
   setUid(uid: string): void { this.uid = uid; }

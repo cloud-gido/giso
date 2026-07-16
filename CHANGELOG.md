@@ -14,11 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.10] - 2026-07-16
+
+### Fixed
+
+- **应用级心跳口径**：`app_heartbeat` 不再继承 `pgid` / 页面参数；前台每 60s 上报，退后台补最后不足一个周期的 `fg_dur`。
+- **远程间隔首跳**：远程 `heartbeat_interval_ms` 返回后立即重排定时器，避免 Demo 本地 15s 配置导致首跳提前。
+- **管理台联调**：事件筛选下拉补充 `app_heartbeat`。
+
+---
+
 ## [1.0.9] - 2026-07-16
 
 ### Added
 
-- **标准事件 `app_heartbeat`**：仅前台默认每 60s 上报（`page.fg_dur` 为本区间）；`/v1/config` 支持 `heartbeat_interval_ms`（15s–300s）。用于活跃时长兜底，与 `video_play_heartbeat` 无关。
+- **标准事件 `app_heartbeat`**：仅前台默认每 60s 上报；`/v1/config` 支持 `heartbeat_interval_ms`（15s–300s）。用于活跃时长兜底，与 `video_play_heartbeat` 无关。
 
 ### Fixed
 
@@ -150,7 +160,8 @@ Initial open-source baseline (pre-SDK package publish).
 
 ---
 
-[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.9...HEAD
+[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.10...HEAD
+[1.0.10]: https://github.com/cloud-gido/giso/releases/tag/v1.0.10
 [1.0.9]: https://github.com/cloud-gido/giso/releases/tag/v1.0.9
 [1.0.8]: https://github.com/cloud-gido/giso/releases/tag/v1.0.8
 [1.0.7]: https://github.com/cloud-gido/giso/releases/tag/v1.0.7

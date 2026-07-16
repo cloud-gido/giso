@@ -25,8 +25,6 @@ public final class VideoApp extends Application {
                 .exposureDurationMs(500L)
                 .batchSize(5)
                 .flushIntervalMs(8000L)
-                // Demo 用 15s 便于验证 app_heartbeat；生产默认 60s，也可由 /v1/config 下发
-                .heartbeatIntervalMs(15_000L)
                 .build());
         // 历史无账号体系：业务自管设备 ID → common.biz_did
         Tracker.get().setBizDid(loadOrCreateBizDid());

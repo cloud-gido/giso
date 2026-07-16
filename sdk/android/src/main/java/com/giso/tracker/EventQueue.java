@@ -109,10 +109,11 @@ final class EventQueue {
      * 退后台（Activity.onStop）。
      * <ol>
      *   <li>先 barrier 等待 worker 把已排队的 page_exit 等事件写入 buffer</li>
+     *   <li>依次加入最后一个不足周期的 heartbeat、background</li>
      *   <li>在调用线程持 WakeLock 同步落盘并发送，避免只投递异步任务后被 OEM 挂起</li>
      * </ol>
      */
-    void onBackground(TrackEvent background, long timeoutMs) {
+    void onBackground(TrackEvent heartbeat, TrackEvent background, long timeoutMs) {
         long timeout = Math.max(2000L, timeoutMs);
         // 让 exitPage 等已 submit 的 push 先入队
         runOnWorkerBlocking(Math.min(800L, timeout / 3), () -> { /* queue barrier */ });
@@ -133,6 +134,10 @@ final class EventQueue {
         try {
             synchronized (lock) {
                 cancelTimerLocked();
+                if (heartbeat != null) {
+                    buffer.addLast(heartbeat);
+                    if (config.debug) Log.d(TAG, heartbeat.event + " " + heartbeat.toJson());
+                }
                 buffer.addLast(background);
                 if (config.debug) Log.d(TAG, background.event + " " + background.toJson());
                 persistAllLocked();

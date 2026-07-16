@@ -27,6 +27,7 @@ class GisoTracker with WidgetsBindingObserver {
   String _bizDid = '';
   String _platform = 'android';
   bool _lifecycleHooked = false;
+  bool _appForeground = false;
   int _foregroundTs = 0;
   int _heartbeatIntervalMs = 60000;
   int _lastHeartbeatTs = 0;
@@ -78,16 +79,20 @@ class GisoTracker with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.resumed:
+        _appForeground = true;
         _foregroundTs = DateTime.now().millisecondsSinceEpoch;
         unawaited(_emitForeground());
         _startHeartbeat();
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
+        if (!_appForeground) return;
+        _appForeground = false;
         _stopHeartbeat();
-        final fgDur = _foregroundTs > 0
-            ? DateTime.now().millisecondsSinceEpoch - _foregroundTs
-            : 0;
-        unawaited(_emitBackground(fgDur));
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final heartbeatDur = _lastHeartbeatTs > 0 ? now - _lastHeartbeatTs : 0;
+        _lastHeartbeatTs = 0;
+        final fgDur = _foregroundTs > 0 ? now - _foregroundTs : 0;
+        unawaited(_emitBackground(fgDur, heartbeatDur));
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
         break;
@@ -112,7 +117,13 @@ class GisoTracker with WidgetsBindingObserver {
     final now = DateTime.now().millisecondsSinceEpoch;
     final dur = now - _lastHeartbeatTs;
     _lastHeartbeatTs = now;
-    await _emit('app_heartbeat', pageExtras: {'fg_dur': dur < 0 ? 0 : dur});
+    if (dur > 0) {
+      await _emit(
+        'app_heartbeat',
+        pageExtras: {'fg_dur': dur},
+        appLevelPage: true,
+      );
+    }
   }
 
   int _clampHeartbeat(int ms) {
@@ -237,6 +248,7 @@ class GisoTracker with WidgetsBindingObserver {
     ElementContext? element,
     BizContext? biz,
     Map<String, Object?>? pageExtras,
+    bool appLevelPage = false,
     Passthrough? pt,
   }) async {
     final queue = _queue;
@@ -248,6 +260,7 @@ class GisoTracker with WidgetsBindingObserver {
       element: element,
       biz: biz,
       pageExtras: pageExtras,
+      appLevelPage: appLevelPage,
       pt: pt,
     ));
   }
@@ -258,13 +271,22 @@ class GisoTracker with WidgetsBindingObserver {
     await queue.onForeground(await _buildEnvelope('app_foreground'));
   }
 
-  Future<void> _emitBackground(int fgDur) async {
+  Future<void> _emitBackground(int fgDur, int heartbeatDur) async {
     final queue = _queue;
     if (queue == null) return;
+    final preceding = <Map<String, dynamic>>[];
+    if (heartbeatDur > 0) {
+      preceding.add(await _buildEnvelope(
+        'app_heartbeat',
+        pageExtras: {'fg_dur': heartbeatDur},
+        appLevelPage: true,
+      ));
+    }
     await queue.onBackground(await _buildEnvelope(
       'app_background',
       pageExtras: {'fg_dur': fgDur},
-    ));
+      appLevelPage: true,
+    ), preceding: preceding);
   }
 
   Future<Map<String, dynamic>> _buildEnvelope(
@@ -272,6 +294,7 @@ class GisoTracker with WidgetsBindingObserver {
     ElementContext? element,
     BizContext? biz,
     Map<String, Object?>? pageExtras,
+    bool appLevelPage = false,
     Passthrough? pt,
   }) async {
     final cfg = _config;
@@ -293,15 +316,19 @@ class GisoTracker with WidgetsBindingObserver {
       'ctime': DateTime.now().millisecondsSinceEpoch,
       'common': common.toJson(),
     };
-    final page = _pageContext(extras: pageExtras);
-    if (page.pgid.isNotEmpty || pageExtras != null) {
-      final pageJson = page.toJson();
-      if (pageExtras != null) {
-        for (final e in pageExtras.entries) {
-          if (e.key != 'pg_stay') pageJson[e.key] = e.value;
+    if (appLevelPage) {
+      if (pageExtras != null) envelope['page'] = Map<String, Object?>.from(pageExtras);
+    } else {
+      final page = _pageContext(extras: pageExtras);
+      if (page.pgid.isNotEmpty || pageExtras != null) {
+        final pageJson = page.toJson();
+        if (pageExtras != null) {
+          for (final e in pageExtras.entries) {
+            if (e.key != 'pg_stay') pageJson[e.key] = e.value;
+          }
         }
+        envelope['page'] = pageJson;
       }
-      envelope['page'] = pageJson;
     }
     if (element != null) envelope['element'] = element.toJson();
     if (biz != null) envelope['biz'] = biz.toJson();

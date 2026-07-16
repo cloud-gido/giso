@@ -28,6 +28,7 @@ public final class Tracker {
     private var heartbeatInterval: TimeInterval
     private var lastHeartbeatTs = Date()
     private var heartbeatTimer: Timer?
+    private var appForeground = false
 
     @discardableResult
     public static func initialize(config: TrackerConfig) -> Tracker {
@@ -78,7 +79,11 @@ public final class Tracker {
                 flushInterval: (c["flush_interval_ms"] as? Double).map { $0 / 1000 } ?? self.config.flushInterval)
             if let hb = c["heartbeat_interval_ms"] as? Double {
                 DispatchQueue.main.async {
-                    self.heartbeatInterval = Self.clampHeartbeat(hb / 1000)
+                    let next = Self.clampHeartbeat(hb / 1000)
+                    if next != self.heartbeatInterval {
+                        self.heartbeatInterval = next
+                        if self.appForeground { self.startHeartbeat() }
+                    }
                 }
             }
         }.resume()
@@ -103,11 +108,21 @@ public final class Tracker {
 
     private func onHeartbeatTick() {
         let now = Date()
-        let dur = Int(now.timeIntervalSince(lastHeartbeatTs) * 1000)
+        if let event = heartbeatEvent(at: now) { queue.push(event) }
         lastHeartbeatTs = now
-        var page = pageContext()
-        page["fg_dur"] = max(0, dur)
-        emit("app_heartbeat", page: page)
+    }
+
+    /// 应用级心跳只携带本区间 fg_dur，不继承当前页面。
+    private func heartbeatEvent(at now: Date) -> [String: Any]? {
+        let dur = Int(now.timeIntervalSince(lastHeartbeatTs) * 1000)
+        guard dur > 0 else { return nil }
+        return [
+            "event": "app_heartbeat",
+            "log_id": UUID().uuidString.lowercased(),
+            "ctime": Int(now.timeIntervalSince1970 * 1000),
+            "common": common.snapshot(),
+            "page": ["fg_dur": dur],
+        ]
     }
 
     public func setUid(_ uid: String) { common.setUid(uid) }
@@ -269,6 +284,7 @@ public final class Tracker {
         let nc = NotificationCenter.default
         nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
+            self.appForeground = true
             self.common.onForeground()
             self.foregroundTs = Date()
             var ev: [String: Any] = [
@@ -282,9 +298,14 @@ public final class Tracker {
         }
         nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
+            self.appForeground = false
             self.stopHeartbeat()
-            var page = self.pageContext()
-            page["fg_dur"] = Int(Date().timeIntervalSince(self.foregroundTs) * 1000)
+            let now = Date()
+            let heartbeat = self.heartbeatEvent(at: now)
+            self.lastHeartbeatTs = .distantPast
+            let page: [String: Any] = [
+                "fg_dur": max(0, Int(now.timeIntervalSince(self.foregroundTs) * 1000))
+            ]
             var ev: [String: Any] = [
                 "event": "app_background",
                 "log_id": UUID().uuidString.lowercased(),
@@ -292,7 +313,7 @@ public final class Tracker {
                 "common": self.common.snapshot(),
                 "page": page,
             ]
-            self.queue.onBackground(ev)
+            self.queue.onBackground(ev, preceding: heartbeat.map { [$0] } ?? [])
         }
     }
 

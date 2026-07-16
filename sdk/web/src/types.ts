@@ -45,7 +45,8 @@ export interface CommonParams {
 }
 
 export interface PageContext {
-  pgid: string;
+  /** 页面事件必填；应用级 app_background / app_heartbeat 不携带。 */
+  pgid?: string;
   pg_params?: Params;
   ref_pgid?: string;
   ref_eid?: string;

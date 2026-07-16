@@ -52,10 +52,12 @@ final class EventQueue {
         }
     }
 
-    /// 退后台：写入 background，落盘并排空
-    func onBackground(_ event: [String: Any], timeout: TimeInterval = 2.5) {
+    /// 退后台：先写不足一个周期的心跳，再写 background，落盘并排空
+    func onBackground(_ event: [String: Any], preceding: [[String: Any]] = [],
+                      timeout: TimeInterval = 2.5) {
         runBlocking(timeout: timeout) {
             self.cancelTimer()
+            self.buffer.append(contentsOf: preceding)
             self.buffer.append(event)
             self.persistAll()
             self.flushAll(urgent: true)
