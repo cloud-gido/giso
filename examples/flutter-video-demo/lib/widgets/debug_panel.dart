@@ -119,7 +119,7 @@ class _DebugPanelState extends State<DebugPanel> {
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              'pgid: ${widget.pgid} · sdk=1.0.8',
+              'pgid: ${widget.pgid} · sdk=1.0.9',
               style: TextStyle(color: Colors.grey.shade400, fontSize: 11),
             ),
             Text(

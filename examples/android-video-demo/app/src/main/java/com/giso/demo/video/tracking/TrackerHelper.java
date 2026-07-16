@@ -67,7 +67,7 @@ public final class TrackerHelper {
         if (mode != null) {
             mode.setText((BuildConfig.TRACK_DEBUG ? "debug 实时上报" : "生产模式 · 攒批上报")
                     + " · env=" + BuildConfig.TRACK_ENV
-                    + " · sdk=1.0.8");
+                    + " · sdk=1.0.9");
         }
         if (copyDid != null) {
             copyDid.setOnClickListener(v -> {
