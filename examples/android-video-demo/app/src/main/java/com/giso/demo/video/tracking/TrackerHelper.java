@@ -17,10 +17,12 @@ import com.giso.demo.video.R;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-/** 演示辅助：读取 did、渲染联调面板、探测网关连通性。 */
+/** 演示辅助：读取 did / biz_did、渲染联调面板、探测网关连通性。 */
 public final class TrackerHelper {
     private static final String SP = "giso_tracker";
     private static final String KEY_DID = "did";
+    private static final String BIZ_SP = "video_biz";
+    private static final String KEY_BIZ_DID = "biz_did";
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     private TrackerHelper() { }
@@ -30,8 +32,14 @@ public final class TrackerHelper {
         return prefs.getString(KEY_DID, "");
     }
 
+    public static String bizDeviceId(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(BIZ_SP, Context.MODE_PRIVATE);
+        return prefs.getString(KEY_BIZ_DID, "");
+    }
+
     public static void bindDebugPanel(Context context, View root, String pageId) {
         TextView did = root.findViewById(R.id.debugDid);
+        TextView bizDid = root.findViewById(R.id.debugBizDid);
         TextView page = root.findViewById(R.id.debugPage);
         TextView appKey = root.findViewById(R.id.debugAppKey);
         TextView endpoint = root.findViewById(R.id.debugEndpoint);
@@ -40,8 +48,12 @@ public final class TrackerHelper {
         Button copyDid = root.findViewById(R.id.debugCopyDid);
 
         String didValue = deviceId(context);
+        String bizDidValue = bizDeviceId(context);
         if (did != null) {
             did.setText("did: " + (didValue.isEmpty() ? "（启动后生成）" : didValue));
+        }
+        if (bizDid != null) {
+            bizDid.setText("biz_did: " + (bizDidValue.isEmpty() ? "（未设置）" : bizDidValue));
         }
         if (page != null) {
             page.setText("pgid: " + pageId);
@@ -54,7 +66,8 @@ public final class TrackerHelper {
         }
         if (mode != null) {
             mode.setText((BuildConfig.TRACK_DEBUG ? "debug 实时上报" : "生产模式 · 攒批上报")
-                    + " · env=" + BuildConfig.TRACK_ENV);
+                    + " · env=" + BuildConfig.TRACK_ENV
+                    + " · sdk=1.0.8");
         }
         if (copyDid != null) {
             copyDid.setOnClickListener(v -> {

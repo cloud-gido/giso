@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _didKey = 'giso_did';
+const _bizDidKey = 'demo_biz_did';
 
 class DebugPanel extends StatefulWidget {
   const DebugPanel({
@@ -23,13 +24,14 @@ class DebugPanel extends StatefulWidget {
 
 class _DebugPanelState extends State<DebugPanel> {
   String _did = '';
+  String _bizDid = '';
   String _gatewayStatus = '网关: 检测中…';
   bool _gatewayOk = false;
 
   @override
   void initState() {
     super.initState();
-    _loadDid();
+    _loadIds();
     _probeGateway();
   }
 
@@ -41,9 +43,12 @@ class _DebugPanelState extends State<DebugPanel> {
     }
   }
 
-  Future<void> _loadDid() async {
+  Future<void> _loadIds() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _did = prefs.getString(_didKey) ?? '');
+    setState(() {
+      _did = prefs.getString(_didKey) ?? '';
+      _bizDid = prefs.getString(_bizDidKey) ?? '';
+    });
   }
 
   Future<void> _probeGateway() async {
@@ -108,7 +113,13 @@ class _DebugPanelState extends State<DebugPanel> {
               ],
             ),
             Text(
-              'pgid: ${widget.pgid}',
+              'biz_did: ${_bizDid.isEmpty ? '（未设置）' : _bizDid}',
+              style: TextStyle(color: Colors.grey.shade300, fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              'pgid: ${widget.pgid} · sdk=1.0.8',
               style: TextStyle(color: Colors.grey.shade400, fontSize: 11),
             ),
             Text(

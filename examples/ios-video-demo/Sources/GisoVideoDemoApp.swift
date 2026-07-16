@@ -14,6 +14,8 @@ struct GisoVideoDemoApp: App {
         cfg.debug = true
         cfg.env = "test"
         Tracker.initialize(config: cfg)
+        // 演示历史业务设备 ID → common.biz_did
+        Tracker.shared.setBizDid("biz-ios-demo-fixed")
     }
 
     var body: some Scene {

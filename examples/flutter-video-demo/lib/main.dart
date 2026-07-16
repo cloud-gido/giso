@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:giso_tracker/giso_tracker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'pages/detail_page.dart';
 import 'pages/feed_page.dart';
@@ -24,11 +25,19 @@ Future<void> main() async {
   await GisoTracker.instance.init(GisoConfig(
     appId: gisoAppKey,
     appKey: gisoAppKey,
-    appVersion: '1.0.5-demo',
+    appVersion: '1.0.8-demo',
     endpoint: gisoEndpoint,
     channel: gisoChannel,
     debug: kDebugMode,
   ));
+  // 历史无账号体系：业务自管设备 ID → common.biz_did
+  final prefs = await SharedPreferences.getInstance();
+  var bizDid = prefs.getString('demo_biz_did');
+  if (bizDid == null || bizDid.isEmpty) {
+    bizDid = 'biz-${DateTime.now().millisecondsSinceEpoch}';
+    await prefs.setString('demo_biz_did', bizDid);
+  }
+  GisoTracker.instance.setBizDid(bizDid);
   GisoLifecycleBinding.attach();
   runApp(const VideoDemoApp());
 }
