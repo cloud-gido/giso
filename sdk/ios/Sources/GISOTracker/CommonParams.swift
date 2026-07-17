@@ -3,7 +3,7 @@ import UIKit
 
 /// 公共参数采集：did 自生成持久化；session 前后台间隔 30 分钟重开。
 final class CommonParams {
-    private static let sdkVersion = "1.0.10"
+    private static let sdkVersion = "1.0.11"
     private static let didKey = "giso_tracker_did"
     private static let sessionGap: TimeInterval = 30 * 60
 

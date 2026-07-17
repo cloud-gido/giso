@@ -29,11 +29,12 @@ import java.util.zip.GZIPOutputStream;
 /**
  * 事件队列。
  *
- * <p>生命周期约定：
+ * <p>生命周期约定（对齐业界合规：主线程禁止网络、不拖垮 Activity 生命周期）：
  * <ul>
  *   <li>冷启动 spill 延后到首次 {@link #onForeground} 之后发送</li>
- *   <li>{@link #onBackground} 在调用线程同步落盘+发送（持 WakeLock），避免 OEM 挂起后发不出去</li>
- *   <li>{@link #onForeground}：先排空残留 → foreground → 释放 spill</li>
+ *   <li>{@link #onBackground}：主线程仅短时等待「入队+落盘」；HTTPS 在 worker 异步发送（持 WakeLock）</li>
+ *   <li>{@link #onForeground}：不阻塞主线程做网络；worker 上先排空残留 → foreground → 释放 spill</li>
+ *   <li>普通 {@link #push}/{@link #flush} 一律走 worker，禁止主线程 {@code HttpURLConnection}</li>
  * </ul>
  */
 final class EventQueue {
@@ -93,65 +94,74 @@ final class EventQueue {
     }
 
     /**
-     * 进前台（Activity.onStart）。可在主线程调用；内部切到 worker 并短时等待。
+     * 进前台（Activity.onStart）。可在主线程调用；立即返回，网络与 spill 回放在 worker。
      */
     void onForeground(TrackEvent foreground, long timeoutMs) {
-        runOnWorkerBlocking(timeoutMs, () -> {
-            flushAllLocked(false);
-            buffer.addLast(foreground);
-            if (config.debug) Log.d(TAG, foreground.event + " " + foreground.toJson());
-            flushAllLocked(false);
-            releaseSpillLocked();
+        // timeoutMs 保留与历史调用兼容；进前台不再阻塞主线程等待网络
+        worker.execute(() -> {
+            synchronized (lock) {
+                // 顺序：残留 → foreground → spill；均在 giso-tracker 线程，不触主线程网络
+                flushAllLocked(false);
+                buffer.addLast(foreground);
+                if (config.debug) Log.d(TAG, foreground.event + " " + foreground.toJson());
+                flushAllLocked(false);
+                releaseSpillLocked();
+            }
         });
     }
 
     /**
      * 退后台（Activity.onStop）。
      * <ol>
-     *   <li>先 barrier 等待 worker 把已排队的 page_exit 等事件写入 buffer</li>
-     *   <li>依次加入最后一个不足周期的 heartbeat、background</li>
-     *   <li>在调用线程持 WakeLock 同步落盘并发送，避免只投递异步任务后被 OEM 挂起</li>
+     *   <li>短时 barrier：等待已 submit 的 page_exit 等入队，并写入 heartbeat/background + 落盘</li>
+     *   <li>主线程不发起 HTTPS（避免 NetworkOnMainThreadException / ANR）</li>
+     *   <li>worker 持 WakeLock 异步 flush；失败保留 spill，下次前台补发</li>
      * </ol>
      */
     void onBackground(TrackEvent heartbeat, TrackEvent background, long timeoutMs) {
         long timeout = Math.max(2000L, timeoutMs);
-        // 让 exitPage 等已 submit 的 push 先入队
-        runOnWorkerBlocking(Math.min(800L, timeout / 3), () -> { /* queue barrier */ });
-
-        PowerManager.WakeLock wakeLock = null;
-        try {
-            PowerManager pm = (PowerManager) appContext.getSystemService(Context.POWER_SERVICE);
-            if (pm != null) {
-                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG);
-                wakeLock.setReferenceCounted(false);
-                wakeLock.acquire(timeout + 500L);
+        // 1) 主线程最多短暂等待：入队 + 本地落盘（无网络）。进程随后被杀也不丢这批事件。
+        runOnWorkerBlocking(Math.min(800L, timeout / 3), () -> {
+            cancelTimerLocked();
+            if (heartbeat != null) {
+                buffer.addLast(heartbeat);
+                if (config.debug) Log.d(TAG, heartbeat.event + " " + heartbeat.toJson());
             }
-        } catch (Exception e) {
-            Log.w(TAG, "wake lock acquire failed", e);
-        }
+            buffer.addLast(background);
+            if (config.debug) Log.d(TAG, background.event + " " + background.toJson());
+            persistAllLocked();
+            Log.i(TAG, "onBackground: persisted queue size=" + buffer.size());
+        });
 
-        long deadline = System.currentTimeMillis() + timeout;
-        try {
-            synchronized (lock) {
-                cancelTimerLocked();
-                if (heartbeat != null) {
-                    buffer.addLast(heartbeat);
-                    if (config.debug) Log.d(TAG, heartbeat.event + " " + heartbeat.toJson());
+        // 2) 异步发送：网络仅在 worker；WakeLock 也只包住 worker 发送窗口
+        final long deadline = System.currentTimeMillis() + timeout;
+        worker.execute(() -> {
+            PowerManager.WakeLock wakeLock = null;
+            try {
+                PowerManager pm = (PowerManager) appContext.getSystemService(Context.POWER_SERVICE);
+                if (pm != null) {
+                    wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG);
+                    wakeLock.setReferenceCounted(false);
+                    wakeLock.acquire(timeout + 500L);
                 }
-                buffer.addLast(background);
-                if (config.debug) Log.d(TAG, background.event + " " + background.toJson());
-                persistAllLocked();
-                Log.i(TAG, "onBackground: flushing queue size=" + buffer.size());
-                flushAllLockedUntil(deadline, true);
-                Log.i(TAG, "onBackground: done, remaining=" + buffer.size() + " spill=" + spill.size());
+            } catch (Exception e) {
+                Log.w(TAG, "wake lock acquire failed", e);
             }
-        } finally {
-            if (wakeLock != null && wakeLock.isHeld()) {
-                try {
-                    wakeLock.release();
-                } catch (Exception ignored) { }
+            try {
+                synchronized (lock) {
+                    Log.i(TAG, "onBackground: flushing queue size=" + buffer.size());
+                    flushAllLockedUntil(deadline, true);
+                    Log.i(TAG, "onBackground: done, remaining=" + buffer.size()
+                            + " spill=" + spill.size());
+                }
+            } finally {
+                if (wakeLock != null && wakeLock.isHeld()) {
+                    try {
+                        wakeLock.release();
+                    } catch (Exception ignored) { }
+                }
             }
-        }
+        });
     }
 
     void flush() {
@@ -195,7 +205,7 @@ final class EventQueue {
         Log.i(TAG, "releasing spill after foreground, count=" + spill.size());
         while (!spill.isEmpty()) {
             List<JSONObject> batch = pollSpillBatchLocked();
-            int status = sendJsonBatch(batch); // HTTP 在 lock 内：后台路径可接受；前台路径尽量快
+            int status = sendJsonBatch(batch); // HTTP 仅在 giso-tracker worker 线程
             if (isAccept(status)) {
                 backoffMs = 1000L;
             } else {

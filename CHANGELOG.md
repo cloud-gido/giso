@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.11] - 2026-07-17
+
+### Fixed
+
+- **Android 退后台合规 flush**：`onActivityStopped` 不再在主线程做 HTTPS（修复 `NetworkOnMainThreadException`）。主线程仅短时等待入队+本地落盘；网络在 `giso-tracker` 工作线程异步发送并短持 WakeLock。进前台同样不阻塞主线程做网络。对齐业界埋点 SDK：不拖垮生命周期、不主线程 IO 网络。
+
+---
+
 ## [1.0.10] - 2026-07-16
 
 ### Fixed
@@ -160,7 +168,8 @@ Initial open-source baseline (pre-SDK package publish).
 
 ---
 
-[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.10...HEAD
+[Unreleased]: https://github.com/cloud-gido/giso/compare/v1.0.11...HEAD
+[1.0.11]: https://github.com/cloud-gido/giso/releases/tag/v1.0.11
 [1.0.10]: https://github.com/cloud-gido/giso/releases/tag/v1.0.10
 [1.0.9]: https://github.com/cloud-gido/giso/releases/tag/v1.0.9
 [1.0.8]: https://github.com/cloud-gido/giso/releases/tag/v1.0.8

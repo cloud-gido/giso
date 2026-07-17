@@ -3,7 +3,7 @@
 > **读者**：拿不到 GISO 源码、只需集成埋点 SDK 的外部 App 团队（Android / iOS / Web）及负责发包的 GISO 平台同学。  
 > **原则**：只发**二进制包 + 配置 + 文档**，不发业务源码；登记与口径规则仍走 [06-接入指南](06-接入指南.md)。
 
-> **当前版本 1.0.10**：已对接 1.0.9 的团队看 **[18-SDK-1.0.10心跳修复说明](18-SDK-1.0.10心跳修复说明.md)**；仍在 1.0.8 的团队先看 [17-SDK-1.0.9升级说明](17-SDK-1.0.9升级说明.md)。
+> **当前版本 1.0.11（Android 切后台崩溃请看 [19-退后台合规](19-SDK-1.0.11退后台合规修复.md)）**：已对接 1.0.9 的团队看 **[18-SDK-1.0.10心跳修复说明](18-SDK-1.0.10心跳修复说明.md)**；仍在 1.0.8 的团队先看 [17-SDK-1.0.9升级说明](17-SDK-1.0.9升级说明.md)。
 
 ---
 
@@ -13,11 +13,11 @@
 
 | # | 交付物 | 示例 | 谁提供 |
 |---|--------|------|--------|
-| 1 | **SDK 版本号** | `1.0.10` | 平台（Git tag `v1.0.10` 触发 CI） |
-| 2 | **Android Maven 坐标** | `com.giso:tracker:1.0.10` | 平台 |
-| 3 | **Web npm 包名** | `@cloud-gido/giso-tracker-web@1.0.10` | 平台 |
-| 4 | **iOS 引用方式** | SwiftPM：`cloud-gido/giso`，tag `v1.0.10`，产品 `GISOTracker` | 平台 |
-| 4b | **Flutter 引用方式** | Git：`giso_tracker` @ tag `v1.0.10`，path `sdk/flutter/giso_tracker` | 平台 |
+| 1 | **SDK 版本号** | `1.0.11` | 平台（Git tag `v1.0.11` 触发 CI） |
+| 2 | **Android Maven 坐标** | `com.giso:tracker:1.0.11` | 平台 |
+| 3 | **Web npm 包名** | `@cloud-gido/giso-tracker-web@1.0.11` | 平台 |
+| 4 | **iOS 引用方式** | SwiftPM：`cloud-gido/giso`，tag `v1.0.11`，产品 `GISOTracker` | 平台 |
+| 4b | **Flutter 引用方式** | Git：`giso_tracker` @ tag `v1.0.11`，path `sdk/flutter/giso_tracker` | 平台 |
 | 5 | **私有仓库读权限** | GitHub PAT（`read:packages`）或组织成员身份 | 平台开通 |
 | 6 | **上报 endpoint** | `https://gamelinelab-giso.envir.dev/v1/track` | 平台（测试）；生产另给域名 |
 | 7 | **远程配置 URL** | 同上域名，`GET /v1/config`（SDK 自动拉） | 平台 |
@@ -80,7 +80,7 @@ gpr.key=ghp_xxxxxxxx  # read:packages
 
 ```gradle
 dependencies {
-    implementation 'com.giso:tracker:1.0.10'
+    implementation 'com.giso:tracker:1.0.11'
 }
 ```
 
@@ -95,7 +95,7 @@ dependencies {
 
 ```bash
 export GITHUB_TOKEN=ghp_xxxxxxxx   # read:packages
-npm install @cloud-gido/giso-tracker-web@1.0.10
+npm install @cloud-gido/giso-tracker-web@1.0.11
 ```
 
 ### 3.4 iOS（SwiftPM）
@@ -103,19 +103,19 @@ npm install @cloud-gido/giso-tracker-web@1.0.10
 Xcode → **File → Add Package Dependencies**：
 
 - URL：`https://github.com/cloud-gido/giso.git`
-- Dependency Rule：**Exact Version** `1.0.10`（对应 tag `v1.0.10`）
+- Dependency Rule：**Exact Version** `1.0.11`（对应 tag `v1.0.11`）
 
 或 `Package.swift`：
 
 ```swift
-.package(url: "https://github.com/cloud-gido/giso.git", exact: "1.0.10")
+.package(url: "https://github.com/cloud-gido/giso.git", exact: "1.0.11")
 ```
 
 > iOS 当前为**源码 target 按 tag 分发**（仍无需业务方接触 Gateway 等服务端代码）。后续可改为 XCFramework 二进制 target，坐标不变。
 
 ### 3.5 Flutter（Dart / git path）
 
-GitHub（推荐）或 GitLab 镜像，**与 Android/iOS 同一 Git tag**（如 `v1.0.10`）：
+GitHub（推荐）或 GitLab 镜像，**与 Android/iOS 同一 Git tag**（如 `v1.0.11`）：
 
 ```yaml
 # pubspec.yaml
@@ -123,7 +123,7 @@ dependencies:
   giso_tracker:
     git:
       url: https://github.com/cloud-gido/giso.git
-      ref: v1.0.10
+      ref: v1.0.11
       path: sdk/flutter/giso_tracker
 ```
 
@@ -329,7 +329,7 @@ git push origin v1.0.0
 
 ### Q6. 版本记录在哪？
 
-[CHANGELOG.md](../../CHANGELOG.md) · 当前 SDK **1.0.10**（tag `v1.0.10`）。
+[CHANGELOG.md](../../CHANGELOG.md) · 当前 SDK **1.0.11**（tag `v1.0.11`）。
 
 ### Q7. 没有 GitHub 账号怎么办？
 
@@ -358,14 +358,14 @@ git push origin v1.0.0
 ## 十一、对接邮件 / 飞书模板（复制即用）
 
 ```
-【GISO SDK 对接包 v1.0.10】
+【GISO SDK 对接包 v1.0.11】
 
 一、SDK
-- Android: com.giso:tracker:1.0.10
+- Android: com.giso:tracker:1.0.11
   仓库: https://maven.pkg.github.com/cloud-gido/giso
-- iOS: SwiftPM cloud-gido/giso tag v1.0.10, product GISOTracker
-- Web: @cloud-gido/giso-tracker-web@1.0.10
-- Flutter: giso_tracker @ git tag v1.0.10, path sdk/flutter/giso_tracker
+- iOS: SwiftPM cloud-gido/giso tag v1.0.11, product GISOTracker
+- Web: @cloud-gido/giso-tracker-web@1.0.11
+- Flutter: giso_tracker @ git tag v1.0.11, path sdk/flutter/giso_tracker
 
 二、环境与密钥
 - Endpoint: https://gamelinelab-giso.envir.dev/v1/track
@@ -379,6 +379,7 @@ git push origin v1.0.0
 四、文档
 - 升级说明（1.0.8→1.0.9）: docs/tracking/17-SDK-1.0.9升级说明.md
 - 心跳修复（1.0.9→1.0.10）: docs/tracking/18-SDK-1.0.10心跳修复说明.md
+- 退后台合规（→1.0.11）: docs/tracking/19-SDK-1.0.11退后台合规修复.md
 - 分发说明: docs/tracking/13-SDK分发与版本.md
 - 接入步骤: docs/tracking/06-接入指南.md
 - FAQ: docs/tracking/08-接入常见问题FAQ.md

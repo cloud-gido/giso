@@ -16,7 +16,7 @@ import java.util.UUID;
 
 /** 公共参数采集：did 自生成持久化；session 前后台间隔 30min 重开。 */
 final class CommonParams {
-    private static final String SDK_VERSION = "1.0.10";
+    private static final String SDK_VERSION = "1.0.11";
     private static final String SP_NAME = "giso_tracker";
     private static final String KEY_DID = "did";
     private static final long SESSION_GAP_MS = 30 * 60 * 1000L;

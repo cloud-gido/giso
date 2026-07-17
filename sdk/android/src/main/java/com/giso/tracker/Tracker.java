@@ -334,7 +334,7 @@ public final class Tracker {
                     JSONObject page = new JSONObject();
                     try { page.put("fg_dur", Math.max(0L, now - foregroundTs)); }
                     catch (JSONException ignored) { }
-                    // 主线程同步 flush + WakeLock；超时加长以应对弱网 / OEM
+                    // 主线程只做入队+落盘等待；HTTPS 异步（合规，避免 NetworkOnMainThreadException）
                     queue.onBackground(
                             heartbeat,
                             TrackEvent.of("app_background", common.snapshot(), page, null, null),
