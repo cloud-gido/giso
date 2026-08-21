@@ -1,7 +1,10 @@
 ARG NODE_IMAGE=node:20-alpine
 ARG NGINX_IMAGE=nginx:alpine
 
-FROM ${NODE_IMAGE} AS build
+# 静态资源与 CPU 架构无关：在 builder 本机架构跑 npm，避免 QEMU 交叉编译 arm64 时
+# `Illegal instruction`（CI buildx multi-platform 常见问题）。
+ARG BUILDPLATFORM
+FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS build
 WORKDIR /src
 COPY sdk/web ./sdk/web
 COPY examples/web-news-demo ./examples/web-news-demo
