@@ -17,7 +17,7 @@ import javax.sql.DataSource;
  * PostgreSQL 结构迁移：按版本号严格顺序执行，每条脚本仅运行一次。
  * <p>
  * 顺序：V1 注册表 → V2 账号 → V3 审批 → V4 空间 → V5 注册表按空间隔离。
- * 数据类同步（如 default→longvideo 注册表）在 bootstrap 之后单独执行，不占用版本号。
+ * 数据类同步（如 default→longvideo / sports 注册表）在 bootstrap 之后单独执行，不占用版本号。
  */
 public final class DbMigrator {
     private static final List<Migration> MIGRATIONS = List.of(
@@ -32,6 +32,8 @@ public final class DbMigrator {
 
     /** default → longvideo 注册表复制（幂等）；须在 V5 之后且 default 有数据时执行。 */
     public static final String SYNC_LONGVIDEO_SQL = "/db/sync_longvideo_registry.sql";
+    /** default → sports 注册表复制（幂等）。 */
+    public static final String SYNC_SPORTS_SQL = "/db/sync_sports_registry.sql";
 
     private final DataSource ds;
     private final String dbSchema;
@@ -60,6 +62,13 @@ public final class DbMigrator {
             throw new SQLException("cannot sync longvideo registry before V5 (registry_space) is applied");
         }
         runScript(SYNC_LONGVIDEO_SQL);
+    }
+
+    public void syncDefaultRegistryToSports() throws IOException, SQLException {
+        if (!isApplied(5)) {
+            throw new SQLException("cannot sync sports registry before V5 (registry_space) is applied");
+        }
+        runScript(SYNC_SPORTS_SQL);
     }
 
     private void ensureMigrationsTable() throws SQLException {

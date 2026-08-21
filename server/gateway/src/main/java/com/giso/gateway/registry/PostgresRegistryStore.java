@@ -56,6 +56,7 @@ public final class PostgresRegistryStore implements RegistryStore {
         migrator.migrate();
         store.bootstrapIfEmpty();
         migrator.syncDefaultRegistryToLongvideo();
+        migrator.syncDefaultRegistryToSports();
         return store;
     }
 
@@ -154,6 +155,7 @@ public final class PostgresRegistryStore implements RegistryStore {
                 insertAudit(c, spaceKey, kind, key, action, before, item, operator);
                 if (SpaceService.DEFAULT_SPACE.equals(spaceKey)) {
                     mirrorUpsert(c, "longvideo", kind, key, bodyJson, status, operator);
+                    mirrorUpsert(c, "sports", kind, key, bodyJson, status, operator);
                 }
                 long revision = bumpRevision(c);
                 notifyReload(c, revision);
@@ -194,6 +196,7 @@ public final class PostgresRegistryStore implements RegistryStore {
                 insertAudit(c, spaceKey, kind, key, "delete", before, null, operator);
                 if (SpaceService.DEFAULT_SPACE.equals(spaceKey)) {
                     mirrorDelete(c, "longvideo", kind, key, operator);
+                    mirrorDelete(c, "sports", kind, key, operator);
                 }
                 long revision = bumpRevision(c);
                 notifyReload(c, revision);

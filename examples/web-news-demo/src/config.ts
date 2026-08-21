@@ -1,5 +1,6 @@
 /** 上报配置：可通过 .env.local 覆盖；未配置时按当前页面 host 推断网关（方便局域网） */
-export const APP_KEY = import.meta.env.VITE_APP_KEY || 'demo-key';
+/** sports-* → 体育空间；勿用 video-*（会进 longvideo） */
+export const APP_KEY = import.meta.env.VITE_APP_KEY || 'sports-web-beta';
 export const APP_VERSION = '1.0.0-news-demo';
 
 function defaultEndpoint(): string {

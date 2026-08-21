@@ -25,6 +25,22 @@
 }
 .meta-pill.mono { font-family: var(--mono); }
 .meta-time { color: var(--faint); font-size: 11.5px; margin-left: 4px; }
+.ev-copy {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; margin-left: 2px; padding: 0;
+  border: 1px solid transparent; border-radius: 8px;
+  background: transparent; color: var(--muted); cursor: pointer;
+  opacity: .55; transition: opacity .12s, color .12s, border-color .12s, background .12s;
+}
+.ev:hover .ev-copy, .ev.open .ev-copy { opacity: 1; }
+.ev-copy:hover {
+  border-color: var(--border); background: var(--panel2); color: var(--accent);
+}
+.ev-copy.copied {
+  opacity: 1; border-color: transparent; background: var(--green-soft); color: var(--green);
+}
+.ev-copy svg { width: 14px; height: 14px; display: block; }
 .ev-body { display: none; border-top: 1px solid var(--border); padding: 12px 14px; background: #fbfcfe; }
 .ev.open .ev-body { display: block; }
 .issues { margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; }

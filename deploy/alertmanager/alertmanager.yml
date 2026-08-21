@@ -28,13 +28,14 @@ receivers:
 
   - name: lark
     webhook_configs:
-      # 部署 deploy/lark-webhook 或替换为内网 adapter 地址
-      - url: ${LARK_WEBHOOK_ADAPTER:-http://lark-webhook:8080/webhook}
+      # Alertmanager 不支持 shell ${VAR}；compose 内用 lark-webhook 服务
+      - url: http://lark-webhook:8080/webhook
         send_resolved: true
 
   - name: slack-critical
     slack_configs:
-      - api_url: ${SLACK_WEBHOOK_URL}
+      # 本地默认丢弃；生产请换成真实 Slack Incoming Webhook
+      - api_url: http://127.0.0.1:65535/discard
         channel: '#giso-alerts'
         send_resolved: true
         title: '{{ .GroupLabels.alertname }}'

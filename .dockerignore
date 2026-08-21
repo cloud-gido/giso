@@ -9,5 +9,6 @@
 **/.DS_Store
 examples/web-news-demo/node_modules
 deploy/.env
+**/.env.local
 **/*.md
 !deploy/README.md

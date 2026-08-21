@@ -1,0 +1,5 @@
+# 本地临时覆盖：本机 5433 已被 dataease-pgsql 占用
+services:
+  postgres:
+    ports: !override
+      - "5434:5432"

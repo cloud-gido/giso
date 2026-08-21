@@ -1,11 +1,13 @@
 /* 实时联调：SSE 事件流 + 过滤 + 状态计数 */
-import { $, fmtTime, esc, toast } from '../util.js';
+import { $, fmtTime, esc, toast, copyText } from '../util.js';
 import { api, connectSSE, disconnectSSE, getSpace } from '../api.js';
 import { t } from '../i18n.js';
 
 const counts = { ok: 0, missing: 0, error: 0 };
 const MAX_ROWS = 300;
 const STATUS_TEXT = { ok: '正常', missing: '缺失', error: '错误' };
+const COPY_ICON = '<svg aria-hidden="true"><use href="#ico-copy"/></svg>';
+const CHECK_ICON = '<svg aria-hidden="true"><use href="#ico-check"/></svg>';
 
 function targetOf(d) {
   switch (d.event) {
@@ -32,6 +34,7 @@ function passFilter(w) {
 function renderEvent(w, prepend = true) {
   if (!passFilter(w)) return;
   const d = w.data || {};
+  const jsonText = JSON.stringify(d, null, 2);
   const div = document.createElement('div');
   div.className = 'ev ' + w.status;
   const issues = (w.issues || []).map((i) =>
@@ -48,12 +51,31 @@ function renderEvent(w, prepend = true) {
         <span class="meta-pill mono">pg:${esc(d.page?.pgid || '-')}</span>
         <span class="meta-time">${fmtTime(w.stime)}</span>
       </span>
+      <button type="button" class="ev-copy" title="复制 JSON" aria-label="复制 JSON">${COPY_ICON}</button>
     </div>
     <div class="ev-body">
       ${issues ? `<div class="issues">${issues}</div>` : ''}
-      <pre>${esc(JSON.stringify(d, null, 2))}</pre>
+      <pre>${esc(jsonText)}</pre>
     </div>`;
   div.querySelector('.ev-head').onclick = () => div.classList.toggle('open');
+  const copyBtn = div.querySelector('.ev-copy');
+  copyBtn.onclick = async (e) => {
+    e.stopPropagation();
+    try {
+      await copyText(jsonText);
+      copyBtn.classList.add('copied');
+      copyBtn.innerHTML = CHECK_ICON;
+      copyBtn.title = '已复制';
+      toast('已复制事件 JSON');
+      setTimeout(() => {
+        copyBtn.classList.remove('copied');
+        copyBtn.innerHTML = COPY_ICON;
+        copyBtn.title = '复制 JSON';
+      }, 1600);
+    } catch {
+      toast('复制失败，请手动选中 JSON', 'error');
+    }
+  };
   const list = $('#event-list');
   prepend ? list.prepend(div) : list.append(div);
   while (list.children.length > MAX_ROWS) list.lastChild.remove();

@@ -33,7 +33,7 @@ registry:
     schema: public
 
 auth:
-  app_keys: [demo-key]
+  app_keys: [demo-key, sports-web-beta]
   admin_user: admin
   admin_password: admin123
   viewer_user: viewer

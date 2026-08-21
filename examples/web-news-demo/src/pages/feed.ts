@@ -2,8 +2,19 @@ import { Elements, Pages, Params, Tracker } from '@giso/tracker-web';
 import { articlesByCat, NEWS_CATEGORIES, type NewsArticle } from '../catalog';
 import { navigate } from '../router';
 
+/** localhost 为安全上下文有 randomUUID；局域网 HTTP IP 没有，需降级 */
+function newId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 export function renderFeed(root: HTMLElement, cat: string, onPgid: (pgid: string) => void): () => void {
-  const recTraceId = `rec-${crypto.randomUUID()}`;
+  const recTraceId = `rec-${newId()}`;
   let currentCat = cat;
 
   root.innerHTML = `

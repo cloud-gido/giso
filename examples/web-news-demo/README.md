@@ -49,9 +49,11 @@ docker compose --profile demo up -d news-web-demo --build
 
 ### 3. 管理台联调
 
-1. 打开 http://localhost:8123/admin/ → **实时联调**
+1. 打开 http://localhost:8123/admin/ → 空间切到 **体育 / sports** → **实时联调**
 2. 点击 Demo 底部 **复制 did**，粘贴到过滤框
 3. 操作：切换分类 Tab → 点击资讯卡片 → 滚动阅读 → 点相关推荐 → 返回
+
+预期：事件 `common.space` 为 `sports`（App Key `sports-web-beta`）。
 
 预期事件示例：
 
@@ -93,8 +95,11 @@ VITE_TRACK_DEBUG=true
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `VITE_TRACK_ENDPOINT` | `http://localhost:8123/v1/track` | 网关上报地址 |
+| `VITE_APP_KEY` | `sports-web-beta` | `sports-*` → 空间 **sports**（勿用 `video-*`，会进 longvideo） |
+| `VITE_TRACK_ENDPOINT` | 按页面 host 推断 `:8123/v1/track` | 网关上报地址 |
 | `VITE_TRACK_DEBUG` | `true` | `false` 关闭 debug 实时上报 |
+
+联调时请在管理台切到 **体育 / sports** 空间查看事件。
 
 ## 工程结构
 
